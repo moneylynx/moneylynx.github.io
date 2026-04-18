@@ -417,7 +417,8 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
 
   useEffect(() => {
     if (sec.bioEnabled && sec.bioCredId && window.PublicKeyCredential) {
-      setTimeout(tryBio, 500);
+      const id = setTimeout(tryBio, 500);
+      return () => clearTimeout(id);
     }
   }, [sec.bioEnabled, sec.bioCredId, tryBio]);
 
@@ -1736,11 +1737,11 @@ function ShareModal({ C, txs, year, user, onClose, t, lang }) {
   };
 
   const channels=[
-    {lb:"E-mail",   ic:"mail",  col:"#EA4335", fn:()=>window.open(`mailto:${user.email||""}?subject=${subj}&body=${body}`)},
-    {lb:"WhatsApp", ic:"share", col:"#25D366", fn:()=>window.open(`https://wa.me/?text=${encodeURIComponent(sumTxt)}`)},
-    {lb:"Telegram", ic:"share", col:"#2AABEE", fn:()=>window.open(`https://t.me/share/url?url=&text=${encodeURIComponent(sumTxt)}`)},
-    {lb:"Viber",    ic:"phone", col:"#7360F2", fn:()=>window.open(`viber://forward?text=${encodeURIComponent(sumTxt.slice(0,1000))}`)},
-    {lb:"SMS",      ic:"phone", col:"#4CAF50", fn:()=>window.open(`sms:?body=${encodeURIComponent(sumTxt.slice(0,500))}`)},
+    {lb:"E-mail",   ic:"mail",  col:"#EA4335", fn:()=>window.open(`mailto:${encodeURIComponent(user.email||"")}?subject=${subj}&body=${body}`, "_blank", "noopener,noreferrer")},
+    {lb:"WhatsApp", ic:"share", col:"#25D366", fn:()=>window.open(`https://wa.me/?text=${encodeURIComponent(sumTxt)}`, "_blank", "noopener,noreferrer")},
+    {lb:"Telegram", ic:"share", col:"#2AABEE", fn:()=>window.open(`https://t.me/share/url?url=&text=${encodeURIComponent(sumTxt)}`, "_blank", "noopener,noreferrer")},
+    {lb:"Viber",    ic:"phone", col:"#7360F2", fn:()=>window.open(`viber://forward?text=${encodeURIComponent(sumTxt.slice(0,1000))}`, "_blank", "noopener,noreferrer")},
+    {lb:"SMS",      ic:"phone", col:"#4CAF50", fn:()=>window.open(`sms:?body=${encodeURIComponent(sumTxt.slice(0,500))}`, "_blank", "noopener,noreferrer")},
     {lb:copied?t("Kopirano!"):t("Kopiraj"), ic:copied?"check":"copy", col:copied?C.income:C.accent, fn:cp},
     {lb:t("Preuzmi"),  ic:"dl",    col:C.warning, fn:dl},
   ];
