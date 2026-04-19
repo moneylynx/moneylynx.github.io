@@ -105,6 +105,22 @@ const EN_DICT = {
   "Za platiti ovog mjeseca": "To pay this month",
   "Redovno": "Recurring",
   "Prikaži sve": "Show all",
+  "Budžet limiti": "Budget Limits", "Postavi budžet limite": "Set Budget Limits",
+  "Limit (€/mj.)": "Limit (€/mo.)", "Bez limita": "No limit",
+  "Upozorenje: budžet": "Budget warning",
+  "Trošak bi premašio limit za kategoriju": "This expense would exceed the budget limit for",
+  "Dosad potrošeno": "Spent so far", "Limit": "Limit", "Prekoračenje": "Overspent",
+  "Budžet limiti po kategoriji": "Budget Limits per Category",
+  "Postavi mj. limit za svaku kategoriju troškova.": "Set a monthly limit for each expense category.",
+  "Prethodna": "Previous", "Sljedeća": "Next",
+  "Bit ćeš upozoren/a pri unosu troška koji bi prešao limit.": "You will be warned when adding an expense that would exceed the limit.",
+  "Sve godine": "All years", "Izvezi godinu": "Export year",
+  "Biometrija uspješna. Unesi PIN jednom za ovu sesiju.": "Biometrics successful. Enter PIN once for this session.",
+  "Dospjelo": "Overdue",
+  "Prikazuje neplaćene stavke s rokom do danas (tekući + prošli mjeseci)": "Shows unpaid items due up to today (current + past months)",
+  "Trend 3g.": "3yr Trend",
+  "Primici vs Troškovi — 3 godine": "Income vs Expenses — 3 years",
+  "Godišnji saldo — 3 godine": "Annual Balance — 3 years",
   "O aplikaciji": "About",
   "Pomoć": "Help",
   "Licencni uvjeti": "Licence Terms",
@@ -142,6 +158,7 @@ const DEF_LISTS = {
   payments:   ["Gotovina","Kartica (debitna)","Kreditna kartica","Bankovni prijenos","Online plaćanje"],
   statuses:   ["Plaćeno","Čeka plaćanje","U obradi"],
   recurring:  [],
+  budgets:    {}, // { "Hrana": 400, "Zabava": 100, ... } — monthly limits per category
 };
 
 const T = {
@@ -271,7 +288,31 @@ const loadAndDecryptAll = async (key, defLists) => {
 };
 
 
-// ─── Capacitor native bridge (only when running inside the APK) ──────────────
+// ─── Session key cache ────────────────────────────────────────────────────────
+// After successful PIN+crypto unlock, we export the AES key to sessionStorage
+// so that biometric unlock within the same session can skip the PIN entirely.
+// sessionStorage is cleared automatically when the browser tab / app is closed,
+// making it safe for short-term key caching.
+const SESSION_KEY = "ml_sk";
+
+const cacheKeyToSession = async (key) => {
+  try {
+    const raw = await crypto.subtle.exportKey("raw", key);
+    sessionStorage.setItem(SESSION_KEY, bytesToB64(new Uint8Array(raw)));
+  } catch { /* non-critical */ }
+};
+
+const loadKeyFromSession = async () => {
+  try {
+    const b64 = sessionStorage.getItem(SESSION_KEY);
+    if (!b64) return null;
+    return crypto.subtle.importKey("raw", b64ToBytes(b64), { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
+  } catch { return null; }
+};
+
+const clearSessionKey = () => {
+  try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+};
 // The web build stays plain: if @capacitor/* packages aren't installed, these
 // imports silently fail and we fall back to Web Share/download paths.
 const isCapacitor = () =>
@@ -537,12 +578,15 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
           timeout: 60000
         }
       });
-      // Biometry can't provide the PIN, so it can't decrypt data.
-      // Show a helpful message if the vault is encrypted.
-      if (sec.pinHashVersion === "v2") {
-        setErr(t("Biometrija uspješna. Unesi PIN za dešifriranje podataka."));
+      // Biometry passed. Check whether we have a cached session key.
+      // If yes → unlock fully without PIN. If no → prompt for PIN.
+      const cachedKey = await loadKeyFromSession();
+      if (sec.pinHashVersion === "v2" && !cachedKey) {
+        // Encrypted vault, no session cache → user must enter PIN once this session.
+        setErr(t("Biometrija uspješna. Unesi PIN jednom za ovu sesiju."));
       } else {
-        onUnlock(null, false, true); // legacy: biometry only, no crypto
+        // Either: cached key exists (skip PIN) OR no encryption at all.
+        onUnlock(null, false, true);
       }
     } catch { setErr(t("Biometrija otkazana ili neuspješna.")); }
   }, [onUnlock, sec, t]);
@@ -877,7 +921,7 @@ export default function App() {
   const [showActionHub, setShowActionHub] = useState(false);
 
   // Filters
-  const [txFilter, setTxFilter]           = useState("Čeka plaćanje");
+  const [txFilter, setTxFilter]           = useState("pending");
   const [statTab, setStatTab]             = useState("expected");
   const [statMonth, setStatMonth]         = useState("YEAR");
   const [statExpFilter, setStatExpFilter] = useState({recurring:true, rate:true, kredit:true, processing:true});
@@ -1029,6 +1073,7 @@ export default function App() {
         setTxs(data.txs); setDrafts(data.drafts); setLists(data.lists); setUser(data.user);
       }
       setEncKey(key);
+      await cacheKeyToSession(key);
       setUnlocked(true);
     } catch (e) {
       console.error("Crypto unlock failed:", e);
@@ -1045,6 +1090,7 @@ export default function App() {
     await encryptAndSaveAll(key, { txs, drafts, lists, user });
     setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0, lockedUntil:null }));
     setEncKey(key);
+    await cacheKeyToSession(key);
     setSetupMode(false);
   };
 
@@ -1057,6 +1103,7 @@ export default function App() {
     await encryptAndSaveAll(newKey, { txs, drafts, lists, user });
     setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0 }));
     setEncKey(newKey);
+    await cacheKeyToSession(newKey);
   };
 
   // Called after PIN verified during removal — save all data as plaintext.
@@ -1067,6 +1114,7 @@ export default function App() {
     save(K.usr, user);
     setSec(v => ({ ...v, pinHash:null, pinSalt:null, encSalt:null, pinHashVersion:null, attempts:0, totalFailed:0 }));
     setEncKey(null);
+    clearSessionKey();
   };
 
 
@@ -1192,11 +1240,20 @@ export default function App() {
     <LockScreen C={C} sec={sec} t={t}
       onUnlock={async (pin, isLegacy, bioOnly) => {
         if (bioOnly) {
-          // Biometry path without encryption (legacy v1 or no-enc).
-          updS({attempts:0, lockedUntil:null});
-          setTxs(load(K.db,[])); setDrafts(load(K.drf,[]));
-          setLists(load(K.lst,DEF_LISTS)); setUser(load(K.usr,{}));
-          setUnlocked(true);
+          // Biometry path: try to restore AES key from sessionStorage first.
+          const cachedKey = await loadKeyFromSession();
+          if (cachedKey) {
+            // Session has a cached key — decrypt data and unlock without PIN.
+            const data = await loadAndDecryptAll(cachedKey, DEF_LISTS);
+            setTxs(data.txs); setDrafts(data.drafts); setLists(data.lists); setUser(data.user);
+            setEncKey(cachedKey);
+            updS({attempts:0, lockedUntil:null});
+            setUnlocked(true);
+          } else {
+            // No cached key — biometry passed but we still need PIN to decrypt.
+            // LockScreen will surface the PIN form with a helpful message.
+            // (This happens on first unlock of a new session.)
+          }
           return;
         }
         await handleCryptoUnlock(pin, isLegacy);
@@ -1249,9 +1306,9 @@ export default function App() {
         </div>
       )}
 
-      {page==="dashboard"    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} onQuickAdd={()=>setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg}/>}
-      {page==="add"          && <TxForm {...shared} draft={draftEdit} setLists={setLists} onSubmit={tx=>{ addTx(tx); if(draftEdit){ setDrafts(p=>p.filter(d=>d.id!==draftEdit.id)); setDraftEdit(null); } }} onCancel={()=>{ setPage("dashboard"); setDraftEdit(null); }} onGoRecurring={()=>setPage("recurring")}/>}
-      {page==="edit"         && <TxForm {...shared} tx={txs.find(x=>x.id===editId)} setLists={setLists} onSubmit={updTx} onCancel={()=>{ setEditId(null); setPage("transactions"); }}/>}
+      {page==="dashboard"    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} setTxFilter={setTxFilter} onQuickAdd={()=>setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg}/>}
+      {page==="add"          && <TxForm {...shared} txs={txs} draft={draftEdit} setLists={setLists} onSubmit={tx=>{ addTx(tx); if(draftEdit){ setDrafts(p=>p.filter(d=>d.id!==draftEdit.id)); setDraftEdit(null); } }} onCancel={()=>{ setPage("dashboard"); setDraftEdit(null); }} onGoRecurring={()=>setPage("recurring")}/>}
+      {page==="edit"         && <TxForm {...shared} txs={txs} tx={txs.find(x=>x.id===editId)} setLists={setLists} onSubmit={updTx} onCancel={()=>{ setEditId(null); setPage("transactions"); }}/>}
       {page==="transactions" && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id=>{ setEditId(id); setPage("edit"); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id=>setTxs(p=>p.map(x=>x.id===id?{...x,status:"Plaćeno",date:new Date().toISOString().split("T")[0]}:x))}/>}
       {page==="charts"       && <Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/>}
       {page==="recurring"    && <RecurringScreen {...shared} data={txs} setTxs={setTxs} onBack={()=>setPage("dashboard")}/>}
@@ -1321,7 +1378,7 @@ export default function App() {
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t, lang, prefs, updPrefs, setSubPg }) {
+function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg }) {
   const cmIdx = curMonthIdx();
   const cm  = MONTHS[cmIdx]; 
   const cmName = lang==="en" ? MONTHS_EN[cmIdx] : cm;
@@ -1507,8 +1564,8 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
         <div className="su" style={{ background:`linear-gradient(135deg,${C.accent}22,${bal>=0?C.income:C.expense}18)`, border:`1px solid ${bal>=0?C.income:C.expense}40`, borderRadius:18, padding:"16px 18px 16px 16px", marginBottom:10, position:"relative", overflow:"hidden" }}>
           <div style={{ position:"absolute", top:12, right:18, textAlign:"right" }}>
             <div style={{ fontSize:10, fontWeight:700, color:C.textSub, letterSpacing:.3 }}>{wd}</div>
-            <div style={{ fontSize:13, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.textSub }}>{dd}.{mm}.</div>
-            <div style={{ fontSize:10, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.textMuted, marginTop:1 }}>{yy}.</div>
+            <div style={{ fontSize:13, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.textSub, marginRight:-6 }}>{dd}.{mm}.</div>
+            <div style={{ fontSize:10, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.textMuted, marginTop:1, marginRight:-6 }}>{yy}.</div>
           </div>
           <div style={{ fontSize:11, color:C.textSub, marginBottom:4, textAlign:"left" }}>{t("Bilanca")} {year}.</div>
           <div style={{ fontSize:28, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:bal>=0?C.income:C.expense, textAlign:"left", paddingRight:65 }}>{fmtEur(bal)}</div>
@@ -1563,21 +1620,23 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
               </div>
             )}
 
-            {/* Za platiti ovog mjeseca — ograničeno na 4 stavke da nema skrolanja */}
+            {/* Za platiti ovog mjeseca — fiksni header/footer, skrolabili srednji dio */}
             {todoItems.length > 0 && (
-              <div className="su" style={{ background:C.card, border:`1px solid ${C.warning}40`, borderLeft:`4px solid ${C.warning}`, borderRadius:14, padding:"10px 12px", marginBottom:10 }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+              <div className="su" style={{ background:C.card, border:`1px solid ${C.warning}40`, borderLeft:`4px solid ${C.warning}`, borderRadius:14, marginBottom:10, display:"flex", flexDirection:"column", maxHeight:320, overflow:"hidden" }}>
+                {/* Fiksni header */}
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 12px 8px", flexShrink:0 }}>
                   <div style={{ fontSize:11, fontWeight:600, color:C.warning, display:"flex", alignItems:"center", gap:5 }}>
                     <Ic n="coins" s={12} c={C.warning}/>{t("Za platiti ovog mjeseca")}
-                    {todoItems.length > 4 && <span style={{ background:`${C.warning}25`, borderRadius:10, padding:"1px 7px", fontSize:10, fontWeight:700, color:C.warning }}>+{todoItems.length-4}</span>}
+                    {todoItems.length > 0 && <span style={{ background:`${C.warning}25`, borderRadius:10, padding:"1px 7px", fontSize:10, fontWeight:700, color:C.warning }}>{todoItems.length}</span>}
                   </div>
                   <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.warning }}>
                     {fmtEur(todoItems.reduce((s,i)=>s+i.amount,0))}
                   </div>
                 </div>
-                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                  {todoItems.slice(0, 4).map(item => (
-                    <div key={item.kind+"-"+item.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 9px", background:C.cardAlt, borderRadius:9, border:`1px solid ${C.border}` }}>
+                {/* Skrolabili srednji dio — sve stavke */}
+                <div style={{ overflowY:"auto", flex:1, padding:"0 12px", display:"flex", flexDirection:"column", gap:6 }}>
+                  {todoItems.map(item => (
+                    <div key={item.kind+"-"+item.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 9px", background:C.cardAlt, borderRadius:9, border:`1px solid ${C.border}`, flexShrink:0 }}>
                       <div style={{
                         width:28, height:28, borderRadius:8,
                         background: item.kind==="recurring" ? `${C.accent}20` : `${C.warning}20`,
@@ -1610,14 +1669,15 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
                       </button>
                     </div>
                   ))}
-                  {todoItems.length > 4 && (
-                    <button
-                      onClick={()=>setPage("transactions")}
-                      style={{ padding:"6px", background:"transparent", border:"none", color:C.accent, fontSize:11, fontWeight:600, cursor:"pointer" }}
-                    >
-                      {t("Prikaži sve")} ({todoItems.length})
-                    </button>
-                  )}
+                </div>
+                {/* Fiksni footer */}
+                <div style={{ padding:"6px 12px 10px", flexShrink:0, borderTop:`1px solid ${C.border}` }}>
+                  <button
+                    onClick={()=>{ if(setTxFilter) setTxFilter("overdue"); setPage("transactions"); }}
+                    style={{ width:"100%", padding:"6px", background:"transparent", border:"none", color:C.accent, fontSize:11, fontWeight:600, cursor:"pointer" }}
+                  >
+                    {t("Prikaži sve")} ({todoItems.length})
+                  </button>
                 </div>
               </div>
             )}
@@ -1629,7 +1689,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
 }
 
 // ─── TxForm ───────────────────────────────────────────────────────────────────
-function TxForm({ C, tx, draft, lists, setLists, onSubmit, onCancel, onGoRecurring, t }) {
+function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRecurring, t }) {
   const init = tx ?? (draft ? {
     date: draft.date.split("T")[0],
     type: "Isplata",
@@ -1666,6 +1726,24 @@ function TxForm({ C, tx, draft, lists, setLists, onSubmit, onCancel, onGoRecurri
   const isGotov   = form.payment === "Gotovina";
   const isPrimitak= form.type === "Primitak";
   const cats      = isPrimitak ? lists.categories_income : lists.categories_expense;
+
+  // Budget warning — only for new expense entries (not edits) with a selected category.
+  const budgetWarning = useMemo(() => {
+    if (isPrimitak || tx || !form.category || !lists.budgets) return null;
+    const limit = lists.budgets[form.category];
+    if (!limit || limit <= 0) return null;
+    const now = new Date();
+    const cm = MONTHS[now.getMonth()];
+    const cy = now.getFullYear();
+    const spent = (txs || [])
+      .filter(x => x.type === "Isplata" && x.category === form.category && new Date(x.date).getFullYear() === cy && MONTHS[new Date(x.date).getMonth()] === cm)
+      .reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
+    const incoming = parseFloat(form.amount) || 0;
+    if (spent + incoming > limit) {
+      return { spent, incoming, limit, over: spent + incoming - limit };
+    }
+    return null;
+  }, [form.category, form.amount, form.type, isPrimitak, tx, txs, lists.budgets]);
   // Cards don't apply to incoming money; filter them out for Primitak.
   const CARD_PAYMENTS = ["Kartica (debitna)", "Kreditna kartica"];
   const payments  = isPrimitak
@@ -1934,6 +2012,22 @@ function TxForm({ C, tx, draft, lists, setLists, onSubmit, onCancel, onGoRecurri
           </div>
         )}
 
+        {budgetWarning && (
+          <div className="fi" style={{ marginTop:10, padding:"10px 14px", background:`${C.warning}15`, border:`1px solid ${C.warning}60`, borderRadius:12 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+              <Ic n="alert" s={15} c={C.warning}/>
+              <span style={{ fontSize:13, color:C.warning, fontWeight:700 }}>
+                {t("Trošak bi premašio limit za kategoriju")} {t(form.category)}
+              </span>
+            </div>
+            <div style={{ display:"flex", gap:12, fontSize:11, color:C.textMuted, flexWrap:"wrap" }}>
+              <span>{t("Dosad potrošeno")}: <b style={{color:C.text}}>{fmtEur(budgetWarning.spent)}</b></span>
+              <span>{t("Limit")}: <b style={{color:C.text}}>{fmtEur(budgetWarning.limit)}</b></span>
+              <span>{t("Prekoračenje")}: <b style={{color:C.expense}}>{fmtEur(budgetWarning.over)}</b></span>
+            </div>
+          </div>
+        )}
+
         <button onClick={submit}
           style={{ width:"100%", padding:15, marginTop:err.msg?10:18, marginBottom:16, background:form.type==="Primitak"?`linear-gradient(135deg,${C.income},#059669)`:`linear-gradient(135deg,${C.accent},${C.accentDk})`, border:"none", borderRadius:15, color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
           <Ic n="check" s={18} c="#fff"/>
@@ -1949,6 +2043,8 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
   const [q, setQ]          = useState("");
   const [delCfm,setDelCfm] = useState(null);
   const [grpCfm,setGrpCfm] = useState(null);
+  const [page, setPage]    = useState(1);
+  const PAGE_SIZE = 50;
 
   const rows = useMemo(()=>{
     let f = data.filter(x=>new Date(x.date).getFullYear()===year);
@@ -1956,16 +2052,30 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
     if (filter==="income")   f = f.filter(x=>x.type==="Primitak");
     if (filter==="pending")  f = f.filter(x=>x.status==="Čeka plaćanje");
     if (filter==="processing") f = f.filter(x=>x.status==="U obradi");
-    
+    // "overdue" = pending/processing with date <= today (current + past months, unpaid)
+    if (filter==="overdue") {
+      const today = new Date(); today.setHours(23,59,59,999);
+      f = data.filter(x =>
+        (x.status==="Čeka plaćanje" || x.status==="U obradi") &&
+        new Date(x.date) <= today
+      );
+    }
+
     if (q) f = f.filter(x=>x.description?.toLowerCase().includes(q.toLowerCase())||x.category?.toLowerCase().includes(q.toLowerCase()));
-    
-    if (filter === "pending" || filter === "processing") {
+
+    if (filter === "pending" || filter === "processing" || filter === "overdue") {
         return f.sort((a,b)=>new Date(a.date)-new Date(b.date));
     }
     return f.sort((a,b)=>new Date(b.date)-new Date(a.date));
   },[data,filter,q,year]);
 
-  return (
+  // Reset to page 1 when filter or search changes.
+  useEffect(() => { setPage(1); }, [filter, q]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const pageRows   = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
     <div className="fi" style={{ width:"100%" }}>
       <StickyHeader C={C} icon="list" title={`${t("Transakcije")} · ${year}.`}/>
       <div style={{ padding:"12px 16px 0" }}>
@@ -1975,28 +2085,34 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
           <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }}><Ic n="search" s={16} c={C.textMuted}/></span>
         </div>
 
-        <div style={{ display:"flex", gap:6, marginBottom:12, overflowX:"auto", paddingBottom:4 }}>
+        <div style={{ display:"flex", gap:6, marginBottom:4, overflowX:"auto", paddingBottom:4 }}>
           {[
             ["all",t("Sve")],
             ["expense",t("Plaćeno")],
             ["pending",t("Čeka plaćanje")],
+            ["overdue",t("Dospjelo")],
             ["processing",t("U obradi")],
             ["income",t("Primici")]
           ].map(([id,lb])=>(
-            <Pill key={id} label={lb} active={filter===id} 
-              color={id==="pending" ? "#F87171" : id==="processing" ? "#FB923C" : id==="expense" ? C.income : id==="income" ? C.income : C.accent} 
-              inactiveColor={id==="pending" ? "#FB923C" : undefined}
+            <Pill key={id} label={lb} active={filter===id}
+              color={id==="pending"||id==="overdue" ? "#F87171" : id==="processing" ? "#FB923C" : id==="expense" ? C.income : id==="income" ? C.income : C.accent}
+              inactiveColor={id==="pending"||id==="overdue" ? "#FB923C" : undefined}
               onClick={()=>setFilter(id)}/>
           ))}
         </div>
-
+        {filter==="overdue" && (
+          <div style={{ fontSize:11, color:C.textMuted, marginBottom:8, padding:"4px 2px", display:"flex", alignItems:"center", gap:5 }}>
+            <Ic n="alert" s={11} c={C.warning}/>
+            {t("Prikazuje neplaćene stavke s rokom do danas (tekući + prošli mjeseci)")}
+          </div>
+        )}
         {rows.length===0
           ? <div style={{ textAlign:"center", padding:50, color:C.textMuted }}>
               <Ic n="list" s={44} c={C.border} style={{ marginBottom:12, opacity:.3 }}/>
               <p style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Nema transakcija")}</p>
               <p style={{ fontSize:12, marginTop:4 }}>{q ? t("Pokušajte s drugim pojmom za pretragu.") : filter !== "all" ? t("Nema stavki za odabrani filter.") : t("Pritisnite + za dodavanje.")}</p>
             </div>
-          : rows.map((tx,i)=>(
+          : pageRows.map((tx,i)=>(
             <div key={tx.id} className="su" style={{ background:C.card, border:`1px solid ${C.border}`, borderLeft:`3px solid ${tx.installmentGroup?C.warning:tx.type==="Primitak"?C.income:C.expense}`, borderRadius:14, padding:13, marginBottom:8, animationDelay:`${i*.02}s` }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"stretch" }}>
                 <div style={{ flex:1, minWidth:0, textAlign:"left" }}>
@@ -2039,7 +2155,24 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
             </div>
           ))
         }
-        <div style={{ textAlign:"center", padding:"10px 0", color:C.textMuted, fontSize:12 }}>{rows.length} transakcija · {year}.</div>
+        <div style={{ textAlign:"center", padding:"10px 0", color:C.textMuted, fontSize:12 }}>
+          {rows.length} transakcija · {year}.
+        </div>
+        {totalPages > 1 && (
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"8px 0 16px" }}>
+            <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={safePage===1}
+              style={{ padding:"7px 14px", background:safePage===1?C.cardAlt:C.card, border:`1px solid ${C.border}`, borderRadius:10, color:safePage===1?C.textMuted:C.accent, fontWeight:600, fontSize:12, cursor:safePage===1?"not-allowed":"pointer" }}>
+              ← {t("Prethodna")}
+            </button>
+            <span style={{ fontSize:12, color:C.textMuted, minWidth:80, textAlign:"center" }}>
+              {(safePage-1)*PAGE_SIZE+1}–{Math.min(safePage*PAGE_SIZE, rows.length)} / {rows.length}
+            </span>
+            <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={safePage===totalPages}
+              style={{ padding:"7px 14px", background:safePage===totalPages?C.cardAlt:C.card, border:`1px solid ${C.border}`, borderRadius:10, color:safePage===totalPages?C.textMuted:C.accent, fontWeight:600, fontSize:12, cursor:safePage===totalPages?"not-allowed":"pointer" }}>
+              {t("Sljedeća")} →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2187,7 +2320,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
   const typeLabel = {rata:t("Obrok"), obveza:t("Obveze"), pending:t("Čeka plaćanje"), processing:t("U obradi"), kredit:t("Rate")};
   const typeColor = {rata:C.warning, obveza:C.accent, pending:C.warning, processing:"#FB923C", kredit:"#A78BFA"};
 
-  const tabs=[["expected",t("Očekivano")],["categories",t("Kategorije")],["overview",t("Pregled/Saldo")],["paylocal",t("Plaćanje/Lokacije")]];
+  const tabs=[["expected",t("Očekivano")],["categories",t("Kategorije")],["overview",t("Pregled/Saldo")],["paylocal",t("Plaćanje/Lokacije")],["trend",t("Trend 3g.")]];
   const chartCard = { background:C.card, border:`1px solid ${C.border}`, borderRadius:15, padding:13, overflowX:"auto", marginBottom:10 };
   const chartLbl = (ic,text) => <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:8, display:"flex", alignItems:"center", gap:5 }}><Ic n={ic} s={12} c={C.textMuted}/>{text}</div>;
 
@@ -2306,6 +2439,58 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
             {locD.length>0 ? <BarChart width={W} height={200} data={locD} layout="vertical"><XAxis type="number" tick={{fill:C.textMuted,fontSize:9}} axisLine={false} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:v}/><YAxis type="category" dataKey="name" tick={{fill:C.textMuted,fontSize:11}} tickFormatter={v=>t(v)} axisLine={false} width={100}/><Tooltip {...tt}/><Bar dataKey="value" fill={C.accent} radius={[0,6,6,0]}/></BarChart> : <p style={{textAlign:"center",color:C.textMuted,padding:20,fontSize:13}}>{t("Nema podataka")}</p>}
           </div>
         </>}
+
+        {tab==="trend" && (() => {
+          const cy = curYear();
+          // Build 3-year comparison data: current year and 2 previous.
+          const years3 = [cy-2, cy-1, cy];
+          const trendData = years3.map(yr => {
+            const yrData = data.filter(x => new Date(x.date).getFullYear() === yr);
+            const inc = yrData.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0);
+            const exp = yrData.filter(x=>x.type==="Isplata").reduce((s,x)=>s+(+x.amount||0),0);
+            return { name: `${yr}.`, [t("Primici")]: Math.round(inc*100)/100, [t("Troškovi")]: Math.round(exp*100)/100, [t("Saldo")]: Math.round((inc-exp)*100)/100 };
+          });
+          return <>
+            <div style={chartCard}>
+              {chartLbl("bar", t("Primici vs Troškovi — 3 godine"))}
+              <BarChart width={W} height={200} data={trendData} barGap={3} barCategoryGap="30%">
+                <XAxis dataKey="name" tick={{fill:C.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
+                <YAxis tick={{fill:C.textMuted,fontSize:8}} axisLine={false} tickLine={false} width={38} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:v}/>
+                <Tooltip {...tt}/>
+                <Bar dataKey={t("Primici")}  fill={C.income}  radius={[4,4,0,0]}/>
+                <Bar dataKey={t("Troškovi")} fill={C.expense} radius={[4,4,0,0]}/>
+              </BarChart>
+            </div>
+            <div style={chartCard}>
+              {chartLbl("coins", t("Godišnji saldo — 3 godine"))}
+              <BarChart width={W} height={150} data={trendData}>
+                <XAxis dataKey="name" tick={{fill:C.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
+                <YAxis tick={{fill:C.textMuted,fontSize:8}} axisLine={false} tickLine={false} width={38} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:v}/>
+                <Tooltip {...tt}/>
+                <Bar dataKey={t("Saldo")}
+                  radius={[4,4,0,0]}
+                  fill={C.accent}
+                  // Colour each bar by sign: green=positive, red=negative.
+                  label={false}
+                >
+                  {trendData.map((e,i)=>(
+                    <Cell key={i} fill={e[t("Saldo")]>=0?C.income:C.expense}/>
+                  ))}
+                </Bar>
+              </BarChart>
+            </div>
+            <div style={{ display:"flex", gap:8, marginBottom:8 }}>
+              {trendData.map(d=>(
+                <div key={d.name} style={{ flex:1, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"10px 12px" }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.textMuted, marginBottom:6 }}>{d.name}</div>
+                  <div style={{ fontSize:11, color:C.income }}>↑ {fmtEur(d[t("Primici")])}</div>
+                  <div style={{ fontSize:11, color:C.expense }}>↓ {fmtEur(d[t("Troškovi")])}</div>
+                  <div style={{ fontSize:12, fontWeight:700, color:d[t("Saldo")]>=0?C.income:C.expense, marginTop:4 }}>= {fmtEur(d[t("Saldo")])}</div>
+                </div>
+              ))}
+            </div>
+          </>;
+        })()}
 
       </div>
     </div>
@@ -2843,6 +3028,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   // we show the JSON in a modal with a Copy button so the user can paste into any
   // note/chat app and save it elsewhere.
   const [exportFallback, setExportFallback] = useState(null); // { filename, content }
+  const [exportYear, setExportYear]         = useState("all"); // "all" or specific year
 
   const hasProfileData = user.firstName || user.lastName || user.phone || user.email;
   const [isEditingProfile, setIsEditingProfile] = useState(!hasProfileData);
@@ -2889,15 +3075,16 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   // Whatever fails, the user always has a working option.
   const fullExport = () => {
     try {
-      // Always export PLAINTEXT — data is already decrypted in React state.
-      // This ensures backups are always readable, even when localStorage is encrypted.
+      const yr = exportYear === "all" ? null : parseInt(exportYear);
+      const filteredTxs = yr ? txs.filter(x => new Date(x.date).getFullYear() === yr) : txs;
       const payload = {
         __moja_lova_backup: true,
         version: 1,
         exportedAt: new Date().toISOString(),
         app: "Moja lova",
+        exportYear: yr || "all",
         data: {
-          txs,
+          txs: filteredTxs,
           drafts,
           lists,
           user,
@@ -2905,7 +3092,8 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         }
       };
       const jsonStr  = JSON.stringify(payload, null, 2);
-      const filename = `moja_lova_backup_${new Date().toISOString().split("T")[0]}.json`;
+      const yearSuffix = yr ? `_${yr}` : "";
+      const filename = `moja_lova_backup${yearSuffix}_${new Date().toISOString().split("T")[0]}.json`;
       setExportFallback({ filename, content: jsonStr });
     } catch {
       alert(t("Greška pri čitanju datoteke."));
@@ -3126,12 +3314,26 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           </button>
 
           {/* 2) EXPORT (BACKUP) — full JSON backup of all data */}
+          {/* Year filter row */}
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, padding:"0 2px" }}>
+            <Ic n="cal" s={13} c={C.textMuted}/>
+            <span style={{ fontSize:12, color:C.textMuted, flex:1 }}>{t("Izvezi godinu")}:</span>
+            <select value={exportYear} onChange={e=>setExportYear(e.target.value)}
+              style={{ padding:"5px 10px", background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:8, color:C.text, fontSize:12, cursor:"pointer" }}>
+              <option value="all">{t("Sve godine")}</option>
+              {Array.from({length:6},(_,i)=>curYear()-i).map(y=>(
+                <option key={y} value={y}>{y}.</option>
+              ))}
+            </select>
+          </div>
           <button onClick={fullExport} style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.warning}20,${C.warning}08)`, border:`1px solid ${C.warning}40`, borderRadius:13, marginBottom:7, cursor:"pointer" }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <Ic n="dl" s={19} c={C.warning}/>
               <div style={{ textAlign:"left" }}>
                 <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Izvezi (Backup)")}</div>
-                <div style={{ fontSize:11, color:C.textMuted }}>{t("Napravi kopiju svih podataka u .json datoteci")}</div>
+                <div style={{ fontSize:11, color:C.textMuted }}>
+                  {exportYear === "all" ? t("Napravi kopiju svih podataka u .json datoteci") : `${exportYear}. · ${txs.filter(x=>new Date(x.date).getFullYear()===parseInt(exportYear)).length} ${t("transakcija")}`}
+                </div>
               </div>
             </div>
             <Ic n="chevron" s={14} c={C.warning} style={{ transform:"rotate(-90deg)" }}/>
@@ -3604,6 +3806,55 @@ Hvala što koristiš Moja lova!`
   );
 }
 
+// ─── BudgetEditor ─────────────────────────────────────────────────────────────
+function BudgetEditor({ C, cats, budgets, onBack, t }) {
+  const [local, setLocal] = useState(() => ({ ...budgets }));
+
+  const set = (cat, val) => {
+    const n = parseFloat(val);
+    setLocal(b => ({ ...b, [cat]: isNaN(n) || n <= 0 ? 0 : n }));
+  };
+
+  return (
+    <div className="fi" style={{ width:"100%" }}>
+      <StickyHeader C={C} icon="coins" title={t("Budžet limiti")}
+        right={<button onClick={()=>onBack(local)} style={{ background:C.accent, border:"none", color:"#fff", padding:"8px 16px", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer" }}>{t("Spremi")}</button>}
+      />
+      <div style={{ padding:"14px 16px 24px" }}>
+        <p style={{ fontSize:12, color:C.textMuted, marginBottom:14, lineHeight:1.5 }}>
+          {t("Postavi mj. limit za svaku kategoriju troškova.")}
+          {" "}{t("Bit ćeš upozoren/a pri unosu troška koji bi prešao limit.")}
+        </p>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {cats.map(cat => {
+            const val = local[cat] || "";
+            const active = val > 0;
+            return (
+              <div key={cat} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 13px", background:C.card, border:`1px solid ${active ? C.warning+"80" : C.border}`, borderRadius:12 }}>
+                <div style={{ flex:1, fontSize:13, fontWeight:500, color:C.text }}>{t(cat)}</div>
+                <div style={{ position:"relative", display:"flex", alignItems:"center" }}>
+                  <input
+                    type="number" min="0" step="1" placeholder={t("Bez limita")}
+                    value={val === 0 ? "" : val}
+                    onChange={e=>set(cat, e.target.value)}
+                    style={{ width:100, padding:"6px 28px 6px 10px", background:C.cardAlt, border:`1px solid ${active?C.warning:C.border}`, borderRadius:8, color:active?C.warning:C.text, fontSize:13, fontWeight:active?700:400, fontFamily:"'JetBrains Mono',monospace", textAlign:"right" }}
+                  />
+                  <span style={{ position:"absolute", right:8, fontSize:11, color:C.textMuted, pointerEvents:"none" }}>€</span>
+                </div>
+                {active && (
+                  <button onClick={()=>set(cat,0)} style={{ background:"transparent", border:"none", cursor:"pointer", padding:2 }}>
+                    <Ic n="x" s={13} c={C.textMuted}/>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Settings (Glavni izbornik) ───────────────────────────────────────────────
 function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, onChangePinCrypto, onRemovePinCrypto, t, lang }) {
   const cy = curYear();
@@ -3618,6 +3869,10 @@ function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, list
     }
     if (subPg === "about") {
       return <AboutScreen C={C} onBack={()=>setSubPg(null)} t={t} lang={lang}/>;
+    }
+    if (subPg === "budgets") {
+      return <BudgetEditor C={C} cats={lists.categories_expense} budgets={lists.budgets||{}} t={t}
+        onBack={b=>{ setLists(l=>({...l,budgets:b})); setSubPg(null); }}/>;
     }
     const MAP = { cat_exp:{title:"Kategorije troškova",key:"categories_expense"}, cat_inc:{title:"Kategorije primici",key:"categories_income"}, locations:{title:"Lokacije",key:"locations"}, payments:{title:"Načini plaćanja",key:"payments"}, statuses:{title:"Statusi",key:"statuses"} };
     const m = MAP[subPg];
@@ -3685,6 +3940,9 @@ function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, list
           ].map(({id,ic,lb,n})=>(
             <Row key={id} icon={ic} label={lb} right={`${n} ${t("stavki")}`} onClick={()=>setSubPg(id)}/>
           ))}
+          <Row icon="coins" label={t("Budžet limiti")}
+            right={`${Object.values(lists.budgets||{}).filter(v=>v>0).length} ${t("stavki")}`}
+            onClick={()=>setSubPg("budgets")}/>
         </div>
 
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
