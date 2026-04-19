@@ -90,6 +90,9 @@ const EN_DICT = {
   "Backup uspješno spremljen.": "Backup saved successfully.",
   "Nova verzija dostupna": "New version available",
   "Klikni za ažuriranje": "Tap to update",
+  "Davno nisi napravio backup": "Haven't backed up in a while",
+  "Klikni ovdje da sačuvaš kopiju podataka.": "Tap here to save a copy of your data.",
+  "Podsjeti me za 7 dana": "Remind me in 7 days",
   "Kopiraj tekst ispod i spremi ga u datoteku ili zalijepi u e-mail / Drive / Keep.": "Copy the text below and save it to a file, or paste it into e-mail / Drive / Keep.",
   "Spremi backup koristeći jednu od opcija ispod. Ako jedna ne radi, druga hoće.": "Save the backup using one of the options below. If one doesn't work, another will.",
   "Podijeli": "Share",
@@ -173,6 +176,23 @@ const isCapacitor = () =>
   && window.Capacitor
   && typeof window.Capacitor.isNativePlatform === "function"
   && window.Capacitor.isNativePlatform();
+
+// ─── Backup reminder helpers ──────────────────────────────────────────────────
+// Nudge the user to back up if it's been a while. Also respects a "snooze"
+// timestamp set by the user via the banner's X button.
+const BACKUP_REMIND_AFTER_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const BACKUP_SNOOZE_MS       =  7 * 24 * 60 * 60 * 1000; //  7 days
+
+const needsBackupReminder = (prefs) => {
+  if (!prefs) return false;
+  const now = Date.now();
+  // User dismissed the banner recently — respect the snooze.
+  if (prefs.backupSnoozedUntil && prefs.backupSnoozedUntil > now) return false;
+  // Never backed up → remind after 30 days of use (based on first onboarding).
+  const last = prefs.lastBackupAt || prefs.firstUseAt || 0;
+  if (!last) return false;
+  return (now - last) >= BACKUP_REMIND_AFTER_MS;
+};
 
 // Native save — writes the backup JSON to the device's Documents folder using
 // @capacitor/filesystem, then offers a share sheet so the user can move it
@@ -761,6 +781,16 @@ export default function App() {
     return () => document.removeEventListener("visibilitychange", fn);
   },[sec.pinHash]);
 
+  // ─── Backfill firstUseAt for users who onboarded before this feature ──────
+  // Without this, existing users would never see the backup reminder because
+  // lastBackupAt is 0 and firstUseAt is undefined. Set it once on upgrade.
+  useEffect(() => {
+    if (prefs.onboarded && !prefs.firstUseAt) {
+      updP({ firstUseAt: Date.now() });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ─── Service Worker registration + update detection ───────────────────────
   // Registers sw.js on first load so the app can work offline. If a new SW
   // is waiting to activate (because the user has an older version cached),
@@ -878,7 +908,7 @@ export default function App() {
   if (!prefs.onboarded) {
     return (
       <div style={wrap}><style>{gs}</style>
-        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} finish={() => { updP({onboarded:true}); setUnlocked(true); }} />
+        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} finish={() => { updP({onboarded:true, firstUseAt: Date.now()}); setUnlocked(true); }} />
       </div>
     );
   }
@@ -935,7 +965,7 @@ export default function App() {
         </div>
       )}
 
-      {page==="dashboard"    && <Dashboard    {...shared} data={txs} setPage={setPage} onQuickAdd={()=>setShowQuickAdd(true)}/>}
+      {page==="dashboard"    && <Dashboard    {...shared} data={txs} setPage={setPage} onQuickAdd={()=>setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg}/>}
       {page==="add"          && <TxForm {...shared} draft={draftEdit} onSubmit={tx=>{ addTx(tx); if(draftEdit){ setDrafts(p=>p.filter(d=>d.id!==draftEdit.id)); setDraftEdit(null); } }} onCancel={()=>{ setPage("dashboard"); setDraftEdit(null); }} onGoRecurring={()=>setPage("recurring")}/>}
       {page==="edit"         && <TxForm {...shared} tx={txs.find(x=>x.id===editId)} onSubmit={updTx} onCancel={()=>{ setEditId(null); setPage("transactions"); }}/>}
       {page==="transactions" && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id=>{ setEditId(id); setPage("edit"); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id=>setTxs(p=>p.map(x=>x.id===id?{...x,status:"Plaćeno",date:new Date().toISOString().split("T")[0]}:x))}/>}
@@ -973,7 +1003,7 @@ export default function App() {
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-function Dashboard({ C, data, year, user, lists, setPage, onQuickAdd, t, lang }) {
+function Dashboard({ C, data, year, user, lists, setPage, onQuickAdd, t, lang, prefs, updPrefs, setSubPg }) {
   const cmIdx = curMonthIdx();
   const cm  = MONTHS[cmIdx]; 
   const cmName = lang==="en" ? MONTHS_EN[cmIdx] : cm;
@@ -1041,6 +1071,53 @@ function Dashboard({ C, data, year, user, lists, setPage, onQuickAdd, t, lang })
       </div>
 
       <div style={{ padding:"12px 16px 0" }}>
+        {/* Backup reminder — shown when it's been 30+ days since last backup.
+            User can click to jump straight to the Backup screen, or dismiss
+            with the X for 7 days. */}
+        {needsBackupReminder(prefs) && (
+          <div className="su" style={{
+            background: `linear-gradient(135deg, ${C.warning}28, ${C.warning}14)`,
+            border: `1px solid ${C.warning}60`,
+            borderRadius: 14, padding: "12px 14px", marginBottom: 10,
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <div
+              onClick={() => { setPage("settings"); setSubPg && setSubPg("general"); }}
+              style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+            >
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: `${C.warning}30`, display: "flex",
+                alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+                <Ic n="dl" s={18} c={C.warning}/>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2 }}>
+                  {t("Davno nisi napravio backup")}
+                </div>
+                <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.35 }}>
+                  {t("Klikni ovdje da sačuvaš kopiju podataka.")}
+                </div>
+              </div>
+              <Ic n="chevron" s={14} c={C.warning} style={{ transform: "rotate(-90deg)", flexShrink: 0 }}/>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                updPrefs({ backupSnoozedUntil: Date.now() + BACKUP_SNOOZE_MS });
+              }}
+              title={t("Podsjeti me za 7 dana")}
+              style={{
+                background: "transparent", border: "none", padding: 4,
+                cursor: "pointer", color: C.textMuted, flexShrink: 0,
+              }}
+            >
+              <Ic n="x" s={14} c={C.textMuted}/>
+            </button>
+          </div>
+        )}
+
         <div className="su" style={{ background:`linear-gradient(135deg,${C.accent}22,${bal>=0?C.income:C.expense}18)`, border:`1px solid ${bal>=0?C.income:C.expense}40`, borderRadius:18, padding:"16px 18px 16px 16px", marginBottom:10, position:"relative", overflow:"hidden" }}>
           <div style={{ position:"absolute", top:12, right:6, textAlign:"right" }}>
             <div style={{ fontSize:10, fontWeight:700, color:C.textSub, letterSpacing:.3 }}>{wd}</div>
@@ -2356,7 +2433,8 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
         if (data.user  && typeof data.user  === "object") save(K.usr, data.user);
         if (data.prefs && typeof data.prefs === "object") {
           // Preserve onboarded=true so user doesn't re-enter onboarding after restore.
-          save(K.prf, { ...load(K.prf,{}), ...data.prefs, onboarded: true });
+          // Set lastBackupAt=now since successful import means data exists in a backup file.
+          save(K.prf, { ...load(K.prf,{}), ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
         }
         alert(t("Podaci su uspješno vraćeni. Aplikacija će se ponovno učitati."));
         window.location.reload();
@@ -2613,6 +2691,7 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
                       document.execCommand("copy");
                       document.body.removeChild(ta);
                     }
+                    updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
                     alert(t("Kopirano!"));
                   } catch {
                     alert(t("Greška pri čitanju datoteke."));
@@ -2629,11 +2708,13 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
                       const file = new File([content], filename, { type: "application/json" });
                       if (navigator.canShare({ files: [file] })) {
                         await navigator.share({ files: [file], title: "Moja lova — Backup", text: filename });
+                        updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
                         return;
                       }
                     }
                     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
                       await navigator.share({ title: filename, text: content });
+                      updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
                       return;
                     }
                     alert(t("Dijeljenje nije podržano na ovom uređaju. Koristi Kopiraj ili Preuzmi."));
@@ -2654,6 +2735,7 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
                   if (isCapacitor()) {
                     const ok = await nativeSaveAndShare(filename, content);
                     if (ok) {
+                      updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
                       alert(t("Backup uspješno spremljen."));
                       return;
                     }
@@ -2672,6 +2754,7 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
                     a.click();
                     document.body.removeChild(a);
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
                   } catch {
                     alert(t("Preuzimanje nije uspjelo. Koristi Kopiraj ili Podijeli."));
                   }
