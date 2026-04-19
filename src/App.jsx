@@ -179,14 +179,97 @@ const fDate = d => {
 const monthOf = d => d ? MONTHS[new Date(d).getMonth()] ?? MONTHS[0] : MONTHS[0];
 const curMonthIdx = () => new Date().getMonth();
 const curYear = () => new Date().getFullYear();
-const hashPin = async p => {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(p+"ml_salt"));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-};
 
 const K = { db:"ml_data", prf:"ml_prefs", lst:"ml_lists", usr:"ml_user", sec:"ml_sec", drf:"ml_drafts" };
-const load = (k,fb) => { try { const v=localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } };
-const save = (k,v)  => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+// Only prefs and sec are loaded synchronously (before unlock). All others
+// may be encrypted; they are loaded async after the user enters their PIN.
+const load  = (k,fb) => { try { const v=localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } };
+const save  = (k,v)  => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+// Raw string save (stores without JSON.stringify — used for encrypted blobs)
+const saveRaw = (k,v) => { try { localStorage.setItem(k, v); } catch {} };
+const loadRaw = (k)   => { try { return localStorage.getItem(k) || null; } catch { return null; } };
+
+// ─── Crypto layer ─────────────────────────────────────────────────────────────
+// Helpers
+const hexToBytes = h => new Uint8Array(h.match(/.{2}/g).map(b=>parseInt(b,16)));
+const bytesToHex = b => Array.from(b).map(x=>x.toString(16).padStart(2,"0")).join("");
+const bytesToB64 = b => btoa(String.fromCharCode(...b));
+const b64ToBytes = s => new Uint8Array(atob(s).split("").map(c=>c.charCodeAt(0)));
+
+// Derive AES-GCM-256 key from PIN + salt using PBKDF2 (100 000 iterations).
+const deriveEncKey = async (pin, saltHex) => {
+  const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name:"PBKDF2", salt:hexToBytes(saltHex), iterations:100000, hash:"SHA-256" },
+    km, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]
+  );
+};
+
+// PBKDF2-based PIN hash for storage (v2). Returns base64.
+const hashPinV2 = async (pin, saltHex) => {
+  const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name:"PBKDF2", salt:hexToBytes(saltHex), iterations:100000, hash:"SHA-256" }, km, 256
+  );
+  return bytesToB64(new Uint8Array(bits));
+};
+
+// Legacy SHA-256 hash (kept only for migration of existing users).
+const hashPinLegacy = async p => {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(p+"ml_salt"));
+  return bytesToHex(new Uint8Array(buf));
+};
+
+// Encryption format: "ENC2:<iv_b64>:<ciphertext_b64>"
+const ENC_PREFIX = "ENC2:";
+
+const encryptJSON = async (key, data) => {
+  const iv  = crypto.getRandomValues(new Uint8Array(12));
+  const enc = await crypto.subtle.encrypt(
+    { name:"AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(data))
+  );
+  return ENC_PREFIX + bytesToB64(iv) + ":" + bytesToB64(new Uint8Array(enc));
+};
+
+// Decrypts if encrypted, parses JSON otherwise. Returns fallback on error.
+const decryptJSON = async (key, raw, fallback) => {
+  if (!raw) return fallback;
+  if (!raw.startsWith(ENC_PREFIX)) {
+    try { return JSON.parse(raw); } catch { return fallback; }
+  }
+  if (!key) return fallback; // encrypted but no key yet
+  try {
+    const rest = raw.slice(ENC_PREFIX.length);
+    const colonIdx = rest.indexOf(":");
+    const iv   = b64ToBytes(rest.slice(0, colonIdx));
+    const data = b64ToBytes(rest.slice(colonIdx + 1));
+    const dec  = await crypto.subtle.decrypt({ name:"AES-GCM", iv }, key, data);
+    return JSON.parse(new TextDecoder().decode(dec));
+  } catch { return fallback; }
+};
+
+// Encrypt React state → save to localStorage.
+const encryptAndSaveAll = async (key, { txs, drafts, lists, user }) => {
+  const [eTxs, eDrafts, eLists, eUser] = await Promise.all([
+    encryptJSON(key, txs),
+    encryptJSON(key, drafts),
+    encryptJSON(key, lists),
+    encryptJSON(key, user),
+  ]);
+  saveRaw(K.db, eTxs); saveRaw(K.drf, eDrafts); saveRaw(K.lst, eLists); saveRaw(K.usr, eUser);
+};
+
+// Load raw strings from localStorage → decrypt → return plain objects.
+const loadAndDecryptAll = async (key, defLists) => {
+  const [txs, drafts, lists, user] = await Promise.all([
+    decryptJSON(key, loadRaw(K.db),  []),
+    decryptJSON(key, loadRaw(K.drf), []),
+    decryptJSON(key, loadRaw(K.lst), defLists),
+    decryptJSON(key, loadRaw(K.usr), {}),
+  ]);
+  return { txs, drafts, lists, user };
+};
+
 
 // ─── Capacitor native bridge (only when running inside the APK) ──────────────
 // The web build stays plain: if @capacitor/* packages aren't installed, these
@@ -440,6 +523,7 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
   const [pin, setPin]       = useState("");
   const [err, setErr]       = useState("");
   const [tLeft, setTLeft]   = useState(0);
+  const [busy, setBusy]     = useState(false); // crypto in progress
 
   const tryBio = useCallback(async () => {
     try {
@@ -453,9 +537,15 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
           timeout: 60000
         }
       });
-      onUnlock();
+      // Biometry can't provide the PIN, so it can't decrypt data.
+      // Show a helpful message if the vault is encrypted.
+      if (sec.pinHashVersion === "v2") {
+        setErr(t("Biometrija uspješna. Unesi PIN za dešifriranje podataka."));
+      } else {
+        onUnlock(null, false, true); // legacy: biometry only, no crypto
+      }
     } catch { setErr(t("Biometrija otkazana ili neuspješna.")); }
-  }, [onUnlock, sec.bioCredId, t]);
+  }, [onUnlock, sec, t]);
 
   useEffect(() => {
     if (sec.bioEnabled && sec.bioCredId && window.PublicKeyCredential) {
@@ -478,25 +568,42 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
   const isLocked = sec.lockedUntil && Date.now() < sec.lockedUntil;
 
   const tryPin = async () => {
-    if (isLocked || pin.length < 4) return;
-    const h = await hashPin(pin);
-    if (h === sec.pinHash) {
-      save(K.sec, { ...sec, attempts:0, lockedUntil:null });
-      onUnlock();
-    } else {
-      const na = (sec.attempts||0)+1, tf = (sec.totalFailed||0)+1;
-      const upd = { ...sec, attempts:na, totalFailed:tf };
-      if (tf >= WIPE_AT) { onWipe(); return; }
-      if (na >= MAX_ATT) {
-        upd.lockedUntil = Date.now() + LOCK_SEC*1000;
-        upd.attempts = 0;
-        setErr(`${t("Previše pokušaja!")} ${t("Zaključano još")} ${LOCK_SEC}s. (${WIPE_AT-tf} ${t("do brisanja")})`);
+    if (isLocked || pin.length < 4 || busy) return;
+    setBusy(true);
+    setErr("");
+    try {
+      // Determine hash version and verify accordingly.
+      let isCorrect = false;
+      let isLegacy  = false;
+      if (sec.pinHashVersion === "v2") {
+        // PBKDF2 verification
+        const h = await hashPinV2(pin, sec.pinSalt);
+        isCorrect = h === sec.pinHash;
       } else {
-        setErr(`${t("Pogrešan PIN")}. ${na}/${MAX_ATT}. (${WIPE_AT-tf} ${t("do brisanja")})`);
+        // Legacy SHA-256 — verify, then trigger silent migration.
+        const h = await hashPinLegacy(pin);
+        isCorrect = h === sec.pinHash;
+        if (isCorrect) isLegacy = true;
       }
-      save(K.sec, upd);
-      setPin("");
-    }
+
+      if (isCorrect) {
+        save(K.sec, { ...sec, attempts:0, lockedUntil:null });
+        await onUnlock(pin, isLegacy, false); // pass PIN for key derivation
+      } else {
+        const na = (sec.attempts||0)+1, tf = (sec.totalFailed||0)+1;
+        const upd = { ...sec, attempts:na, totalFailed:tf };
+        if (tf >= WIPE_AT) { onWipe(); return; }
+        if (na >= MAX_ATT) {
+          upd.lockedUntil = Date.now() + LOCK_SEC*1000;
+          upd.attempts = 0;
+          setErr(`${t("Previše pokušaja!")} ${t("Zaključano još")} ${LOCK_SEC}s. (${WIPE_AT-tf} ${t("do brisanja")})`);
+        } else {
+          setErr(`${t("Pogrešan PIN")}. ${na}/${MAX_ATT}. (${WIPE_AT-tf} ${t("do brisanja")})`);
+        }
+        save(K.sec, upd);
+        setPin("");
+      }
+    } finally { setBusy(false); }
   };
 
   const PAD = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
@@ -539,9 +646,11 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
           ))}
         </div>
 
-        <button onClick={tryPin} disabled={isLocked||pin.length<4}
-          style={{ width:"100%", padding:13, marginBottom:10, background:isLocked||pin.length<4?C.border:`linear-gradient(135deg,${C.accent},${C.accentDk})`, border:"none", borderRadius:13, color:"#fff", fontSize:15, fontWeight:700, cursor:isLocked||pin.length<4?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
-          <Ic n="unlock" s={17} c="#fff"/> {t("Otključaj")}
+        <button onClick={tryPin} disabled={isLocked||pin.length<4||busy}
+          style={{ width:"100%", padding:13, marginBottom:10, background:isLocked||pin.length<4||busy?C.border:`linear-gradient(135deg,${C.accent},${C.accentDk})`, border:"none", borderRadius:13, color:"#fff", fontSize:15, fontWeight:700, cursor:isLocked||pin.length<4||busy?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+          {busy
+            ? <><span style={{ width:16,height:16,borderRadius:"50%",border:`2px solid #fff`,borderTopColor:"transparent",display:"inline-block",animation:"spin .7s linear infinite" }}/>{t("Dešifriranje…")}</>
+            : <><Ic n="unlock" s={17} c="#fff"/>{t("Otključaj")}</>}
         </button>
 
         {sec.bioEnabled && sec.bioCredId && (
@@ -569,7 +678,7 @@ function SetupPin({ C, onSave, onSkip, isChange=false, t }) {
     if (pin.length < 4) { setErr(t("Minimalno 4 znamenke")); return; }
     if (step==="enter") { setFirst(pin); setPin(""); setStep("confirm"); }
     else if (pin !== first) { setErr(t("PIN-ovi se ne poklapaju")); setPin(""); setStep("enter"); setFirst(""); }
-    else { onSave(await hashPin(pin)); }
+    else { onSave(pin); } // pass plain PIN — caller (App root or GeneralSettings) handles all crypto
   };
 
   return (
@@ -738,13 +847,22 @@ function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, 
 
 // ─── App (root) ───────────────────────────────────────────────────────────────
 export default function App() {
-  
-  const [txs, setTxs] = useState(() => load(K.db, []));
-  const [drafts, setDrafts] = useState(() => load(K.drf, []));
+  // Detect at startup whether data is protected by a PIN.
+  // If yes, encrypted data keys start empty — they're filled async after unlock.
+  // sec and prefs are ALWAYS plaintext (needed before unlock for theme/lang).
+  const _sec = load(K.sec, {});
+  const _hasPin = !!_sec.pinHash;
+
+  const [txs, setTxs] = useState(() => _hasPin ? [] : load(K.db, []));
+  const [drafts, setDrafts] = useState(() => _hasPin ? [] : load(K.drf, []));
   const [prefs,setPrefs]= useState(()=>load(K.prf,{theme:"auto",year:curYear(), onboarded:false, lang:"hr"}));
-  const [user, setUser] = useState(()=>load(K.usr,{firstName:"",lastName:"",phone:"",email:""}));
+  const [user, setUser] = useState(()=> _hasPin ? {} : load(K.usr,{firstName:"",lastName:"",phone:"",email:""}));
   const [sec,  setSec]  = useState(()=>load(K.sec,{pinHash:null,bioEnabled:false,bioCredId:null,attempts:0,totalFailed:0,lockedUntil:null}));
-  const [lists,setLists] = useState(() => load(K.lst, DEF_LISTS));
+  const [lists,setLists] = useState(() => _hasPin ? DEF_LISTS : load(K.lst, DEF_LISTS));
+
+  // AES-GCM key lives ONLY in memory. Never persisted.
+  // null = no PIN / not yet unlocked. Set on successful PIN entry.
+  const [encKey, setEncKey] = useState(null);
 
   const [page, setPage] = useState("dashboard");
   const [editId,setEditId]   = useState(null);
@@ -788,12 +906,28 @@ export default function App() {
   },[prefs.theme]);
   const C = T[theme] ?? T.dark;
 
-  useEffect(()=>save(K.db,txs),[txs]);
-  useEffect(()=>save(K.drf,drafts),[drafts]);
-  useEffect(()=>save(K.prf,prefs),[prefs]);
-  useEffect(()=>save(K.lst,lists),[lists]);
-  useEffect(()=>save(K.usr,user),[user]);
-  useEffect(()=>save(K.sec,sec),[sec]);
+  // Crypto-aware save: encrypt if encKey is active, plaintext if no PIN.
+  // SAFETY: if PIN exists but encKey is null (not yet unlocked), do NOT save —
+  // prevents accidentally overwriting encrypted ciphertext with plaintext.
+  useEffect(()=>{
+    if (encKey)         { encryptJSON(encKey,txs).then(e=>saveRaw(K.db,e)); }
+    else if (!sec.pinHash) { save(K.db,txs); }
+  },[txs]);
+  useEffect(()=>{
+    if (encKey)         { encryptJSON(encKey,drafts).then(e=>saveRaw(K.drf,e)); }
+    else if (!sec.pinHash) { save(K.drf,drafts); }
+  },[drafts]);
+  useEffect(()=>save(K.prf,prefs),[prefs]);   // always plaintext
+  useEffect(()=>{
+    if (encKey)         { encryptJSON(encKey,lists).then(e=>saveRaw(K.lst,e)); }
+    else if (!sec.pinHash) { save(K.lst,lists); }
+  },[lists]);
+  useEffect(()=>{
+    if (encKey)         { encryptJSON(encKey,user).then(e=>saveRaw(K.usr,e)); }
+    else if (!sec.pinHash) { save(K.usr,user); }
+  },[user]);
+  useEffect(()=>save(K.sec,sec),[sec]);        // always plaintext
+
   useEffect(()=>{
     if (!sec.pinHash) return;
     const fn = () => { if (document.hidden) setUnlocked(false); };
@@ -860,6 +994,81 @@ export default function App() {
   const updP = p => setPrefs(v=>({...v,...p}));
   const updU = p => setUser(v=>({...v,...p}));
   const updS = p => setSec(v=>({...v,...p}));
+
+  // ─── Crypto callbacks (all run in App root to keep full state access) ────────
+
+  // Called by LockScreen when PIN is verified correct.
+  // Derives AES key, loads+decrypts all data, fills React state.
+  const handleCryptoUnlock = async (pin, isLegacyHash) => {
+    try {
+      let key;
+      if (isLegacyHash) {
+        // Legacy SHA-256 PIN — migrate transparently.
+        // 1. Generate new PBKDF2 salts.
+        const pinSalt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+        const encSalt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+        // 2. Compute new PBKDF2 pin hash.
+        const pinHash = await hashPinV2(pin, pinSalt);
+        // 3. Derive AES key.
+        key = await deriveEncKey(pin, encSalt);
+        // 4. Load PLAINTEXT data (still unencrypted before this migration).
+        const rawTxs    = JSON.parse(loadRaw(K.db) || "[]");
+        const rawDrafts = JSON.parse(loadRaw(K.drf) || "[]");
+        const rawLists  = (() => { try { return JSON.parse(loadRaw(K.lst)); } catch { return DEF_LISTS; } })();
+        const rawUser   = (() => { try { return JSON.parse(loadRaw(K.usr)); } catch { return {}; } })();
+        const data = { txs: rawTxs, drafts: rawDrafts, lists: rawLists || DEF_LISTS, user: rawUser || {} };
+        // 5. Encrypt and save.
+        await encryptAndSaveAll(key, data);
+        // 6. Update sec with new hash format.
+        setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0 }));
+        setTxs(data.txs); setDrafts(data.drafts); setLists(data.lists); setUser(data.user);
+      } else {
+        // Already v2 — derive key and decrypt.
+        key = await deriveEncKey(pin, sec.encSalt);
+        const data = await loadAndDecryptAll(key, DEF_LISTS);
+        setTxs(data.txs); setDrafts(data.drafts); setLists(data.lists); setUser(data.user);
+      }
+      setEncKey(key);
+      setUnlocked(true);
+    } catch (e) {
+      console.error("Crypto unlock failed:", e);
+    }
+  };
+
+  // Called by SetupPin (from setupMode flow) when user sets their FIRST PIN.
+  // Existing data is plaintext — encrypt it all.
+  const handleFirstSetPin = async (pin) => {
+    const pinSalt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+    const encSalt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+    const pinHash = await hashPinV2(pin, pinSalt);
+    const key     = await deriveEncKey(pin, encSalt);
+    await encryptAndSaveAll(key, { txs, drafts, lists, user });
+    setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0, lockedUntil:null }));
+    setEncKey(key);
+    setSetupMode(false);
+  };
+
+  // Called after old PIN verified — re-encrypt everything with new PIN key.
+  const handleChangePinCrypto = async (newPin) => {
+    const pinSalt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+    const encSalt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+    const pinHash = await hashPinV2(newPin, pinSalt);
+    const newKey  = await deriveEncKey(newPin, encSalt);
+    await encryptAndSaveAll(newKey, { txs, drafts, lists, user });
+    setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0 }));
+    setEncKey(newKey);
+  };
+
+  // Called after PIN verified during removal — save all data as plaintext.
+  const handleRemovePinCrypto = () => {
+    save(K.db,  txs);
+    save(K.drf, drafts);
+    save(K.lst, lists);
+    save(K.usr, user);
+    setSec(v => ({ ...v, pinHash:null, pinSalt:null, encSalt:null, pinHashVersion:null, attempts:0, totalFailed:0 }));
+    setEncKey(null);
+  };
+
 
   const addTx = tx => {
     const inst = parseInt(tx.installments) || 0;
@@ -958,6 +1167,7 @@ export default function App() {
     ::-webkit-scrollbar{width:3px;} ::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px;}
     @keyframes su{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     @keyframes fi{from{opacity:0}to{opacity:1}}
+    @keyframes spin{to{transform:rotate(360deg)}}
     .su{animation:su .25s ease-out both} .fi{animation:fi .2s ease-out both}
     input[type=date]::-webkit-calendar-picker-indicator{filter:${theme==="dark"?"invert(1)":"none"};opacity:.5;}
     select{appearance:none;-webkit-appearance:none;}
@@ -980,7 +1190,17 @@ export default function App() {
   if (sec.pinHash && !unlocked) return (
     <div style={wrap}><style>{gs}</style>
     <LockScreen C={C} sec={sec} t={t}
-      onUnlock={()=>{ updS({attempts:0,lockedUntil:null}); setUnlocked(true); }}
+      onUnlock={async (pin, isLegacy, bioOnly) => {
+        if (bioOnly) {
+          // Biometry path without encryption (legacy v1 or no-enc).
+          updS({attempts:0, lockedUntil:null});
+          setTxs(load(K.db,[])); setDrafts(load(K.drf,[]));
+          setLists(load(K.lst,DEF_LISTS)); setUser(load(K.usr,{}));
+          setUnlocked(true);
+          return;
+        }
+        await handleCryptoUnlock(pin, isLegacy);
+      }}
       onWipe={wipe}
     />
     </div>
@@ -991,7 +1211,7 @@ export default function App() {
     return (
       <div style={wrap}><style>{gs}</style>
         <SetupPin C={C} isChange={false} t={t}
-          onSave={hash => { setSec(v=>({...v, pinHash:hash, attempts:0, totalFailed:0, lockedUntil:null})); setSetupMode(false); }}
+          onSave={pin => handleFirstSetPin(pin)}
           onSkip={() => setSetupMode(false)}
         />
       </div>
@@ -1035,7 +1255,7 @@ export default function App() {
       {page==="transactions" && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id=>{ setEditId(id); setPage("edit"); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id=>setTxs(p=>p.map(x=>x.id===id?{...x,status:"Plaćeno",date:new Date().toISOString().split("T")[0]}:x))}/>}
       {page==="charts"       && <Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/>}
       {page==="recurring"    && <RecurringScreen {...shared} data={txs} setTxs={setTxs} onBack={()=>setPage("dashboard")}/>}
-      {page==="settings"     && <Settings {...shared} txs={txs} setTxs={setTxs} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode}/>}
+      {page==="settings"     && <Settings {...shared} txs={txs} setTxs={setTxs} drafts={drafts} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode} onChangePinCrypto={handleChangePinCrypto} onRemovePinCrypto={handleRemovePinCrypto}/>}
 
       {showQuickAdd && <QuickAddModal C={C} t={t} onClose={()=>setShowQuickAdd(false)} onSave={d => { setDrafts(p=>[{id:Date.now().toString(), amount:d.amount, description:d.desc, date:new Date().toISOString()}, ...p]); setShowQuickAdd(false); }}/>}
       {showActionHub && <ActionHubModal C={C} t={t} drafts={drafts} onClose={()=>setShowActionHub(false)} onNew={()=>{ setPage("add"); setDraftEdit(null); setShowActionHub(false); }} onSelect={d=>{ setDraftEdit(d); setPage("add"); setShowActionHub(false); }} onDel={delDraft}/>}
@@ -2612,7 +2832,7 @@ function RecurringEditor({ C, items, lists, onBack, t }) {
 }
 
 // ─── GeneralSettings ──────────────────────────────────────────────────────────
-function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, t, lang }) {
+function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, t, lang }) {
   const [pinChg,  setPinChg]  = useState(false);
   const [rmPin,   setRmPin]   = useState(false);
   const [vPin,    setVPin]    = useState("");
@@ -2627,7 +2847,10 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
   const hasProfileData = user.firstName || user.lastName || user.phone || user.email;
   const [isEditingProfile, setIsEditingProfile] = useState(!hasProfileData);
 
-  if (pinChg) return <SetupPin C={C} isChange onSave={hash=>{ updSec({pinHash:hash,attempts:0,totalFailed:0,lockedUntil:null}); setPinChg(false); }} onSkip={()=>setPinChg(false)} t={t}/>;
+  if (pinChg) return <SetupPin C={C} isChange onSave={async newPin=>{
+    if (onChangePinCrypto) await onChangePinCrypto(newPin);
+    setPinChg(false);
+  }} onSkip={()=>setPinChg(false)} t={t}/>;
 
   const cy = curYear();
 
@@ -2666,17 +2889,19 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
   // Whatever fails, the user always has a working option.
   const fullExport = () => {
     try {
+      // Always export PLAINTEXT — data is already decrypted in React state.
+      // This ensures backups are always readable, even when localStorage is encrypted.
       const payload = {
         __moja_lova_backup: true,
         version: 1,
         exportedAt: new Date().toISOString(),
         app: "Moja lova",
         data: {
-          txs:    load(K.db, []),
-          drafts: load(K.drf, []),
-          lists:  load(K.lst, DEF_LISTS),
-          user:   load(K.usr, {}),
-          prefs:  load(K.prf, {}),
+          txs,
+          drafts,
+          lists,
+          user,
+          prefs: load(K.prf, {}),
         }
       };
       const jsonStr  = JSON.stringify(payload, null, 2);
@@ -2735,7 +2960,25 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
     reader.readAsText(file);
   };
 
-  const removePIN = async () => { const h=await hashPin(vPin); if(h===sec.pinHash){updSec({pinHash:null,bioEnabled:false,bioCredId:null,attempts:0,totalFailed:0,lockedUntil:null});setRmPin(false);setVPin("");setVErr("");}else setVErr(t("Pogrešan PIN")); };
+  const removePIN = async () => {
+    let isCorrect = false;
+    if (sec.pinHashVersion === "v2") {
+      const h = await hashPinV2(vPin, sec.pinSalt);
+      isCorrect = h === sec.pinHash;
+    } else {
+      const h = await hashPinLegacy(vPin);
+      isCorrect = h === sec.pinHash;
+    }
+    if (isCorrect) {
+      if (onRemovePinCrypto) onRemovePinCrypto();
+      // Also clear biometry.
+      updSec({ pinHash:null, pinSalt:null, encSalt:null, pinHashVersion:null,
+               bioEnabled:false, bioCredId:null, attempts:0, totalFailed:0, lockedUntil:null });
+      setRmPin(false); setVPin(""); setVErr("");
+    } else {
+      setVErr(t("Pogrešan PIN"));
+    }
+  };
 
   const toggleBio = async () => {
     if (sec.bioEnabled) {
@@ -3362,13 +3605,13 @@ Hvala što koristiš Moja lova!`
 }
 
 // ─── Settings (Glavni izbornik) ───────────────────────────────────────────────
-function Settings({ C, txs, setTxs, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, t, lang }) {
+function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, onChangePinCrypto, onRemovePinCrypto, t, lang }) {
   const cy = curYear();
   const years = Array.from({length:12},(_,i)=>cy-5+i);
 
   if (subPg) {
     if (subPg === "general") {
-      return <GeneralSettings C={C} txs={txs} setTxs={setTxs} prefs={prefs} updPrefs={updPrefs} user={user} updUser={updUser} sec={sec} updSec={updSec} year={year} setSetupMode={setSetupMode} setUnlocked={setUnlocked} onBack={()=>setSubPg(null)} onAbout={()=>setSubPg("about")} t={t} lang={lang} />;
+      return <GeneralSettings C={C} txs={txs} setTxs={setTxs} drafts={drafts} lists={lists} setLists={setLists} prefs={prefs} updPrefs={updPrefs} user={user} updUser={updUser} sec={sec} updSec={updSec} year={year} setSetupMode={setSetupMode} setUnlocked={setUnlocked} onBack={()=>setSubPg(null)} onAbout={()=>setSubPg("about")} onChangePinCrypto={onChangePinCrypto} onRemovePinCrypto={onRemovePinCrypto} t={t} lang={lang} />;
     }
     if (subPg === "recurring") {
       return <RecurringEditor C={C} items={lists.recurring||[]} lists={lists} t={t} onBack={arr=>{ setLists(l=>({...l,recurring:arr})); setSubPg(null); }}/>;
