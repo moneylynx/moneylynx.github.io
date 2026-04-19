@@ -105,6 +105,14 @@ const EN_DICT = {
   "Za platiti ovog mjeseca": "To pay this month",
   "Redovno": "Recurring",
   "Prikaži sve": "Show all",
+  "O aplikaciji": "About",
+  "Pomoć": "Help",
+  "Licencni uvjeti": "Licence Terms",
+  "Odricanje odgovornosti": "Disclaimer",
+  "Privatnost i kolačići": "Privacy & Cookies",
+  "Kontaktiraj nas": "Contact Us",
+  "Pošalji povratnu informaciju": "Send Feedback",
+  "Dijagnostika": "Diagnostics",
   "Kopiraj tekst ispod i spremi ga u datoteku ili zalijepi u e-mail / Drive / Keep.": "Copy the text below and save it to a file, or paste it into e-mail / Drive / Keep.",
   "Spremi backup koristeći jednu od opcija ispod. Ako jedna ne radi, druga hoće.": "Save the backup using one of the options below. If one doesn't work, another will.",
   "Podijeli": "Share",
@@ -138,18 +146,18 @@ const DEF_LISTS = {
 
 const T = {
   dark: {
-    bg:"#0D1B2A", card:"#112233", cardAlt:"#162840",
+    bg:"#0A1628", card:"#0F2035", cardAlt:"#162845",
     accent:"#38BDF8", accentDk:"#0EA5E9", accentGlow:"#38BDF830",
     income:"#34D399", expense:"#F87171", warning:"#FBBF24",
-    text:"#F1F5F9", textMuted:"#64748B", textSub:"#94A3B8",
-    border:"#1E3A5F", navBg:"#0A1628",
+    text:"#F1F5F9", textMuted:"#7A9EC0", textSub:"#94A3B8",
+    border:"#1A3355", navBg:"#07111E",
   },
   light: {
-    bg:"#F8FAFC", card:"#FFFFFF", cardAlt:"#F1F5F9",
-    accent:"#0EA5E9", accentDk:"#0284C7", accentGlow:"#0EA5E930",
+    bg:"#FFFFFF", card:"#F8FAFC", cardAlt:"#EFF6FF",
+    accent:"#0EA5E9", accentDk:"#0284C7", accentGlow:"#0EA5E920",
     income:"#059669", expense:"#DC2626", warning:"#D97706",
     text:"#0F172A", textMuted:"#64748B", textSub:"#475569",
-    border:"#CBD5E1", navBg:"#FFFFFF",
+    border:"#DBEAFE", navBg:"#FFFFFF",
   },
 };
 
@@ -751,7 +759,7 @@ export default function App() {
   const [showActionHub, setShowActionHub] = useState(false);
 
   // Filters
-  const [txFilter, setTxFilter]           = useState("all");
+  const [txFilter, setTxFilter]           = useState("Čeka plaćanje");
   const [statTab, setStatTab]             = useState("expected");
   const [statMonth, setStatMonth]         = useState("YEAR");
   const [statExpFilter, setStatExpFilter] = useState({recurring:true, rate:true, kredit:true, processing:true});
@@ -1082,7 +1090,7 @@ export default function App() {
             }
           }} style={{ background:"none", border:"none", display:"flex", flexDirection:"column", alignItems:"center", gap:3, cursor:"pointer", padding:"4px 10px", borderRadius:10 }}>
             {id==="add"
-              ? <div style={{ width:46, height:46, borderRadius:16, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center", marginTop:-24, boxShadow:`0 4px 18px ${C.accentGlow}` }}><Ic n="plus" s={22} c="#fff"/></div>
+              ? <div style={{ width:46, height:46, borderRadius:16, background:C.accent, display:"flex", alignItems:"center", justifyContent:"center", marginTop:-24, boxShadow:`0 4px 18px ${C.accentGlow}` }}><Ic n="plus" s={24} c="#fff"/></div>
               : <><Ic n={ic} s={20} c={page===id?C.accent:C.textMuted}/><span style={{ fontSize:10, color:page===id?C.accent:C.textMuted, fontWeight:page===id?600:400 }}>{t(lb)}</span></>
             }
           </button>
@@ -1208,10 +1216,8 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
   const dn  = [user.firstName, user.lastName].filter(Boolean).join(" ");
 
   const cards = [
-    { icon:<Ic n="up"    s={13} c={C.income}/>,  label:`${cmName} ${t("primici")}`,        val:fmtEur(mI),            color:C.income  },
-    { icon:<Ic n="down"  s={13} c={C.expense}/>, label:`${cmName} ${t("plaćeno")}`,        val:fmtEur(mE),            color:C.expense },
-    { icon:<Ic n="coins" s={13} c={C.warning}/>, label:`${cmName} ${t("čekaju")}`,         val:fmtEur(pendingMonth), color:C.warning },
-    { icon:<Ic n="coins" s={13} c={C.accentDk}/>, label:t("Prosjek/mj."),         val:fmtEur(exp/12),       color:C.accentDk },
+    { icon:<Ic n="up"    s={13} c={C.income}/>,  label:`${cmName} ${t("primici")}`,  val:fmtEur(mI), color:C.income  },
+    { icon:<Ic n="down"  s={13} c={C.expense}/>, label:`${cmName} ${t("plaćeno")}`,  val:fmtEur(mE), color:C.expense },
   ];
 
   return (
@@ -1220,7 +1226,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
             <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
-              <Ic n="wallet" s={22} c={C.accent}/> {t("Moja lova")} <span style={{fontSize:14,color:C.textMuted,fontWeight:500}}>· {year}.</span>
+              <Ic n="wallet" s={22} c={C.accent}/> {t("Moja lova")} <span style={{fontSize:14, color:C.textMuted, fontWeight:500, verticalAlign:"middle", position:"relative", top:2}}>· {year}.</span>
             </h1>
             {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
@@ -1279,7 +1285,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
         )}
 
         <div className="su" style={{ background:`linear-gradient(135deg,${C.accent}22,${bal>=0?C.income:C.expense}18)`, border:`1px solid ${bal>=0?C.income:C.expense}40`, borderRadius:18, padding:"16px 18px 16px 16px", marginBottom:10, position:"relative", overflow:"hidden" }}>
-          <div style={{ position:"absolute", top:12, right:6, textAlign:"right" }}>
+          <div style={{ position:"absolute", top:12, right:18, textAlign:"right" }}>
             <div style={{ fontSize:10, fontWeight:700, color:C.textSub, letterSpacing:.3 }}>{wd}</div>
             <div style={{ fontSize:13, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.textSub }}>{dd}.{mm}.</div>
             <div style={{ fontSize:10, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.textMuted, marginTop:1 }}>{yy}.</div>
@@ -1308,34 +1314,49 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
           </div>
         ) : (
           <>
-            <div className="su" style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:"10px 10px 6px", marginBottom:10 }}>
-              <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:6, display:"flex", alignItems:"center", gap:5 }}>
-                <Ic n="bar" s={12} c={C.textMuted}/>{t("Primici vs Troškovi")} — {year}.
+            {/* Top kategorije — kompaktno, dovoljno konteksta bez previše prostora */}
+            {catsMonth.length>0 && (
+              <div className="su" style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:"10px 12px", marginBottom:10 }}>
+                <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:10, display:"flex", alignItems:"center", gap:5 }}>
+                  <Ic n="tag" s={12} c={C.textMuted}/>{t("Top kategorije")} · {cmName} {year}.
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+                  <div style={{ flexShrink:0 }}>
+                    <PieChart width={Math.round(W*.38)} height={100}>
+                      <Pie data={catsMonth.slice(0,4)} cx="50%" cy="50%" innerRadius={20} outerRadius={45} dataKey="value" stroke="none">
+                        {catsMonth.slice(0,4).map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}
+                      </Pie>
+                    </PieChart>
+                  </div>
+                  <div style={{ flex:1, maxHeight:100, overflowY:"auto", paddingRight:4 }}>
+                    {catsMonth.map((c,i)=>(
+                      <div key={c.name} style={{ display:"flex", justifyContent:"space-between", padding:"4px 0", borderBottom: i<catsMonth.length-1?`1px solid ${C.border}40`:"none", fontSize:11 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <div style={{ width:7, height:7, borderRadius:2, background:CHART_COLORS[i%CHART_COLORS.length], flexShrink:0 }}/>
+                          <span style={{ color:C.textSub, maxWidth:80, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t(c.name)}</span>
+                        </div>
+                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:600, fontSize:11 }}>{fmtEur(c.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <BarChart width={W} height={130} data={mBar} barGap={1} barCategoryGap="35%">
-                <XAxis dataKey="name" tick={{fill:C.textMuted,fontSize:8}} axisLine={false} tickLine={false}/>
-                <YAxis tick={{fill:C.textMuted,fontSize:8}} axisLine={false} tickLine={false} width={32} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:v}/>
-                <Tooltip {...tt}/>
-                <Bar dataKey="P" name={t("Primici")}  fill={C.income}  radius={[3,3,0,0]}/>
-                <Bar dataKey="T" name={t("Troškovi")} fill={C.expense} radius={[3,3,0,0]}/>
-              </BarChart>
-            </div>
+            )}
 
-            {/* To-Do widget — items to pay this month. Combines pending/
-                processing transactions with recurring obligations that haven't
-                been materialized yet. Hidden when the list is empty. */}
+            {/* Za platiti ovog mjeseca — ograničeno na 4 stavke da nema skrolanja */}
             {todoItems.length > 0 && (
-              <div className="su" style={{ background:C.card, border:`1px solid ${C.warning}40`, borderLeft:`4px solid ${C.warning}`, borderRadius:14, padding:"10px 12px", marginBottom:12 }}>
+              <div className="su" style={{ background:C.card, border:`1px solid ${C.warning}40`, borderLeft:`4px solid ${C.warning}`, borderRadius:14, padding:"10px 12px", marginBottom:10 }}>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                   <div style={{ fontSize:11, fontWeight:600, color:C.warning, display:"flex", alignItems:"center", gap:5 }}>
                     <Ic n="coins" s={12} c={C.warning}/>{t("Za platiti ovog mjeseca")}
+                    {todoItems.length > 4 && <span style={{ background:`${C.warning}25`, borderRadius:10, padding:"1px 7px", fontSize:10, fontWeight:700, color:C.warning }}>+{todoItems.length-4}</span>}
                   </div>
                   <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.warning }}>
                     {fmtEur(todoItems.reduce((s,i)=>s+i.amount,0))}
                   </div>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                  {todoItems.slice(0, 6).map(item => (
+                  {todoItems.slice(0, 4).map(item => (
                     <div key={item.kind+"-"+item.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 9px", background:C.cardAlt, borderRadius:9, border:`1px solid ${C.border}` }}>
                       <div style={{
                         width:28, height:28, borderRadius:8,
@@ -1369,7 +1390,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
                       </button>
                     </div>
                   ))}
-                  {todoItems.length > 6 && (
+                  {todoItems.length > 4 && (
                     <button
                       onClick={()=>setPage("transactions")}
                       style={{ padding:"6px", background:"transparent", border:"none", color:C.accent, fontSize:11, fontWeight:600, cursor:"pointer" }}
@@ -1377,34 +1398,6 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t,
                       {t("Prikaži sve")} ({todoItems.length})
                     </button>
                   )}
-                </div>
-              </div>
-            )}
-
-            {catsMonth.length>0 && (
-              <div className="su" style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:"10px 12px", marginBottom:12 }}>
-                <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:10, display:"flex", alignItems:"center", gap:5 }}>
-                  <Ic n="tag" s={12} c={C.textMuted}/>{t("Top kategorije")} · {cmName} {year}.
-                </div>
-                <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-                  <div style={{ flexShrink:0 }}>
-                    <PieChart width={Math.round(W*.38)} height={100}>
-                      <Pie data={catsMonth.slice(0,4)} cx="50%" cy="50%" innerRadius={20} outerRadius={45} dataKey="value" stroke="none">
-                        {catsMonth.slice(0,4).map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}
-                      </Pie>
-                    </PieChart>
-                  </div>
-                  <div style={{ flex:1, maxHeight:100, overflowY:"auto", paddingRight:4 }}>
-                    {catsMonth.map((c,i)=>(
-                      <div key={c.name} style={{ display:"flex", justifyContent:"space-between", padding:"4px 0", borderBottom: i<catsMonth.length-1?`1px solid ${C.border}40`:"none", fontSize:11 }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                          <div style={{ width:7, height:7, borderRadius:2, background:CHART_COLORS[i%CHART_COLORS.length], flexShrink:0 }}/>
-                          <span style={{ color:C.textSub, maxWidth:80, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t(c.name)}</span>
-                        </div>
-                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:600, fontSize:11 }}>{fmtEur(c.value)}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
             )}
@@ -2619,7 +2612,7 @@ function RecurringEditor({ C, items, lists, onBack, t }) {
 }
 
 // ─── GeneralSettings ──────────────────────────────────────────────────────────
-function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, t, lang }) {
+function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, t, lang }) {
   const [pinChg,  setPinChg]  = useState(false);
   const [rmPin,   setRmPin]   = useState(false);
   const [vPin,    setVPin]    = useState("");
@@ -2936,7 +2929,13 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="wallet" s={20} c="#fff"/></div>
-            <div><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.2</div></div>
+            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.2</div></div>
+            {onAbout && (
+              <button onClick={onAbout}
+                style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
+                <span style={{ fontSize:14, fontWeight:700, color:C.accent, fontFamily:"serif", lineHeight:1 }}>i</span>
+              </button>
+            )}
           </div>
           <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:11 }}>
             <p style={{ fontSize:13, fontWeight:600, color:C.text }}>{t("Autor:")} Bojan Vivoda</p>
@@ -3068,16 +3067,314 @@ function GeneralSettings({ C, txs, setTxs, prefs, updPrefs, user, updUser, sec, 
 }
 
 // ─── Settings (Glavni izbornik) ───────────────────────────────────────────────
+// ─── AboutScreen ──────────────────────────────────────────────────────────────
+function AboutScreen({ C, onBack, t, lang }) {
+  const [section, setSection] = useState(null); // null = menu, string = content
+
+  const sections = [
+    { id:"help",        icon:"info",   label:t("Pomoć") },
+    { id:"licences",    icon:"lock",   label:t("Licencni uvjeti") },
+    { id:"disclaimer",  icon:"alert",  label:t("Odricanje odgovornosti") },
+    { id:"privacy",     icon:"lock",   label:t("Privatnost i kolačići") },
+    { id:"contact",     icon:"mail",   label:t("Kontaktiraj nas") },
+    { id:"feedback",    icon:"zap",    label:t("Pošalji povratnu informaciju") },
+    { id:"diagnostics", icon:"bar",    label:t("Dijagnostika") },
+  ];
+
+  const content = {
+    help: {
+      title: t("Pomoć"),
+      body: lang === "en" ? `
+GETTING STARTED
+Open the app and tap the blue + button at the bottom to record your first transaction. Choose between Expense or Income, fill in the amount, description, category, location and payment method.
+
+TRANSACTIONS
+• Expense: a payment or cost
+• Income: money received (salary, transfer…)
+• Recurring obligation: a monthly repeating expense (subscription, loan, rent). Enable the "Recurring obligation?" toggle inside the Expense form.
+• Installments: a purchase spread over multiple months (e.g. 24 installments for an appliance). Enable the "Installments?" toggle inside the Expense form.
+
+DASHBOARD
+The home screen shows your yearly balance, monthly income/expenses, top spending categories and a "To pay this month" list. Tap Pay next to any item to mark it as paid instantly.
+
+TRANSACTIONS SCREEN
+Filters at the top let you view: All, Pending, Paid, Processing, Income. The default view shows "Pending" so you immediately see what needs attention.
+
+STATISTICS
+Four views: Expected obligations, Categories, Overview/Balance, Payments & Locations. Use the month pills to narrow down to a specific period.
+
+SETTINGS
+• Active Year — switch the year you're analyzing
+• Manage Obligations — edit or delete recurring obligations
+• List Customization — add your own categories, locations, payment methods
+• General Settings — profile, theme, language, security, backup
+
+BACKUP & RESTORE
+Your data lives only on your device. Go to Settings → General → Export (Backup) and use Copy, Share, or Download to save your data. To restore, use Settings → General → Import (Restore) and pick your JSON backup file.
+
+PIN & BIOMETRICS
+Set a 4-6 digit PIN in Settings → General → Set PIN Protection. After 5 wrong attempts the app locks for 30 seconds. After 10 wrong attempts all data is wiped. Enable Face ID / fingerprint in Settings → General → Biometrics.
+`.trim() : `
+POČETAK RADA
+Otvori aplikaciju i pritisni plavi + gumb na dnu za unos prve transakcije. Odaberi Isplata ili Primitak, unesi iznos, opis, kategoriju, lokaciju i način plaćanja.
+
+TRANSAKCIJE
+• Isplata: plaćanje ili trošak
+• Primitak: primljeni novac (plaća, uplata…)
+• Redovna obveza: trošak koji se ponavlja svaki mjesec (pretplata, kredit, najam). Uključi prekidač "Redovna obveza?" unutar forme za Isplatu.
+• Obročna otplata: kupnja raspoređena na više mjeseci (npr. 24 rate za uređaj). Uključi prekidač "Obročna otplata?" unutar forme za Isplatu.
+
+POČETNI EKRAN
+Prikazuje godišnju bilancu, primike/troškove za tekući mjesec, top kategorije potrošnje i popis "Za platiti ovog mjeseca". Pritisni Plati pored stavke da je odmah označi kao plaćenu.
+
+EKRAN TRANSAKCIJE
+Filteri na vrhu: Sve, Čeka plaćanje, Plaćeno, U obradi, Primici. Zadani prikaz je "Čeka plaćanje" da odmah vidiš što treba platiti.
+
+STATISTIKA
+Četiri prikaza: Očekivano, Kategorije, Pregled/Saldo, Plaćanje i Lokacije. Koristi pill gumbe za odabir određenog mjeseca ili cijele godine.
+
+POSTAVKE
+• Aktivna godina — prebaci godinu za analizu
+• Upravljaj obvezama — uredi ili obriši redovne obveze
+• Prilagodba popisa — dodaj vlastite kategorije, lokacije, načine plaćanja
+• Opće postavke — profil, tema, jezik, sigurnost, backup
+
+BACKUP I VRAĆANJE PODATAKA
+Podaci se čuvaju isključivo na tvom uređaju. Idi u Postavke → Opće → Izvezi (Backup) i koristi Kopiraj, Podijeli ili Preuzmi za spremanje podataka. Za vraćanje: Postavke → Opće → Učitaj (Restore).
+
+PIN I BIOMETRIJA
+Postavi 4-6 znamenkasti PIN u Postavke → Opće → Postavi PIN zaštitu. Nakon 5 krivih pokušaja aplikacija se zaključa 30 sekundi. Nakon 10 krivih pokušaja svi podaci se brišu. Fingerprint/Face ID aktiviraj u Postavke → Opće → Biometrija.
+`.trim()
+    },
+    licences: {
+      title: t("Licencni uvjeti"),
+      body: `Moja lova — Licencni uvjeti / Licence Terms
+
+© 2024–2026 Bojan Vivoda. Sva prava pridržana.
+All rights reserved.
+
+UVJETI KORIŠTENJA (HR)
+Ova aplikacija licencirana je isključivo za osobnu, nekomercijalnu upotrebu. Zabranjeno je: redistribuirati, prodavati, mijenjati ili koristiti kod, dizajn ili sadržaj ove aplikacije u komercijalne svrhe bez pisanog dopuštenja autora.
+
+TERMS OF USE (EN)
+This application is licensed for personal, non-commercial use only. Redistribution, sale, modification, or commercial use of the code, design, or content of this application without the author's written permission is prohibited.
+
+KOMPONENTE OTVORENOG KODA / OPEN SOURCE COMPONENTS
+Ova aplikacija koristi sljedeće open-source biblioteke:
+
+• React 18.2 — MIT License — facebook/react
+• Recharts 2.12 — MIT License — recharts/recharts
+• Vite 5 — MIT License — vitejs/vite
+• Capacitor 8 — MIT License — ionic-team/capacitor
+
+Pune tekstove licenci za ove biblioteke možete pronaći na:
+Full license texts available at: https://opensource.org/licenses/MIT`
+    },
+    disclaimer: {
+      title: t("Odricanje odgovornosti"),
+      body: lang === "en" ? `DISCLAIMER
+
+Moja lova is provided "as is" without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.
+
+FINANCIAL DECISIONS
+This app is a personal budgeting tool only. It does not provide financial, investment, tax, or legal advice. All financial decisions made based on data entered into this app are the sole responsibility of the user. The author is not liable for any financial loss or damage arising from the use of this application.
+
+DATA LOSS
+The author is not responsible for loss of data resulting from: device failure, accidental deletion, uninstallation of the app, browser cache clearing, or any other cause. Users are strongly advised to regularly export backups.
+
+ACCURACY
+The app performs calculations based on user-entered data. The accuracy of all outputs depends entirely on the accuracy of the data entered.
+
+AVAILABILITY
+The author does not guarantee continuous availability of the web version (moja-lova-app.vercel.app). The app may be unavailable due to maintenance, updates, or third-party service outages.` :
+`ODRICANJE ODGOVORNOSTI
+
+Aplikacija Moja lova pruža se "kakva jest" bez ikakvih izričitih ili implicitnih jamstava, uključujući, ali ne ograničavajući se na jamstva prodajnosti, prikladnosti za određenu svrhu ili nekršenja prava.
+
+FINANCIJSKE ODLUKE
+Ova aplikacija je isključivo alat za osobno budžetiranje. Ne pruža financijske, investicijske, porezne niti pravne savjete. Sve financijske odluke donesene na temelju podataka unesenih u aplikaciju isključiva su odgovornost korisnika. Autor nije odgovoran za financijske gubitke ili štete nastale korištenjem aplikacije.
+
+GUBITAK PODATAKA
+Autor nije odgovoran za gubitak podataka uslijed: kvara uređaja, slučajnog brisanja, deinstalacije aplikacije, brisanja predmemorije preglednika ili bilo kojeg drugog uzroka. Korisnicima se snažno preporuča redovit izvoz sigurnosnih kopija.
+
+TOČNOST
+Aplikacija vrši izračune na temelju korisnikovih podataka. Točnost svih rezultata u potpunosti ovisi o točnosti unesenih podataka.
+
+DOSTUPNOST
+Autor ne jamči neprekidnu dostupnost web verzije (moja-lova-app.vercel.app). Aplikacija može biti nedostupna zbog održavanja, ažuriranja ili zastoja usluga trećih strana.`
+    },
+    privacy: {
+      title: t("Privatnost i kolačići"),
+      body: lang === "en" ? `PRIVACY & COOKIES POLICY
+
+DATA COLLECTION
+Moja lova does not collect, transmit, or store any personal data on external servers. All data entered into the app (transactions, categories, profile information) is stored exclusively on your device using browser localStorage or, in the Android app, the device's local storage.
+
+No data is sent to the developer, third parties, or any cloud service without your explicit action (e.g. you choosing to export and email your data).
+
+COOKIES
+The web version (moja-lova-app.vercel.app) does not use tracking cookies, advertising cookies, or analytics cookies. The app may use browser storage (localStorage) to save your preferences and data — this is not a "cookie" in the traditional sense but serves a similar local storage function.
+
+THIRD-PARTY SERVICES
+The web app is hosted on Vercel (vercel.com). Vercel may log standard server access data (IP address, browser type, access times) as part of normal hosting operations. Please refer to Vercel's privacy policy for details.
+
+The app loads fonts from Google Fonts CDN (fonts.googleapis.com). Google may collect standard CDN access logs. Please refer to Google's privacy policy for details.
+
+YOUR RIGHTS
+Since no personal data is collected or stored by the developer, there is no data to request, correct, or delete on our end. Your data is entirely under your control on your own device.
+
+CONTACT
+For privacy-related questions: see the "Contact us" section.` :
+`POLITIKA PRIVATNOSTI I KOLAČIĆA
+
+PRIKUPLJANJE PODATAKA
+Moja lova ne prikuplja, ne prenosi niti pohranjuje nikakve osobne podatke na vanjskim poslužiteljima. Svi podaci uneseni u aplikaciju (transakcije, kategorije, podaci profila) pohranjuju se isključivo na tvom uređaju putem browser localStorage-a ili, u Android verziji, lokalne pohrane uređaja.
+
+Nikakvi podaci ne šalju se programeru, trećim stranama niti nijednoj usluzi u oblaku bez tvoje izričite radnje (npr. kad odlučiš izvesti i e-mailom poslati svoje podatke).
+
+KOLAČIĆI
+Web verzija (moja-lova-app.vercel.app) ne koristi kolačiće za praćenje, oglašavanje niti analitiku. Aplikacija može koristiti browser localStorage za pohranu tvojih postavki i podataka — to nije "kolačić" u tradicionalnom smislu, ali služi sličnoj lokalnoj funkciji pohrane.
+
+USLUGE TREĆIH STRANA
+Web aplikacija je hostirana na Vercelu (vercel.com). Vercel može bilježiti standardne podatke o pristupu poslužitelju (IP adresa, vrsta preglednika, vremena pristupa) kao dio normalnog rada hostinga.
+
+Aplikacija učitava fontove s Google Fonts CDN-a (fonts.googleapis.com). Google može prikupljati standardne CDN pristupne zapise.
+
+TVOJA PRAVA
+Budući da programer ne prikuplja niti pohranjuje osobne podatke, nema podataka koje bismo morali ispraviti ili obrisati s naše strane. Tvoji podaci u potpunosti su pod tvojom kontrolom, na tvom uređaju.`
+    },
+    contact: {
+      title: t("Kontaktiraj nas"),
+      body: `Moja lova
+Autor: Bojan Vivoda
+
+${lang === "en" ? "For questions, suggestions or bug reports, please reach out via:" : "Za pitanja, prijedloge ili prijavu grešaka, obratite se putem:"}
+
+GitHub: github.com/bvivoda/Moja-lova-app
+${lang === "en" ? "Web app:" : "Web aplikacija:"} moja-lova-app.vercel.app
+
+${lang === "en" ? "When reporting a bug, please include:" : "Kod prijave greške, navedite:"}
+${lang === "en" ? "• App version (1.2)" : "• Verziju aplikacije (1.2)"}
+${lang === "en" ? "• Device and OS version" : "• Uređaj i verziju OS-a"}
+${lang === "en" ? "• Steps to reproduce the issue" : "• Korake koji reproduciraju problem"}`
+    },
+    feedback: {
+      title: t("Pošalji povratnu informaciju"),
+      body: lang === "en" ? `SEND FEEDBACK
+
+We appreciate your feedback! It helps improve the app for everyone.
+
+Ways to provide feedback:
+
+• GitHub Issues — for bug reports and feature requests:
+  github.com/bvivoda/Moja-lova-app/issues
+
+• GitHub Discussions — for general suggestions and ideas
+
+Please describe:
+1. What you were trying to do
+2. What happened instead
+3. What you expected to happen
+4. Your device and OS version
+
+Thank you for using Moja lova!` :
+`POŠALJI POVRATNU INFORMACIJU
+
+Hvala na povratnoj informaciji! Pomaže nam poboljšati aplikaciju za sve.
+
+Načini pružanja povratnih informacija:
+
+• GitHub Issues — za prijave grešaka i zahtjeve za nove značajke:
+  github.com/bvivoda/Moja-lova-app/issues
+
+• GitHub Discussions — za opće prijedloge i ideje
+
+Molimo opiši:
+1. Što si pokušavao napraviti
+2. Što se umjesto toga dogodilo
+3. Što si očekivao da se dogodi
+4. Tvoj uređaj i verziju OS-a
+
+Hvala što koristiš Moja lova!`
+    },
+    diagnostics: {
+      title: t("Dijagnostika"),
+      body: [
+        `${lang==="en"?"App version":"Verzija aplikacije"}: 1.2`,
+        `${lang==="en"?"Platform":"Platforma"}: ${typeof window !== "undefined" && window.Capacitor && window.Capacitor.isNativePlatform() ? "Android APK" : "Web / PWA"}`,
+        `${lang==="en"?"User Agent":"User Agent"}: ${typeof navigator !== "undefined" ? navigator.userAgent : "N/A"}`,
+        `${lang==="en"?"Language":"Jezik"}: ${typeof navigator !== "undefined" ? navigator.language : "N/A"}`,
+        `${lang==="en"?"Screen":"Zaslon"}: ${typeof window !== "undefined" ? `${window.screen.width}×${window.screen.height}` : "N/A"}`,
+        `${lang==="en"?"Online":"Online"}: ${typeof navigator !== "undefined" ? (navigator.onLine ? (lang==="en"?"Yes":"Da") : (lang==="en"?"No":"Ne")) : "N/A"}`,
+        `${lang==="en"?"Service Worker":"Service Worker"}: ${"serviceWorker" in navigator ? (lang==="en"?"Supported":"Podržan") : (lang==="en"?"Not supported":"Nije podržan")}`,
+        `${lang==="en"?"Storage available":"Pohrana dostupna"}: ${(() => { try { const t = "ml_test"; localStorage.setItem(t,"1"); localStorage.removeItem(t); return lang==="en"?"Yes":"Da"; } catch { return lang==="en"?"No":"Ne"; }})()}`,
+      ].join("\n")
+    },
+  };
+
+  const item = section ? content[section] : null;
+
+  return (
+    <div className="fi" style={{ width:"100%" }}>
+      <StickyHeader C={C} icon="info" title={item ? item.title : t("O aplikaciji")}
+        right={<button onClick={item ? ()=>setSection(null) : onBack}
+          style={{ background:C.cardAlt, border:`1px solid ${C.border}`, color:C.textMuted, padding:"8px 14px", borderRadius:10, fontSize:13, cursor:"pointer" }}>
+          {t("Natrag")}
+        </button>}
+      />
+      <div style={{ padding:"14px 16px 24px" }}>
+        {!section ? (
+          <>
+            <div style={{ background:`linear-gradient(135deg,${C.accent}18,${C.accent}08)`, border:`1px solid ${C.accent}30`, borderRadius:14, padding:"14px 16px", marginBottom:18, display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ width:44, height:44, borderRadius:14, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Ic n="wallet" s={22} c="#fff"/>
+              </div>
+              <div>
+                <div style={{ fontSize:17, fontWeight:700, color:C.text }}>Moja lova</div>
+                <div style={{ fontSize:12, color:C.textMuted }}>{t("Verzija")} 1.2 · © 2026 Bojan Vivoda</div>
+              </div>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              {sections.map(s=>(
+                <button key={s.id} onClick={()=>setSection(s.id)}
+                  style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:C.card, border:`1px solid ${C.border}`, borderRadius:13, cursor:"pointer", textAlign:"left" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ width:32, height:32, borderRadius:9, background:`${C.accent}18`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <Ic n={s.icon} s={15} c={C.accent}/>
+                    </div>
+                    <span style={{ fontSize:14, fontWeight:500, color:C.text }}>{s.label}</span>
+                  </div>
+                  <Ic n="chevron" s={14} c={C.textMuted} style={{ transform:"rotate(-90deg)" }}/>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:16 }}>
+            <pre style={{ fontFamily:"'Inter',sans-serif", fontSize:12.5, lineHeight:1.7, color:C.text, whiteSpace:"pre-wrap", wordBreak:"break-word", margin:0 }}>
+              {item.body}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Settings (Glavni izbornik) ───────────────────────────────────────────────
 function Settings({ C, txs, setTxs, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, t, lang }) {
   const cy = curYear();
   const years = Array.from({length:12},(_,i)=>cy-5+i);
 
   if (subPg) {
     if (subPg === "general") {
-      return <GeneralSettings C={C} txs={txs} setTxs={setTxs} prefs={prefs} updPrefs={updPrefs} user={user} updUser={updUser} sec={sec} updSec={updSec} year={year} setSetupMode={setSetupMode} setUnlocked={setUnlocked} onBack={()=>setSubPg(null)} t={t} lang={lang} />;
+      return <GeneralSettings C={C} txs={txs} setTxs={setTxs} prefs={prefs} updPrefs={updPrefs} user={user} updUser={updUser} sec={sec} updSec={updSec} year={year} setSetupMode={setSetupMode} setUnlocked={setUnlocked} onBack={()=>setSubPg(null)} onAbout={()=>setSubPg("about")} t={t} lang={lang} />;
     }
     if (subPg === "recurring") {
       return <RecurringEditor C={C} items={lists.recurring||[]} lists={lists} t={t} onBack={arr=>{ setLists(l=>({...l,recurring:arr})); setSubPg(null); }}/>;
+    }
+    if (subPg === "about") {
+      return <AboutScreen C={C} onBack={()=>setSubPg(null)} t={t} lang={lang}/>;
     }
     const MAP = { cat_exp:{title:"Kategorije troškova",key:"categories_expense"}, cat_inc:{title:"Kategorije primici",key:"categories_income"}, locations:{title:"Lokacije",key:"locations"}, payments:{title:"Načini plaćanja",key:"payments"}, statuses:{title:"Statusi",key:"statuses"} };
     const m = MAP[subPg];
@@ -3150,7 +3447,11 @@ function Settings({ C, txs, setTxs, prefs, updPrefs, user, updUser, lists, setLi
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="wallet" s={20} c="#fff"/></div>
-            <div><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.2</div></div>
+            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.2</div></div>
+            <button onClick={()=>setSubPg("about")}
+              style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
+              <span style={{ fontSize:14, fontWeight:700, color:C.accent, fontFamily:"serif", lineHeight:1 }}>i</span>
+            </button>
           </div>
           <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:11 }}>
             <p style={{ fontSize:13, fontWeight:600, color:C.text }}>{t("Autor:")} Bojan Vivoda</p>
