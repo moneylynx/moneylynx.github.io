@@ -88,6 +88,8 @@ const EN_DICT = {
   "Napravi kopiju svih podataka u .json datoteci": "Save a backup of all data in a .json file",
   "Vrati podatke iz prethodne kopije": "Restore data from a previous backup",
   "Backup uspješno spremljen.": "Backup saved successfully.",
+  "Nova verzija dostupna": "New version available",
+  "Klikni za ažuriranje": "Tap to update",
   "Kopiraj tekst ispod i spremi ga u datoteku ili zalijepi u e-mail / Drive / Keep.": "Copy the text below and save it to a file, or paste it into e-mail / Drive / Keep.",
   "Spremi backup koristeći jednu od opcija ispod. Ako jedna ne radi, druga hoće.": "Save the backup using one of the options below. If one doesn't work, another will.",
   "Podijeli": "Share",
@@ -710,6 +712,7 @@ export default function App() {
   const [subPg, setSubPg]    = useState(null);
   const [unlocked,setUnlocked] = useState(false);
   const [setupMode, setSetupMode] = useState(false); // shows SetupPin screen from Settings when user has no PIN yet
+  const [swUpdate, setSwUpdate] = useState(null);     // ServiceWorker waiting — trigger via banner click
 
   // Modal controls
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -757,6 +760,52 @@ export default function App() {
     document.addEventListener("visibilitychange", fn);
     return () => document.removeEventListener("visibilitychange", fn);
   },[sec.pinHash]);
+
+  // ─── Service Worker registration + update detection ───────────────────────
+  // Registers sw.js on first load so the app can work offline. If a new SW
+  // is waiting to activate (because the user has an older version cached),
+  // we surface an "Update available" banner; clicking it tells the new SW
+  // to skipWaiting and reloads to pick up the fresh code.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    // Register only on real deployments; skip in dev (Vite HMR handles reloads).
+    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") return;
+
+    let registration;
+    const onControllerChange = () => { window.location.reload(); };
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
+    navigator.serviceWorker.register("/sw.js").then((reg) => {
+      registration = reg;
+      // If a waiting worker exists at startup (user missed last update), show banner.
+      if (reg.waiting) setSwUpdate(reg.waiting);
+      // Listen for a new SW that becomes installed while the page is open.
+      reg.addEventListener("updatefound", () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener("statechange", () => {
+          if (nw.state === "installed" && navigator.serviceWorker.controller) {
+            setSwUpdate(nw);
+          }
+        });
+      });
+      // Check for updates periodically (every hour while tab is open).
+      const poll = setInterval(() => reg.update().catch(() => null), 60 * 60 * 1000);
+      // Store cleanup on closure via a variable captured below.
+      registration._pollId = poll;
+    }).catch(() => null);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      if (registration && registration._pollId) clearInterval(registration._pollId);
+    };
+  }, []);
+
+  const applySwUpdate = () => {
+    if (!swUpdate) return;
+    swUpdate.postMessage({ type: "SKIP_WAITING" });
+    // controllerchange listener above will reload once the new SW takes over.
+  };
 
   const updP = p => setPrefs(v=>({...v,...p}));
   const updU = p => setUser(v=>({...v,...p}));
@@ -860,6 +909,31 @@ export default function App() {
   return (
     <div style={{ ...wrap, paddingBottom:88 }}>
       <style>{gs}</style>
+
+      {/* Service Worker update banner — appears when a new app version is ready. */}
+      {swUpdate && (
+        <div
+          onClick={applySwUpdate}
+          style={{
+            position:"fixed", top:0, left:"50%", transform:"translateX(-50%)",
+            width:"100%", maxWidth:480, zIndex:300,
+            background:`linear-gradient(135deg,${C.accent},${C.accentDk})`,
+            color:"#fff", padding:"12px 16px", cursor:"pointer",
+            display:"flex", alignItems:"center", justifyContent:"space-between",
+            gap:10, borderBottom:`1px solid ${C.accentDk}`,
+            paddingTop:`max(12px, env(safe-area-inset-top))`,
+          }}
+        >
+          <div style={{ display:"flex", alignItems:"center", gap:8, flex:1 }}>
+            <Ic n="zap" s={16} c="#fff"/>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700 }}>{t("Nova verzija dostupna")}</div>
+              <div style={{ fontSize:11, opacity:.9 }}>{t("Klikni za ažuriranje")}</div>
+            </div>
+          </div>
+          <Ic n="chevron" s={14} c="#fff" style={{ transform:"rotate(-90deg)" }}/>
+        </div>
+      )}
 
       {page==="dashboard"    && <Dashboard    {...shared} data={txs} setPage={setPage} onQuickAdd={()=>setShowQuickAdd(true)}/>}
       {page==="add"          && <TxForm {...shared} draft={draftEdit} onSubmit={tx=>{ addTx(tx); if(draftEdit){ setDrafts(p=>p.filter(d=>d.id!==draftEdit.id)); setDraftEdit(null); } }} onCancel={()=>{ setPage("dashboard"); setDraftEdit(null); }} onGoRecurring={()=>setPage("recurring")}/>}
