@@ -96,6 +96,15 @@ const EN_DICT = {
   "Stavka obrisana": "Item deleted",
   "Grupa obrisana": "Group deleted",
   "Skica obrisana": "Draft deleted",
+  "Redovna obveza?": "Recurring obligation?",
+  "Pretplata, kredit ili najam koji se ponavlja svakog mjeseca.": "Subscription, loan or rent that repeats every month.",
+  "Dan dospijeća": "Due day",
+  "Broj mjeseci (opc.)": "Months (optional)",
+  "neograničeno": "unlimited",
+  "Unos za ovaj mjesec bit će kreiran odmah sa statusom \"Čeka plaćanje\".": "An entry for this month will be created with status \"Pending\".",
+  "Za platiti ovog mjeseca": "To pay this month",
+  "Redovno": "Recurring",
+  "Prikaži sve": "Show all",
   "Kopiraj tekst ispod i spremi ga u datoteku ili zalijepi u e-mail / Drive / Keep.": "Copy the text below and save it to a file, or paste it into e-mail / Drive / Keep.",
   "Spremi backup koristeći jednu od opcija ispod. Ako jedna ne radi, druga hoće.": "Save the backup using one of the options below. If one doesn't work, another will.",
   "Podijeli": "Share",
@@ -1012,9 +1021,9 @@ export default function App() {
         </div>
       )}
 
-      {page==="dashboard"    && <Dashboard    {...shared} data={txs} setPage={setPage} onQuickAdd={()=>setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg}/>}
-      {page==="add"          && <TxForm {...shared} draft={draftEdit} onSubmit={tx=>{ addTx(tx); if(draftEdit){ setDrafts(p=>p.filter(d=>d.id!==draftEdit.id)); setDraftEdit(null); } }} onCancel={()=>{ setPage("dashboard"); setDraftEdit(null); }} onGoRecurring={()=>setPage("recurring")}/>}
-      {page==="edit"         && <TxForm {...shared} tx={txs.find(x=>x.id===editId)} onSubmit={updTx} onCancel={()=>{ setEditId(null); setPage("transactions"); }}/>}
+      {page==="dashboard"    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} onQuickAdd={()=>setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg}/>}
+      {page==="add"          && <TxForm {...shared} draft={draftEdit} setLists={setLists} onSubmit={tx=>{ addTx(tx); if(draftEdit){ setDrafts(p=>p.filter(d=>d.id!==draftEdit.id)); setDraftEdit(null); } }} onCancel={()=>{ setPage("dashboard"); setDraftEdit(null); }} onGoRecurring={()=>setPage("recurring")}/>}
+      {page==="edit"         && <TxForm {...shared} tx={txs.find(x=>x.id===editId)} setLists={setLists} onSubmit={updTx} onCancel={()=>{ setEditId(null); setPage("transactions"); }}/>}
       {page==="transactions" && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id=>{ setEditId(id); setPage("edit"); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id=>setTxs(p=>p.map(x=>x.id===id?{...x,status:"Plaćeno",date:new Date().toISOString().split("T")[0]}:x))}/>}
       {page==="charts"       && <Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/>}
       {page==="recurring"    && <RecurringScreen {...shared} data={txs} setTxs={setTxs} onBack={()=>setPage("dashboard")}/>}
@@ -1084,7 +1093,7 @@ export default function App() {
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-function Dashboard({ C, data, year, user, lists, setPage, onQuickAdd, t, lang, prefs, updPrefs, setSubPg }) {
+function Dashboard({ C, data, setTxs, year, user, lists, setPage, onQuickAdd, t, lang, prefs, updPrefs, setSubPg }) {
   const cmIdx = curMonthIdx();
   const cm  = MONTHS[cmIdx]; 
   const cmName = lang==="en" ? MONTHS_EN[cmIdx] : cm;
@@ -1106,6 +1115,76 @@ function Dashboard({ C, data, year, user, lists, setPage, onQuickAdd, t, lang, p
     const unpaidRecSum = rec.filter(r => !recTxsIds.has(r.id)).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
     return pendingTxs + unpaidRecSum;
   }, [md, lists.recurring]);
+
+  // ─── To-Do widget data ─────────────────────────────────────────────────────
+  // Unified "things to pay this month" list: pending/processing transactions
+  // PLUS recurring obligations that haven't been materialized yet this month.
+  // Sorted by due date so the most urgent shows first.
+  const todoItems = useMemo(() => {
+    const items = [];
+
+    // 1) Pending/processing transactions for current month.
+    md.filter(x => x.type === "Isplata" && (x.status === "Čeka plaćanje" || x.status === "U obradi"))
+      .forEach(x => items.push({
+        kind: "tx",
+        id: x.id,
+        date: x.date,
+        description: x.description,
+        category: x.category,
+        amount: parseFloat(x.amount) || 0,
+        status: x.status,
+      }));
+
+    // 2) Recurring obligations that have NOT produced a transaction yet this month.
+    const rec = lists.recurring || [];
+    const recTxsIds = new Set(md.filter(x => x.recurringId).map(x => x.recurringId));
+    const cy = new Date().getFullYear();
+    const cmi = new Date().getMonth();
+    rec.forEach(r => {
+      if (recTxsIds.has(r.id)) return;
+      const day = Math.max(1, Math.min(28, parseInt(r.dueDay) || 1));
+      const dueDate = new Date(cy, cmi, day).toISOString().split("T")[0];
+      items.push({
+        kind: "recurring",
+        id: r.id,
+        date: dueDate,
+        description: r.description,
+        category: r.category,
+        amount: parseFloat(r.amount) || 0,
+        recurring: r,
+      });
+    });
+
+    return items.sort((a, b) => a.date.localeCompare(b.date));
+  }, [md, lists.recurring]);
+
+  // Handle Pay action from the To-Do widget. Works for both kinds:
+  // - tx: flip status to Plaćeno, stamp today's date
+  // - recurring: create a new transaction with status Plaćeno this month
+  const payTodoItem = (item) => {
+    if (!setTxs) return;
+    const today = new Date().toISOString().split("T")[0];
+    if (item.kind === "tx") {
+      setTxs(p => p.map(x => x.id === item.id ? { ...x, status: "Plaćeno", date: today } : x));
+      return;
+    }
+    // Recurring: instantiate a concrete tx for this month.
+    const r = item.recurring;
+    setTxs(p => [...p, {
+      id: Date.now().toString(),
+      type: "Isplata",
+      date: today,
+      description: r.description,
+      amount: r.amount,
+      category: r.category,
+      location: r.location,
+      payment: r.payment,
+      status: "Plaćeno",
+      notes: r.notes || "",
+      recurringId: r.id,
+      installments: 0,
+    }]);
+  };
 
   const catsMonth = useMemo(() => {
     const m={};
@@ -1242,6 +1321,66 @@ function Dashboard({ C, data, year, user, lists, setPage, onQuickAdd, t, lang, p
               </BarChart>
             </div>
 
+            {/* To-Do widget — items to pay this month. Combines pending/
+                processing transactions with recurring obligations that haven't
+                been materialized yet. Hidden when the list is empty. */}
+            {todoItems.length > 0 && (
+              <div className="su" style={{ background:C.card, border:`1px solid ${C.warning}40`, borderLeft:`4px solid ${C.warning}`, borderRadius:14, padding:"10px 12px", marginBottom:12 }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+                  <div style={{ fontSize:11, fontWeight:600, color:C.warning, display:"flex", alignItems:"center", gap:5 }}>
+                    <Ic n="coins" s={12} c={C.warning}/>{t("Za platiti ovog mjeseca")}
+                  </div>
+                  <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.warning }}>
+                    {fmtEur(todoItems.reduce((s,i)=>s+i.amount,0))}
+                  </div>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  {todoItems.slice(0, 6).map(item => (
+                    <div key={item.kind+"-"+item.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 9px", background:C.cardAlt, borderRadius:9, border:`1px solid ${C.border}` }}>
+                      <div style={{
+                        width:28, height:28, borderRadius:8,
+                        background: item.kind==="recurring" ? `${C.accent}20` : `${C.warning}20`,
+                        display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
+                      }}>
+                        <Ic n={item.kind==="recurring"?"repeat":"coins"} s={12} c={item.kind==="recurring"?C.accent:C.warning}/>
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:12, fontWeight:600, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {item.description || t(item.category)}
+                        </div>
+                        <div style={{ fontSize:10, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:1 }}>
+                          <Ic n="cal" s={9} c={C.textMuted}/>
+                          {new Date(item.date).getDate()}.{new Date(item.date).getMonth()+1}.
+                          {item.kind==="recurring" && <span style={{ color:C.accent, fontWeight:600 }}>· {t("Redovno")}</span>}
+                        </div>
+                      </div>
+                      <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.text, flexShrink:0 }}>
+                        {fmtEur(item.amount)}
+                      </div>
+                      <button
+                        onClick={()=>payTodoItem(item)}
+                        style={{
+                          padding:"5px 10px", background:C.income, border:"none", borderRadius:7,
+                          color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer",
+                          display:"flex", alignItems:"center", gap:4, flexShrink:0,
+                        }}
+                      >
+                        <Ic n="check" s={10} c="#fff"/>{t("Plati")}
+                      </button>
+                    </div>
+                  ))}
+                  {todoItems.length > 6 && (
+                    <button
+                      onClick={()=>setPage("transactions")}
+                      style={{ padding:"6px", background:"transparent", border:"none", color:C.accent, fontSize:11, fontWeight:600, cursor:"pointer" }}
+                    >
+                      {t("Prikaži sve")} ({todoItems.length})
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {catsMonth.length>0 && (
               <div className="su" style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:"10px 12px", marginBottom:12 }}>
                 <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:10, display:"flex", alignItems:"center", gap:5 }}>
@@ -1277,7 +1416,7 @@ function Dashboard({ C, data, year, user, lists, setPage, onQuickAdd, t, lang, p
 }
 
 // ─── TxForm ───────────────────────────────────────────────────────────────────
-function TxForm({ C, tx, draft, lists, onSubmit, onCancel, onGoRecurring, t }) {
+function TxForm({ C, tx, draft, lists, setLists, onSubmit, onCancel, onGoRecurring, t }) {
   const init = tx ?? (draft ? {
     date: draft.date.split("T")[0],
     type: "Isplata",
@@ -1301,6 +1440,14 @@ function TxForm({ C, tx, draft, lists, onSubmit, onCancel, onGoRecurring, t }) {
   const [showInstSetup, setShowInstSetup] = useState(false);
   const [tempInst, setTempInst] = useState(form.installments || 3);
   const [tempPeriod, setTempPeriod] = useState(form.installmentPeriod || "M");
+
+  // Recurring-obligation toggle state (kept local — not persisted on form).
+  // When true, submission adds to lists.recurring instead of creating a
+  // one-off transaction. Not available in edit mode (you can't convert an
+  // existing tx into a recurring obligation from here).
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recDueDay,   setRecDueDay]   = useState(new Date().getDate());
+  const [recMonths,   setRecMonths]   = useState("");      // optional; empty = open-ended
 
   const inst      = parseInt(form.installments) || 0;
   const isGotov   = form.payment === "Gotovina";
@@ -1341,6 +1488,37 @@ function TxForm({ C, tx, draft, lists, onSubmit, onCancel, onGoRecurring, t }) {
     if (!form.category)           { setErr({ msg: t("Odaberite kategoriju"),      field:"category"    }); return; }
     if (!form.location)           { setErr({ msg: t("Odaberite lokaciju"),        field:"location"    }); return; }
     if (!form.payment)            { setErr({ msg: t("Odaberite način plaćanja"),  field:"payment"     }); return; }
+
+    // Recurring-obligation branch: save into lists.recurring AND create a
+    // "Čeka plaćanje" transaction for the current month so the user sees it
+    // in the To-Do widget / Transactions list right away.
+    if (!tx && isRecurring && form.type === "Isplata") {
+      const day = Math.max(1, Math.min(31, parseInt(recDueDay) || 1));
+      const months = parseInt(recMonths) || 0; // 0 = open-ended
+      const rec = {
+        id: Date.now().toString(),
+        description: form.description.trim(),
+        amount, category: form.category, location: form.location,
+        payment: form.payment, dueDay: day,
+        months: months > 0 ? months : null,
+        createdAt: Date.now(),
+        notes: form.notes || "",
+      };
+      if (typeof setLists === "function") {
+        setLists(l => ({ ...l, recurring: [...(l.recurring || []), rec] }));
+      }
+      // Create the first occurrence as a Čeka plaćanje tx for this month.
+      const now = new Date();
+      const firstDate = new Date(now.getFullYear(), now.getMonth(), Math.min(day, 28));
+      onSubmit({
+        ...form, amount, installments: 0,
+        date: firstDate.toISOString().split("T")[0],
+        status: "Čeka plaćanje",
+        recurringId: rec.id,
+      });
+      return;
+    }
+
     if (inst <= 1 && !form.status){ setErr({ msg: t("Odaberite status"),          field:"status"      }); return; }
     onSubmit({ ...form, amount, installments: inst });
   };
@@ -1362,21 +1540,13 @@ function TxForm({ C, tx, draft, lists, onSubmit, onCancel, onGoRecurring, t }) {
             </div>
         )}
 
-        <div style={{ display:"grid", gridTemplateColumns:tx?"1fr 1fr":"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
-          {["Isplata",!tx&&"Obveze","Primitak"].filter(Boolean).map(x=>{
-            if (x==="Obveze") return (
-              <button key="Obveze" onClick={onGoRecurring}
-                style={{ padding:12, border:`2px solid ${C.warning}40`, borderRadius:14, background:`${C.warning}10`, color:C.warning, fontSize:14, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:7 }}>
-                <Ic n="repeat" s={15} c={C.warning}/>{t("Obveze")}
-              </button>
-            );
-            return (
-              <button key={x} onClick={()=>upd({type:x})}
-                style={{ padding:12, border:`2px solid ${form.type===x?(x==="Primitak"?C.income:C.expense):C.border}`, borderRadius:14, background:form.type===x?(x==="Primitak"?`${C.income}15`:`${C.expense}15`):"transparent", color:form.type===x?(x==="Primitak"?C.income:C.expense):C.textMuted, fontSize:14, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:7 }}>
-                <Ic n={x==="Primitak"?"up":"down"} s={15} c={form.type===x?(x==="Primitak"?C.income:C.expense):C.textMuted}/>{t(x)}
-              </button>
-            );
-          })}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:16 }}>
+          {["Isplata","Primitak"].map(x=>(
+            <button key={x} onClick={()=>upd({type:x})}
+              style={{ padding:12, border:`2px solid ${form.type===x?(x==="Primitak"?C.income:C.expense):C.border}`, borderRadius:14, background:form.type===x?(x==="Primitak"?`${C.income}15`:`${C.expense}15`):"transparent", color:form.type===x?(x==="Primitak"?C.income:C.expense):C.textMuted, fontSize:14, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:7 }}>
+              <Ic n={x==="Primitak"?"up":"down"} s={15} c={form.type===x?(x==="Primitak"?C.income:C.expense):C.textMuted}/>{t(x)}
+            </button>
+          ))}
         </div>
 
         <div style={{ display:"flex", flexDirection:"column", gap:13 }}>
@@ -1467,7 +1637,53 @@ function TxForm({ C, tx, draft, lists, onSubmit, onCancel, onGoRecurring, t }) {
                 </div>
           )}
 
-          <div style={{ display:"grid", gridTemplateColumns:(inst>1 || isPrimitak)?"1fr":"1fr 1fr", gap:10 }}>
+          {/* Recurring-obligation toggle — only for new Isplata entries, and
+              only if not setting up installments (mutually exclusive). */}
+          {form.type==="Isplata" && !tx && inst <= 1 && (
+            <div style={{ background:C.cardAlt, borderRadius:14, padding:13, border:`1.5px solid ${isRecurring ? C.accent : C.border}`, transition:"border-color .2s" }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontSize:13, fontWeight:600, color:isRecurring ? C.accent : C.textMuted, display:"flex", alignItems:"center", gap:6 }}>
+                  <Ic n="repeat" s={14} c={isRecurring ? C.accent : C.textMuted}/>{t("Redovna obveza?")}
+                </span>
+                <div style={{ display:"flex", gap:6 }}>
+                  <button onClick={()=>{
+                    setIsRecurring(true);
+                    // Mutual exclusion with installments.
+                    if (inst > 1) { upd({ installments: 0 }); setShowInstSetup(false); }
+                  }}
+                    style={{ padding:"5px 14px", borderRadius:20, border:`1.5px solid ${isRecurring ? C.accent : C.border}`, background:isRecurring ? `${C.accent}20` : "transparent", color:isRecurring ? C.accent : C.textMuted, fontSize:12, fontWeight:600, cursor:"pointer", transition:"all .2s" }}>{t("Da")}</button>
+                  <button onClick={()=>setIsRecurring(false)}
+                    style={{ padding:"5px 14px", borderRadius:20, border:`1.5px solid ${!isRecurring ? C.accent : C.border}`, background:!isRecurring ? `${C.accent}20` : "transparent", color:!isRecurring ? C.accent : C.textMuted, fontSize:12, fontWeight:600, cursor:"pointer", transition:"all .2s" }}>{t("Ne")}</button>
+                </div>
+              </div>
+              {isRecurring && (
+                <div className="su" style={{ background: C.bg, padding:14, borderRadius:12, border:`1px solid ${C.border}`, marginTop:12, display:"flex", flexDirection:"column", gap:10 }}>
+                  <div style={{ fontSize:11, color:C.textMuted, lineHeight:1.4 }}>
+                    {t("Pretplata, kredit ili najam koji se ponavlja svakog mjeseca.")}
+                  </div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                    <div>
+                      <label style={lbl}><Ic n="cal" s={11} c={C.textMuted}/>{t("Dan dospijeća")}</label>
+                      <input type="number" min="1" max="31" value={recDueDay}
+                        onChange={e=>setRecDueDay(e.target.value)}
+                        style={{...fld, fontFamily:"'JetBrains Mono',monospace", fontWeight:600}}/>
+                    </div>
+                    <div>
+                      <label style={lbl}><Ic n="tag" s={11} c={C.textMuted}/>{t("Broj mjeseci (opc.)")}</label>
+                      <input type="number" min="1" max="480" placeholder={t("neograničeno")}
+                        value={recMonths} onChange={e=>setRecMonths(e.target.value)}
+                        style={{...fld, fontFamily:"'JetBrains Mono',monospace", fontWeight:600}}/>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:11, color:C.accent, padding:"8px 10px", background:`${C.accent}10`, borderRadius:8, border:`1px solid ${C.accent}30` }}>
+                    <Ic n="info" s={11} c={C.accent}/> {t("Unos za ovaj mjesec bit će kreiran odmah sa statusom \"Čeka plaćanje\".")}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ display:"grid", gridTemplateColumns:(inst>1 || isPrimitak || isRecurring)?"1fr":"1fr 1fr", gap:10 }}>
             <div>
               <label style={lbl}><Ic n="card" s={11} c={C.textMuted}/>{t("Plaćanje")}</label>
               <select value={form.payment} onChange={e=>{ upd({payment:e.target.value}); clearErr(); }} style={{...fld, color:!form.payment?C.textMuted:C.text, borderColor:bd("payment")}}>
@@ -1475,7 +1691,7 @@ function TxForm({ C, tx, draft, lists, onSubmit, onCancel, onGoRecurring, t }) {
                 {payments.map(p=><option key={p} value={p}>{t(p)}</option>)}
               </select>
             </div>
-            {inst <= 1 && !isPrimitak && (
+            {inst <= 1 && !isPrimitak && !isRecurring && (
               <div>
                 <label style={lbl}><Ic n="check" s={11} c={C.textMuted}/>{t("Status")}</label>
                 <select value={form.status} onChange={e=>{ upd({status:e.target.value}); clearErr(); }} style={{...fld, color:!form.status?C.textMuted:C.text, borderColor:bd("status")}}>
