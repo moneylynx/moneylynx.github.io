@@ -238,7 +238,9 @@ export default function App() {
     const pinHash = await hashPinV2(pin, pinSalt);
     const key     = await deriveEncKey(pin, encSalt);
     await encryptAndSaveAll(key, { txs, drafts, lists, user });
-    setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0, lockedUntil:null }));
+    const newSec = { ...sec, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0, lockedUntil:null };
+    save(K.sec, newSec); // immediate save — don't rely on useEffect timing
+    setSec(newSec);
     setEncKey(key);
     await cacheKeyToSession(key);
     setSetupMode(false);
@@ -251,7 +253,9 @@ export default function App() {
     const pinHash = await hashPinV2(newPin, pinSalt);
     const newKey  = await deriveEncKey(newPin, encSalt);
     await encryptAndSaveAll(newKey, { txs, drafts, lists, user });
-    setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0 }));
+    const newSec = { ...sec, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0 };
+    save(K.sec, newSec); // immediate save
+    setSec(newSec);
     setEncKey(newKey);
     await cacheKeyToSession(newKey);
   };
