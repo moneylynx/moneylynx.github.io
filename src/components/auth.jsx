@@ -22,30 +22,30 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
           timeout: 60000
         }
       });
-      // Biometry passed. Check whether we have a cached session key.
-      // If yes → unlock fully without PIN. If no → prompt for PIN.
+      // Biometry passed — try session cache first.
       const cachedKey = await loadKeyFromSession();
-      if (sec.pinHashVersion === "v2" && !cachedKey) {
-        // Encrypted vault, no session cache → user must enter PIN once this session.
-        setErr(t("Biometrija uspješna. Unesi PIN jednom za ovu sesiju."));
+      if (cachedKey) {
+        // Have cached key → full unlock without PIN.
+        await onUnlock(null, false, true);
       } else {
-        // Either: cached key exists (skip PIN) OR no encryption at all.
-        onUnlock(null, false, true);
+        // No cached key → just clear the error and let user type PIN normally.
+        // Don't show confusing message, don't block anything.
+        setErr("");
+        setPin("");
       }
-    } catch { setErr(t("Biometrija otkazana ili neuspješna.")); }
+    } catch {
+      setErr(t("Biometrija otkazana ili neuspješna."));
+    }
   }, [onUnlock, sec, t]);
 
-  // On mount: check session cache first. If valid key exists, unlock silently.
-  // This handles the case where user re-opens the app within 7-day window.
+  // On mount: try session cache silently. If found, unlock immediately.
+  // If not found, do nothing — show PIN form normally.
   useEffect(() => {
     (async () => {
       try {
         const cachedKey = await loadKeyFromSession();
-        if (cachedKey) {
-          // Key found — let parent handle decryption and unlock.
-          await onUnlock(null, false, true);
-        }
-      } catch { /* no cache, proceed to PIN/biometry */ }
+        if (cachedKey) await onUnlock(null, false, true);
+      } catch { /* stay on lock screen */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

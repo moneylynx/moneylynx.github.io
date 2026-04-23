@@ -677,6 +677,9 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
 
   const toggleBio = async () => {
     if (sec.bioEnabled) {
+      const currentSec = JSON.parse(localStorage.getItem("ml_sec") || "{}");
+      const newSec = { ...currentSec, bioEnabled: false, bioCredId: null };
+      localStorage.setItem("ml_sec", JSON.stringify(newSec));
       updSec({ bioEnabled: false, bioCredId: null });
       return;
     }
@@ -699,6 +702,10 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       };
       const cred = await navigator.credentials.create(createOpt);
       const idBase64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+      // Read current sec directly from localStorage to avoid stale prop.
+      const currentSec = JSON.parse(localStorage.getItem("ml_sec") || "{}");
+      const newSec = { ...currentSec, bioEnabled: true, bioCredId: idBase64 };
+      localStorage.setItem("ml_sec", JSON.stringify(newSec));
       updSec({ bioEnabled: true, bioCredId: idBase64 });
       alert(t("Biometrija uspješno aktivirana!"));
     } catch (e) {
