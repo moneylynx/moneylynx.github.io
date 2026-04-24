@@ -102,16 +102,19 @@ export default function App() {
   },[user]);
   useEffect(()=>save(K.sec,sec),[sec]);        // always plaintext
 
-  // ─── Session key logic ────────────────────────────────────────────────────
-  // On initial mount: LockScreen handles biometry/PIN + session cache check.
-  // On foreground return (minimize → restore): silently re-unlock from cache.
-  // On background: lock screen.
+  // Clean up old localStorage session key (from previous implementation).
+  useEffect(()=>{ try { localStorage.removeItem("ml_sk"); } catch {} }, []);
+
+  // sessionStorage clears on app close → PIN/biometry required on reopen.
+  // On foreground return within same session → session key still in
+  // sessionStorage → silent unlock (no PIN, no biometry prompt).
   useEffect(()=>{
     if (!sec.pinHash) return;
     const fn = async () => {
       if (document.hidden) {
         setUnlocked(false);
       } else {
+        // Try session cache — works for minimize/restore within same session.
         try {
           const cachedKey = await loadKeyFromSession();
           if (cachedKey) {
@@ -121,6 +124,7 @@ export default function App() {
             setEncKey(cachedKey);
             setUnlocked(true);
           }
+          // If no cachedKey: LockScreen shows, biometry auto-triggers.
         } catch { /* stay locked */ }
       }
     };
