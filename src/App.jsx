@@ -14,7 +14,7 @@ import { uploadAll, downloadAll } from "./lib/sync.js";
 
 // ─── Components ───────────────────────────────────────────────────────────────
 import { Ic, QuickAddModal, ActionHubModal } from "./components/ui.jsx";
-import { LockScreen, SetupPin, OnboardingScreen } from "./components/auth.jsx";
+import { LockScreen, SetupPin, OnboardingScreen, LanguageScreen } from "./components/auth.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import Dashboard from "./components/Dashboard.jsx";
@@ -555,6 +555,15 @@ export default function App() {
 
   const wrap = { background:C.bg, minHeight:"100vh", width:"100%", color:C.text, fontFamily:"'Inter',sans-serif", maxWidth:480, margin:"0 auto", transition:"background .3s,color .3s" };
 
+  // Show language selection on very first launch (before auth)
+  if (!prefs.langChosen) {
+    return (
+      <div style={wrap}><style>{gs}</style>
+        <LanguageScreen C={C} onSelect={(lang) => { updP({ lang, langChosen: true }); }}/>
+      </div>
+    );
+  }
+
   // Show AuthScreen if not logged in (and auth state is resolved)
   if (authReady && !supaUser) {
     return (
@@ -610,14 +619,24 @@ export default function App() {
   if (!prefs.onboarded) {
     return (
       <div style={wrap}><style>{gs}</style>
-        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} onSetPin={handleFirstSetPin} finish={() => { updP({onboarded:true, firstUseAt: Date.now()}); setUnlocked(true); }} />
+        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} onSetPin={handleFirstSetPin} finish={() => {
+          updP({onboarded:true, firstUseAt: Date.now()});
+          setUnlocked(true);
+          // Check for first expense from onboarding step 4
+          if (lists._firstTx) {
+            const tx = { ...lists._firstTx, id: Date.now().toString(), installments: 0 };
+            setTxs(p => [...p, tx]);
+            queueSync([tx]);
+            setLists(l => { const { _firstTx, ...rest } = l; return rest; });
+          }
+        }} />
       </div>
     );
   }
 
   if (sec.pinHash && !unlocked) return (
     <div style={wrap}><style>{gs}</style>
-    <LockScreen C={C} sec={sec} t={t}
+    <LockScreen C={C} sec={sec} t={t} supaUser={supaUser}
       onUnlock={async (pin, isLegacy, bioOnly) => {
         if (bioOnly) {
           const cachedKey = await loadKeyFromSession();
@@ -626,15 +645,27 @@ export default function App() {
             setTxs(data.txs); setDrafts(data.drafts); setLists(data.lists); setUser(data.user);
             setEncKey(cachedKey);
             updS({attempts:0, lockedUntil:null});
-            await cacheKeyToSession(cachedKey); // renew session cache
+            await cacheKeyToSession(cachedKey);
             setUnlocked(true);
           }
-          // No cachedKey → stay on LockScreen, user must enter PIN
           return;
         }
         await handleCryptoUnlock(pin, isLegacy);
       }}
       onWipe={wipe}
+      onResetPin={async () => {
+        // Reset PIN — clear local encrypted data and re-download from cloud
+        const newSec = { pinHash:null, pinSalt:null, encSalt:null, pinHashVersion:null,
+                         bioEnabled:false, bioCredId:null, attempts:0, totalFailed:0, lockedUntil:null };
+        save(K.sec, newSec); setSec(newSec); secRef.current = newSec;
+        setEncKey(null); clearSessionKey();
+        // Clear encrypted data — will be re-fetched from cloud
+        save(K.db, []); save(K.drf, []); save(K.lst, DEF_LISTS); save(K.usr, {});
+        setTxs([]); setDrafts([]); setLists(DEF_LISTS); setUser({});
+        setUnlocked(true);
+        // Trigger cloud sync to re-download
+        if (supaUser) handleSyncAfterLogin(supaUser.id);
+      }}
     />
     </div>
   );
