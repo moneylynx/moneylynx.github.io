@@ -9,10 +9,13 @@ import {
   encryptJSON, encryptAndSaveAll, loadAndDecryptAll,
   cacheKeyToSession, loadKeyFromSession, clearSessionKey,
 } from "./lib/crypto.js";
+import { supabase, signOut, onAuthChange } from "./lib/supabase.js";
+import { uploadAll, downloadAll } from "./lib/sync.js";
 
 // ─── Components ───────────────────────────────────────────────────────────────
 import { Ic, QuickAddModal, ActionHubModal } from "./components/ui.jsx";
 import { LockScreen, SetupPin, OnboardingScreen } from "./components/auth.jsx";
+import AuthScreen from "./components/AuthScreen.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import TxForm from "./components/TxForm.jsx";
 import TxList from "./components/TxList.jsx";
@@ -21,9 +24,6 @@ import Settings from "./components/Settings.jsx";
 import { RecurringScreen } from "./components/Settings.jsx";
 
 export default function App() {
-  // Detect at startup whether data is protected by a PIN.
-  // If yes, encrypted data keys start empty — they're filled async after unlock.
-  // sec and prefs are ALWAYS plaintext (needed before unlock for theme/lang).
   const _sec = load(K.sec, {});
   const _hasPin = !!_sec.pinHash;
 
@@ -34,20 +34,22 @@ export default function App() {
   const [sec,  setSec]  = useState(()=>load(K.sec,{pinHash:null,bioEnabled:false,bioCredId:null,attempts:0,totalFailed:0,lockedUntil:null}));
   const [lists,setLists] = useState(() => _hasPin ? DEF_LISTS : load(K.lst, DEF_LISTS));
 
-  // AES-GCM key lives ONLY in memory. Never persisted.
-  // null = no PIN / not yet unlocked. Set on successful PIN entry.
   const [encKey, setEncKey] = useState(null);
-  // useRef ensures async callbacks always read the latest sec without stale closure.
   const secRef = useRef(sec);
   useEffect(() => { secRef.current = sec; }, [sec]);
+
+  // ─── Supabase auth state ───────────────────────────────────────────────────
+  const [supaUser, setSupaUser]   = useState(null);  // logged-in Supabase user
+  const [authReady, setAuthReady] = useState(false); // auth state resolved
+  const [syncing, setSyncing]     = useState(false);  // sync in progress
 
   const [page, setPage] = useState("dashboard");
   const [editId,setEditId]   = useState(null);
   const [draftEdit,setDraftEdit] = useState(null);
   const [subPg, setSubPg]    = useState(null);
   const [unlocked,setUnlocked] = useState(false);
-  const [setupMode, setSetupMode] = useState(false); // shows SetupPin screen from Settings when user has no PIN yet
-  const [swUpdate, setSwUpdate] = useState(null);     // ServiceWorker waiting — trigger via banner click
+  const [setupMode, setSetupMode] = useState(false);
+  const [swUpdate, setSwUpdate] = useState(null);
 
   // Modal controls
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -104,6 +106,60 @@ export default function App() {
     else if (!sec.pinHash) { save(K.usr,user); }
   },[user]);
   useEffect(()=>save(K.sec,sec),[sec]);        // always plaintext
+
+  // ─── Supabase auth listener ────────────────────────────────────────────────
+  useEffect(() => {
+    // Check current session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSupaUser(session?.user ?? null);
+      setAuthReady(true);
+    });
+    // Listen for auth changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSupaUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ─── Sync: upload local data after login ──────────────────────────────────
+  const handleSyncAfterLogin = async (userId) => {
+    setSyncing(true);
+    try {
+      // Check if user has cloud data
+      const { fetchTransactions } = await import('./lib/sync.js');
+      const cloudTxs = await fetchTransactions(userId);
+      if (cloudTxs && cloudTxs.length > 0) {
+        // Cloud has data — download and merge (cloud wins for existing, local wins for new)
+        const cloudData = await downloadAll(userId, DEF_LISTS);
+        const localIds = new Set(txs.map(t => t.id));
+        const merged = [
+          ...cloudData.txs,
+          ...txs.filter(t => !cloudData.txs.find(c => c.id === t.id))
+        ];
+        setTxs(merged);
+        if (cloudData.lists && Object.keys(cloudData.lists).length > 0) setLists(cloudData.lists);
+        if (cloudData.user && cloudData.user.firstName) setUser(cloudData.user);
+        // Upload merged data back
+        await uploadAll(userId, { txs: merged, lists, user });
+      } else {
+        // No cloud data — upload local data
+        await uploadAll(userId, { txs, lists, user });
+      }
+    } catch (e) {
+      console.error('Sync error:', e);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // ─── Auto-sync when user logs in ──────────────────────────────────────────
+  useEffect(() => {
+    if (supaUser && unlocked) {
+      handleSyncAfterLogin(supaUser.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supaUser?.id]);
+
 
   // Clean up old localStorage session key (from previous implementation).
   useEffect(()=>{ try { localStorage.removeItem("ml_sk"); } catch {} }, []);
@@ -392,6 +448,24 @@ export default function App() {
 
   const wrap = { background:C.bg, minHeight:"100vh", width:"100%", color:C.text, fontFamily:"'Inter',sans-serif", maxWidth:480, margin:"0 auto", transition:"background .3s,color .3s" };
 
+  // Show AuthScreen if not logged in (and auth state is resolved)
+  if (authReady && !supaUser) {
+    return (
+      <div style={wrap}><style>{gs}</style>
+        <AuthScreen C={C} t={t} onSuccess={(session) => setSupaUser(session?.user)}/>
+      </div>
+    );
+  }
+
+  // Sync indicator overlay
+  if (syncing) return (
+    <div style={{...wrap, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16}}>
+      <style>{gs}</style>
+      <span style={{width:36,height:36,borderRadius:"50%",border:`3px solid ${C.accent}`,borderTopColor:"transparent",display:"inline-block",animation:"spin .7s linear infinite"}}/>
+      <p style={{color:C.textMuted, fontSize:14}}>{t("Sinkronizacija podataka…")}</p>
+    </div>
+  );
+
   if (!prefs.onboarded) {
     return (
       <div style={wrap}><style>{gs}</style>
@@ -473,7 +547,7 @@ export default function App() {
       {page==="transactions" && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id=>{ setEditId(id); setPage("edit"); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id=>setTxs(p=>p.map(x=>x.id===id?{...x,status:"Plaćeno",date:new Date().toISOString().split("T")[0]}:x))}/>}
       {page==="charts"       && <Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/>}
       {page==="recurring"    && <RecurringScreen {...shared} data={txs} setTxs={setTxs} onBack={()=>setPage("dashboard")}/>}
-      {page==="settings"     && <Settings {...shared} txs={txs} setTxs={setTxs} drafts={drafts} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode} onChangePinCrypto={handleChangePinCrypto} onRemovePinCrypto={handleRemovePinCrypto}/>}
+      {page==="settings"     && <Settings {...shared} txs={txs} setTxs={setTxs} drafts={drafts} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode} onChangePinCrypto={handleChangePinCrypto} onRemovePinCrypto={handleRemovePinCrypto} supaUser={supaUser} onSignOut={async()=>{ await signOut(); setSupaUser(null); }}/>}
 
       {showQuickAdd && <QuickAddModal C={C} t={t} onClose={()=>setShowQuickAdd(false)} onSave={d => { setDrafts(p=>[{id:Date.now().toString(), amount:d.amount, description:d.desc, date:new Date().toISOString()}, ...p]); setShowQuickAdd(false); }}/>}
       {showActionHub && <ActionHubModal C={C} t={t} drafts={drafts} onClose={()=>setShowActionHub(false)} onNew={()=>{ setPage("add"); setDraftEdit(null); setShowActionHub(false); }} onSelect={d=>{ setDraftEdit(d); setPage("add"); setShowActionHub(false); }} onDel={delDraft}/>}
