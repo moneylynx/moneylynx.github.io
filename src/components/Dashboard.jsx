@@ -33,18 +33,22 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   // Sorted by due date so the most urgent shows first.
   const todoItems = useMemo(() => {
     const items = [];
+    const today = new Date(); today.setHours(23,59,59,999);
 
-    // 1) Pending/processing transactions for current month.
-    md.filter(x => x.type === "Isplata" && (x.status === "Čeka plaćanje" || x.status === "U obradi"))
-      .forEach(x => items.push({
-        kind: "tx",
-        id: x.id,
-        date: x.date,
-        description: x.description,
-        category: x.category,
-        amount: parseFloat(x.amount) || 0,
-        status: x.status,
-      }));
+    // 1) Pending/processing transactions for current month AND overdue from past months
+    data.filter(x =>
+      x.type === "Isplata" &&
+      (x.status === "Čeka plaćanje" || x.status === "U obradi") &&
+      new Date(x.date) <= today
+    ).forEach(x => items.push({
+      kind: "tx",
+      id: x.id,
+      date: x.date,
+      description: x.description,
+      category: x.category,
+      amount: parseFloat(x.amount) || 0,
+      status: x.status,
+    }));
 
     // 2) Recurring obligations that have NOT produced a transaction yet this month.
     const rec = lists.recurring || [];
@@ -67,7 +71,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
     });
 
     return items.sort((a, b) => a.date.localeCompare(b.date));
-  }, [md, lists.recurring]);
+  }, [data, md, lists.recurring]);
 
   // Handle Pay action from the To-Do widget. Works for both kinds:
   // - tx: flip status to Plaćeno, stamp today's date
