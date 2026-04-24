@@ -556,7 +556,8 @@ export default function App() {
   const wrap = { background:C.bg, minHeight:"100vh", width:"100%", color:C.text, fontFamily:"'Inter',sans-serif", maxWidth:480, margin:"0 auto", transition:"background .3s,color .3s" };
 
   // Show language selection on very first launch (before auth)
-  if (!prefs.langChosen) {
+  // Skip if: user already chose language, or has active session, or auth not ready yet
+  if (!prefs.langChosen && authReady && !supaUser) {
     return (
       <div style={wrap}><style>{gs}</style>
         <LanguageScreen C={C} onSelect={(lang) => { updP({ lang, langChosen: true }); }}/>
