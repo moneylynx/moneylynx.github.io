@@ -164,6 +164,9 @@ export default function App() {
   }, [supaUser?.id]);
 
 
+  // Clean up sync debounce timer on unmount
+  useEffect(() => () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); }, []);
+
   // Clean up old localStorage session key (from previous implementation).
   useEffect(()=>{ try { localStorage.removeItem("ml_sk"); } catch {} }, []);
 
@@ -373,11 +376,38 @@ export default function App() {
 
 
   // ─── Cloud sync helpers ────────────────────────────────────────────────────
-  const cloudSync = async (newTxs) => {
+  // Pending queue of transactions to sync — accumulated across rapid calls.
+  const syncQueueRef = useRef([]);
+  const syncTimerRef = useRef(null);
+
+  // Debounced batch sync — collects all changed txs within 800ms
+  // and sends them in a single Supabase upsert call.
+  const queueSync = useCallback((changedTxs) => {
+    if (!supaUser) return;
+    // Merge into queue (deduplicate by id — latest wins)
+    changedTxs.forEach(tx => {
+      const idx = syncQueueRef.current.findIndex(q => q.id === tx.id);
+      if (idx >= 0) syncQueueRef.current[idx] = tx;
+      else syncQueueRef.current.push(tx);
+    });
+    // Reset debounce timer
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(async () => {
+      const batch = syncQueueRef.current.splice(0); // drain queue
+      if (!batch.length) return;
+      try {
+        const { syncTransactions } = await import('./lib/sync.js');
+        await syncTransactions(supaUser.id, batch);
+      } catch (e) { console.error("queueSync error:", e); }
+    }, 800);
+  }, [supaUser]);
+
+  // Full upload — used for manual sync and login sync only
+  const cloudSync = useCallback(async (newTxs) => {
     if (!supaUser) return;
     try { await uploadAll(supaUser.id, { txs: newTxs, lists, user }); }
     catch (e) { console.error("cloudSync error:", e); }
-  };
+  }, [supaUser, lists, user]);
 
   const cloudDel = async (localId) => {
     if (!supaUser) return;
@@ -389,7 +419,6 @@ export default function App() {
 
   const addTx = tx => {
     const inst = parseInt(tx.installments) || 0;
-    let newTxs;
     if (inst > 1) {
       const tot = parseFloat(tx.amount) || 0;
       const mo  = Math.round(tot/inst*100)/100;
@@ -413,19 +442,19 @@ export default function App() {
           notes: tx.notes ? `${tx.notes} | ${t("Obrok")} ${i+1}/${inst}` : `${t("Obrok")} ${i+1}/${inst} · ${fmtEur(tot)}`,
         });
       }
-      setTxs(p => { newTxs = [...p, ...arr]; cloudSync(newTxs); return newTxs; });
+      // Queue all installments as single batch — 1 Supabase call instead of 12
+      setTxs(p => { const newTxs = [...p, ...arr]; queueSync(arr); return newTxs; });
     } else {
       const newTx = { ...tx, id:Date.now().toString(), installments:0 };
-      setTxs(p => { newTxs = [...p, newTx]; cloudSync(newTxs); return newTxs; });
+      setTxs(p => { queueSync([newTx]); return [...p, newTx]; });
     }
     setPage("dashboard");
   };
 
   const updTx = tx => {
     setTxs(p => {
-      const newTxs = p.map(x => x.id===tx.id ? tx : x);
-      cloudSync(newTxs);
-      return newTxs;
+      queueSync([tx]);
+      return p.map(x => x.id===tx.id ? tx : x);
     });
     setEditId(null);
     setPage("transactions");
@@ -463,14 +492,14 @@ export default function App() {
     if (!removed) return;
     setTxs(p => p.filter(x => x.id !== id));
     cloudDel(id);
-    startUndo(t("Stavka obrisana"), () => { setTxs(p => [...p, removed]); cloudSync([...txs, removed]); });
+    startUndo(t("Stavka obrisana"), () => { setTxs(p => [...p, removed]); queueSync([removed]); });
   };
   const delGrp = g => {
     const removed = txs.filter(x => x.installmentGroup === g);
     if (!removed.length) return;
     setTxs(p => p.filter(x => x.installmentGroup !== g));
     removed.forEach(r => cloudDel(r.id));
-    startUndo(t("Grupa obrisana") + ` (${removed.length})`, () => { setTxs(p => [...p, ...removed]); cloudSync([...txs, ...removed]); });
+    startUndo(t("Grupa obrisana") + ` (${removed.length})`, () => { setTxs(p => [...p, ...removed]); queueSync(removed); });
   };
   const delDraft = id => {
     const removed = drafts.find(d => d.id === id);
