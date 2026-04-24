@@ -170,26 +170,27 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
 // ─── SetupPin ────────────────────────────────────────────────────────────────
 function SetupPin({ C, onSave, onSkip, isChange=false, t }) {
   const [step, setStep]         = useState("enter");
-  const [enterPin, setEnterPin] = useState("");  // PIN in first step
-  const [confirmPin, setConfirmPin] = useState(""); // PIN in confirm step
+  const [enterPin, setEnterPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   const [err, setErr]           = useState("");
 
-  // Use the right pin state depending on step
-  const pin    = step === "enter" ? enterPin    : confirmPin;
-  const setPin = step === "enter" ? setEnterPin : setConfirmPin;
+  const currentPin    = step === "enter" ? enterPin    : confirmPin;
+  const setCurrentPin = step === "enter" ? setEnterPin : setConfirmPin;
 
   const PAD = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
   const tap = k => {
     if (!k) return;
     setErr("");
-    if (k === "⌫") setPin(p => p.slice(0,-1));
-    else if (pin.length < 6) setPin(p => p + k);
+    if (k === "⌫") setCurrentPin(p => p.slice(0,-1));
+    else if (currentPin.length < 6) setCurrentPin(p => p + k);
   };
 
-  const next = async () => {
+  const canProceed = currentPin.length >= 4;
+
+  const next = () => {
+    if (!canProceed) return;
     if (step === "enter") {
-      if (enterPin.length < 4) { setErr(t("Minimalno 4 znamenke")); return; }
-      setConfirmPin(""); // clear confirm field
+      setConfirmPin("");
       setStep("confirm");
     } else {
       if (confirmPin !== enterPin) {
@@ -214,7 +215,7 @@ function SetupPin({ C, onSave, onSkip, isChange=false, t }) {
 
         <div style={{ display:"flex", gap:14, justifyContent:"center", marginBottom:24 }}>
           {Array.from({length:6}).map((_,i)=>(
-            <div key={i} style={{ width:13, height:13, borderRadius:"50%", background:i<pin.length?C.accent:C.border, transition:"background .2s" }}/>
+            <div key={i} style={{ width:13, height:13, borderRadius:"50%", background:i<currentPin.length?C.accent:C.border, transition:"background .2s" }}/>
           ))}
         </div>
 
@@ -229,8 +230,8 @@ function SetupPin({ C, onSave, onSkip, isChange=false, t }) {
           ))}
         </div>
 
-        <button onClick={next} disabled={pin.length<4}
-          style={{ width:"100%", padding:13, marginBottom:10, background:pin.length<4?C.border:`linear-gradient(135deg,${C.accent},${C.accentDk})`, border:"none", borderRadius:13, color:"#fff", fontSize:15, fontWeight:700, cursor:pin.length<4?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+        <button onClick={next} disabled={!canProceed}
+          style={{ width:"100%", padding:13, marginBottom:10, background:!canProceed?C.border:`linear-gradient(135deg,${C.accent},${C.accentDk})`, border:"none", borderRadius:13, color:"#fff", fontSize:15, fontWeight:700, cursor:!canProceed?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
           <Ic n="check" s={17} c="#fff"/>{step==="enter"?t("Dalje"):t("Spremi PIN")}
         </button>
 
