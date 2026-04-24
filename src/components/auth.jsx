@@ -187,6 +187,17 @@ function SetupPin({ C, onSave, onSkip, isChange=false, t }) {
 
   const canProceed = currentPin.length >= 4;
 
+  // Hidden input to capture hardware/software keyboard on Android.
+  const handleKeyInput = (e) => {
+    const val = e.target.value;
+    // Only take the last character typed
+    const last = val.slice(-1);
+    if (/\d/.test(last) && currentPin.length < 6) {
+      setCurrentPin(p => p + last);
+    }
+    e.target.value = ""; // always clear
+  };
+
   const next = () => {
     if (!canProceed) return;
     if (step === "enter") {
@@ -212,6 +223,11 @@ function SetupPin({ C, onSave, onSkip, isChange=false, t }) {
           <h2 style={{ fontSize:20, fontWeight:700, color:C.text }}>{step==="enter"?t("Postavi PIN"):t("Potvrdi PIN")}</h2>
           <p style={{ fontSize:13, color:C.textMuted, marginTop:4 }}>{step==="enter"?t("Odaberi PIN (4–6 znamenki)"):t("Unesite isti PIN još jednom")}</p>
         </div>
+
+        {/* Hidden input captures Android soft keyboard */}
+        <input type="number" inputMode="numeric" onChange={handleKeyInput}
+          style={{ position:"absolute", opacity:0, width:1, height:1, pointerEvents:"none" }}
+          tabIndex={-1} aria-hidden="true"/>
 
         <div style={{ display:"flex", gap:14, justifyContent:"center", marginBottom:24 }}>
           {Array.from({length:6}).map((_,i)=>(
