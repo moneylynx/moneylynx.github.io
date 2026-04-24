@@ -871,6 +871,27 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           </label>
         </div>
 
+        {/* Account section */}
+        {supaUser && (
+          <div style={{ marginTop:14, marginBottom:6 }}>
+            <SL text={t("Račun")} icon="user"/>
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:"12px 14px", marginBottom:7, display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:`${C.accent}20`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <Ic n="user" s={18} c={C.accent}/>
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                  {supaUser.user_metadata?.full_name || supaUser.email}
+                </div>
+                <div style={{ fontSize:11, color:C.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                  {supaUser.email}
+                </div>
+              </div>
+            </div>
+            <Row icon="unlock" label={t("Odjava")} danger onClick={onSignOut} right={false}/>
+          </div>
+        )}
+
         <div style={{ marginTop:14, marginBottom:6 }}>
           <SL text={t("Opasna zona")} icon="alert"/>
           {!confirm
@@ -1370,7 +1391,7 @@ function BudgetEditor({ C, cats, budgets, onBack, t }) {
 }
 
 // ─── Settings (Glavni izbornik) ───────────────────────────────────────────────
-function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, onChangePinCrypto, onRemovePinCrypto, t, lang }) {
+function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, t, lang }) {
   const cy = curYear();
   const years = Array.from({length:12},(_,i)=>cy-5+i);
 
@@ -1427,6 +1448,27 @@ function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, list
       />
       
       <div style={{ padding:"12px 16px 0" }}>
+
+        {/* Account section — shown when logged in via Supabase */}
+        {supaUser && (
+          <div style={{ background:C.card, border:`1px solid ${C.accent}30`, borderLeft:`4px solid ${C.accent}`, borderRadius:13, padding:"12px 14px", marginBottom:12 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:34, height:34, borderRadius:10, background:`${C.accent}20`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <Ic n="user" s={16} c={C.accent}/>
+                </div>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{supaUser.user_metadata?.full_name || supaUser.email}</div>
+                  <div style={{ fontSize:11, color:C.textMuted }}>{supaUser.email}</div>
+                </div>
+              </div>
+              <button onClick={onSignOut}
+                style={{ padding:"6px 12px", background:`${C.expense}15`, border:`1px solid ${C.expense}40`, borderRadius:8, color:C.expense, fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                {t("Odjava")}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div style={{ marginTop:4, marginBottom:6 }}>
           <SL text={t("Aktivna godina")} icon="cal"/>

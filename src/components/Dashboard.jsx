@@ -4,7 +4,7 @@ import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, DEF_LISTS, T, CHART_COLORS, BACKU
 import { fmtEur, monthOf, curYear, curMonthIdx, needsBackupReminder } from '../lib/helpers.js';
 import { Ic } from './ui.jsx';
 
-function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg }) {
+function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser }) {
   const cmIdx = curMonthIdx();
   const cm  = MONTHS[cmIdx]; 
   const cmName = lang==="en" ? MONTHS_EN[cmIdx] : cm;
@@ -133,9 +133,17 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
             </h1>
             {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
-          <button onClick={onQuickAdd} style={{ background:`${C.warning}18`, border:`1px solid ${C.warning}50`, borderRadius:12, padding:"6px 10px", fontSize:12, fontWeight:700, color:C.warning, display:"flex", alignItems:"center", gap:5, cursor:"pointer", boxShadow:`0 2px 10px ${C.warning}20` }}>
-            <Ic n="zap" s={14} c={C.warning}/> {t("Brzi unos")}
-          </button>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            {syncing && (
+              <span title={t("Sinkronizacija…")} style={{ width:8, height:8, borderRadius:"50%", background:C.warning, display:"inline-block", animation:"pulse 1s infinite" }}/>
+            )}
+            {!syncing && supaUser && (
+              <span title={supaUser.email} style={{ width:8, height:8, borderRadius:"50%", background:C.income, display:"inline-block" }}/>
+            )}
+            <button onClick={onQuickAdd} style={{ background:`${C.warning}18`, border:`1px solid ${C.warning}50`, borderRadius:12, padding:"6px 10px", fontSize:12, fontWeight:700, color:C.warning, display:"flex", alignItems:"center", gap:5, cursor:"pointer", boxShadow:`0 2px 10px ${C.warning}20` }}>
+              <Ic n="zap" s={14} c={C.warning}/> {t("Brzi unos")}
+            </button>
+          </div>
         </div>
       </div>
 
