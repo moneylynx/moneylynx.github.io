@@ -524,7 +524,7 @@ function RecurringEditor({ C, items, lists, onBack, t }) {
 }
 
 // ─── GeneralSettings ──────────────────────────────────────────────────────────
-function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, t, lang }) {
+function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, t, lang }) {
   const [pinChg,  setPinChg]  = useState(false);
   const [rmPin,   setRmPin]   = useState(false);
   const [vPin,    setVPin]    = useState("");
@@ -647,6 +647,10 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           save(K.prf, { ...load(K.prf,{}), ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
         }
         alert(t("Podaci su uspješno vraćeni. Aplikacija će se ponovno učitati."));
+        // Trigger cloud sync after reload if user is logged in
+        if (supaUser && onSyncToCloud) {
+          try { await onSyncToCloud(data.txs || [], data.lists, data.user); } catch {}
+        }
         window.location.reload();
       } catch {
         alert(t("Datoteka nije valjan Moja lova backup."));
@@ -889,6 +893,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
               </div>
             </div>
             <Row icon="unlock" label={t("Odjava")} danger onClick={onSignOut} right={false}/>
+            {onSyncToCloud && <Row icon="repeat" label={t("Sinkroniziraj s oblakom")} onClick={async()=>{ await onSyncToCloud(txs, lists, user); alert(t("Sinkronizacija završena.")); }} right={false}/>}
           </div>
         )}
 
@@ -1391,13 +1396,13 @@ function BudgetEditor({ C, cats, budgets, onBack, t }) {
 }
 
 // ─── Settings (Glavni izbornik) ───────────────────────────────────────────────
-function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, t, lang }) {
+function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, t, lang }) {
   const cy = curYear();
   const years = Array.from({length:12},(_,i)=>cy-5+i);
 
   if (subPg) {
     if (subPg === "general") {
-      return <GeneralSettings C={C} txs={txs} setTxs={setTxs} drafts={drafts} lists={lists} setLists={setLists} prefs={prefs} updPrefs={updPrefs} user={user} updUser={updUser} sec={sec} updSec={updSec} year={year} setSetupMode={setSetupMode} setUnlocked={setUnlocked} onBack={()=>setSubPg(null)} onAbout={()=>setSubPg("about")} onChangePinCrypto={onChangePinCrypto} onRemovePinCrypto={onRemovePinCrypto} supaUser={supaUser} onSignOut={onSignOut} t={t} lang={lang} />;
+      return <GeneralSettings C={C} txs={txs} setTxs={setTxs} drafts={drafts} lists={lists} setLists={setLists} prefs={prefs} updPrefs={updPrefs} user={user} updUser={updUser} sec={sec} updSec={updSec} year={year} setSetupMode={setSetupMode} setUnlocked={setUnlocked} onBack={()=>setSubPg(null)} onAbout={()=>setSubPg("about")} onChangePinCrypto={onChangePinCrypto} onRemovePinCrypto={onRemovePinCrypto} supaUser={supaUser} onSignOut={onSignOut} onSyncToCloud={onSyncToCloud} t={t} lang={lang} />;
     }
     if (subPg === "recurring") {
       return <RecurringEditor C={C} items={lists.recurring||[]} lists={lists} t={t} onBack={arr=>{ setLists(l=>({...l,recurring:arr})); setSubPg(null); }}/>;
