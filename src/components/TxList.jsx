@@ -22,6 +22,18 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
     overdue:    C.expense, // keep as-is
   };
 
+  // Detect potential duplicates — same amount, date, description
+  const dupIds = useMemo(() => {
+    const seen = {};
+    const dups = new Set();
+    data.forEach(x => {
+      const key = `${x.date}|${x.amount}|${x.description?.trim().toLowerCase()}`;
+      if (seen[key]) { dups.add(x.id); dups.add(seen[key]); }
+      else seen[key] = x.id;
+    });
+    return dups;
+  }, [data]);
+
   const rows = useMemo(()=>{
     let f = data.filter(x=>new Date(x.date).getFullYear()===year);
     if (filter==="expense")  f = f.filter(x=>x.type==="Isplata" && x.status==="Plaćeno");
@@ -111,6 +123,11 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
                   <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                     <span style={{ fontWeight:600, fontSize:14, color:C.text }}>{tx.description}</span>
                     {tx.installmentGroup && <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:10, background:`${C.warning}20`, color:C.warning }}>{tx.installmentNum}/{tx.installmentTotal}</span>}
+                    {dupIds.has(tx.id) && (
+                      <span title={t("Moguć duplikat")} style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:10, background:`${C.expense}20`, color:C.expense, display:"flex", alignItems:"center", gap:3 }}>
+                        <Ic n="alert" s={9} c={C.expense}/>{t("Duplikat?")}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>{fDate(tx.date)} · {t(tx.category)} · {t(tx.location)}</div>
                   <div style={{ fontSize:11, color:C.textMuted, marginTop:2 }}>{t(tx.payment)} · <span style={{ color:tx.status==="Plaćeno"?C.income:tx.status==="U obradi"?"#FB923C":C.warning }}>{t(tx.status)}</span></div>
