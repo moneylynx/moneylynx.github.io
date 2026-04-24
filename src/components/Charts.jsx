@@ -22,11 +22,11 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
     const mLabel = (lang==="en" ? MSHORT_EN : MSHORT)[i];
     return{
       name:mLabel,
-      [t("Primici")]:mt.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0),
-      [t("Troškovi")]:mt.filter(x=>x.type==="Isplata"&&x.status==="Plaćeno").reduce((s,x)=>s+(+x.amount||0),0),
-      [t("Čeka plaćanje")]:mt.filter(x=>x.status==="Čeka plaćanje").reduce((s,x)=>s+(+x.amount||0),0),
-      [t("U obradi")]:mt.filter(x=>x.status==="U obradi").reduce((s,x)=>s+(+x.amount||0),0),
-      [t("Obveze")]:recAmt,
+      inc:  mt.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0),
+      exp:  mt.filter(x=>x.type==="Isplata"&&x.status==="Plaćeno").reduce((s,x)=>s+(+x.amount||0),0),
+      ceka: mt.filter(x=>x.status==="Čeka plaćanje").reduce((s,x)=>s+(+x.amount||0),0),
+      obr:  mt.filter(x=>x.status==="U obradi").reduce((s,x)=>s+(+x.amount||0),0),
+      rec:  recAmt,
     };
   }),[yd,rec,lang,t]);
 
@@ -37,7 +37,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
       const mt=yd.filter(x=>monthOf(x.date)===m);
       c+=mt.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0)-mt.filter(x=>x.type==="Isplata").reduce((s,x)=>s+(+x.amount||0),0);
       const mLabel = (lang==="en" ? MSHORT_EN : MSHORT)[i];
-      return{ name:mLabel, Saldo:(isCurrentYear && i>curMIdx)?null:c };
+      return{ name:mLabel, saldo:(isCurrentYear && i>curMIdx)?null:c };
     });
   },[yd,year,lang]);
 
@@ -246,16 +246,16 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
           <div style={chartCard}>
             {chartLbl("bar",t("Primici vs Troškovi"))}
             <BarChart width={W} height={260} data={mBar}><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="name" tick={{fill:C.textMuted,fontSize:9}} axisLine={false}/><YAxis tick={{fill:C.textMuted,fontSize:9}} axisLine={false} width={44} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:v}/><Tooltip {...tt}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey={t("Primici")} fill={C.income} radius={[3,3,0,0]}/>
-              <Bar dataKey={t("Troškovi")} fill={C.expense} radius={[3,3,0,0]}/>
-              <Bar dataKey={t("Čeka plaćanje")} fill={C.warning} radius={[3,3,0,0]}/>
-              <Bar dataKey={t("U obradi")} fill="#FB923C" radius={[3,3,0,0]}/>
-              <Bar dataKey={t("Obveze")} fill={`${C.accent}80`} radius={[3,3,0,0]}/>
+              <Bar dataKey="inc"  name={t("Primici")}         fill={C.income}          radius={[3,3,0,0]}/>
+              <Bar dataKey="exp"  name={t("Troškovi")}        fill={C.expense}         radius={[3,3,0,0]}/>
+              <Bar dataKey="ceka" name={t("Čeka plaćanje")}   fill={C.warning}         radius={[3,3,0,0]}/>
+              <Bar dataKey="obr"  name={t("U obradi")}        fill="#FB923C"           radius={[3,3,0,0]}/>
+              <Bar dataKey="rec"  name={t("Obveze")}          fill={`${C.accent}80`}   radius={[3,3,0,0]}/>
             </BarChart>
           </div>
           <div style={chartCard}>
             {chartLbl("up",t("Kumulativni saldo"))}
-            <AreaChart width={W} height={220} data={saldo}><defs><linearGradient id="saldoFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.accent} stopOpacity={0.25}/><stop offset="95%" stopColor={C.accent} stopOpacity={0.03}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="name" tick={{fill:C.textMuted,fontSize:9}} axisLine={false}/><YAxis tick={{fill:C.textMuted,fontSize:9}} axisLine={false} width={44} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(1)}k`:v}/><Tooltip {...tt}/><Area type="monotone" dataKey="Saldo" stroke={C.accent} strokeWidth={2.5} fill="url(#saldoFill)" dot={{fill:C.accent,r:3}} activeDot={{r:6}} connectNulls={false}/></AreaChart>
+            <AreaChart width={W} height={220} data={saldo}><defs><linearGradient id="saldoFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.accent} stopOpacity={0.25}/><stop offset="95%" stopColor={C.accent} stopOpacity={0.03}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="name" tick={{fill:C.textMuted,fontSize:9}} axisLine={false}/><YAxis tick={{fill:C.textMuted,fontSize:9}} axisLine={false} width={44} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(1)}k`:v}/><Tooltip {...tt}/><Area type="monotone" dataKey="saldo" name={t("Kumulativni saldo")} stroke={C.accent} strokeWidth={2.5} fill="url(#saldoFill)" dot={{fill:C.accent,r:3}} activeDot={{r:6}} connectNulls={false}/></AreaChart>
           </div>
         </>}
 
