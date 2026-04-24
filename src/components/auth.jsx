@@ -39,8 +39,11 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
   }, [onUnlock, sec, t]);
 
   // On mount: try session cache silently. If found, unlock immediately.
-  // If not found, do nothing — show PIN form normally.
+  // But only if biometry is NOT available — if biometry is active,
+  // let it trigger naturally (500ms delay) to show the biometry prompt.
   useEffect(() => {
+    const hasBio = sec.bioEnabled && sec.bioCredId && window.PublicKeyCredential;
+    if (hasBio) return; // biometry will handle unlock via tryBio
     (async () => {
       try {
         const cachedKey = await loadKeyFromSession();
@@ -166,19 +169,36 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
 
 // ─── SetupPin ────────────────────────────────────────────────────────────────
 function SetupPin({ C, onSave, onSkip, isChange=false, t }) {
-  const [step, setStep]   = useState("enter");
-  const [pin, setPin]     = useState("");
-  const [first, setFirst] = useState("");
-  const [err, setErr]     = useState("");
+  const [step, setStep]         = useState("enter");
+  const [enterPin, setEnterPin] = useState("");  // PIN in first step
+  const [confirmPin, setConfirmPin] = useState(""); // PIN in confirm step
+  const [err, setErr]           = useState("");
+
+  // Use the right pin state depending on step
+  const pin    = step === "enter" ? enterPin    : confirmPin;
+  const setPin = step === "enter" ? setEnterPin : setConfirmPin;
 
   const PAD = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
-  const tap = k => { if(!k)return; setErr(""); if(k==="⌫") setPin(p=>p.slice(0,-1)); else if(pin.length<6) setPin(p=>p+k); };
+  const tap = k => {
+    if (!k) return;
+    setErr("");
+    if (k === "⌫") setPin(p => p.slice(0,-1));
+    else if (pin.length < 6) setPin(p => p + k);
+  };
 
   const next = async () => {
-    if (pin.length < 4) { setErr(t("Minimalno 4 znamenke")); return; }
-    if (step==="enter") { setFirst(pin); setPin(""); setStep("confirm"); }
-    else if (pin !== first) { setErr(t("PIN-ovi se ne poklapaju")); setPin(""); setStep("enter"); setFirst(""); }
-    else { onSave(pin); } // pass plain PIN — caller (App root or GeneralSettings) handles all crypto
+    if (step === "enter") {
+      if (enterPin.length < 4) { setErr(t("Minimalno 4 znamenke")); return; }
+      setConfirmPin(""); // clear confirm field
+      setStep("confirm");
+    } else {
+      if (confirmPin !== enterPin) {
+        setErr(t("PIN-ovi se ne poklapaju"));
+        setEnterPin(""); setConfirmPin(""); setStep("enter");
+      } else {
+        onSave(enterPin);
+      }
+    }
   };
 
   return (
