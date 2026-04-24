@@ -393,7 +393,7 @@ export default function App() {
   if (!prefs.onboarded) {
     return (
       <div style={wrap}><style>{gs}</style>
-        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} onSetPin={handleFirstSetPin} finish={() => { updP({onboarded:true, firstUseAt: Date.now()}); setUnlocked(true); }} />
+        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} finish={() => { updP({onboarded:true, firstUseAt: Date.now()}); setUnlocked(true); }} />
       </div>
     );
   }
