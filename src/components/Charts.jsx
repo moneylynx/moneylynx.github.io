@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, PieChart, Pie, Cell, AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, CHART_COLORS } from '../lib/constants.js';
 import { fmtEur, fDate, monthOf, curYear } from '../lib/helpers.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
