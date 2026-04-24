@@ -47,7 +47,7 @@ export default function App() {
   const [editId,setEditId]   = useState(null);
   const [draftEdit,setDraftEdit] = useState(null);
   const [subPg, setSubPg]    = useState(null);
-  const [unlocked,setUnlocked] = useState(false);
+  const [unlocked,setUnlocked] = useState(()=>!load(K.sec,{}).pinHash);
   const [setupMode, setSetupMode] = useState(false);
   const [swUpdate, setSwUpdate] = useState(null);
 
@@ -125,26 +125,27 @@ export default function App() {
   const handleSyncAfterLogin = async (userId) => {
     setSyncing(true);
     try {
-      // Check if user has cloud data
-      const { fetchTransactions } = await import('./lib/sync.js');
-      const cloudTxs = await fetchTransactions(userId);
-      if (cloudTxs && cloudTxs.length > 0) {
-        // Cloud has data — download and merge (cloud wins for existing, local wins for new)
-        const cloudData = await downloadAll(userId, DEF_LISTS);
-        const localIds = new Set(txs.map(t => t.id));
+      const cloudData = await downloadAll(userId, DEF_LISTS);
+      const cloudTxs = cloudData.txs || [];
+
+      if (cloudTxs.length > 0) {
+        // Cloud has data — merge with any local data (cloud wins for conflicts)
         const merged = [
-          ...cloudData.txs,
-          ...txs.filter(t => !cloudData.txs.find(c => c.id === t.id))
+          ...cloudTxs,
+          ...txs.filter(t => !cloudTxs.find(c => c.id === t.id))
         ];
         setTxs(merged);
         if (cloudData.lists && Object.keys(cloudData.lists).length > 0) setLists(cloudData.lists);
         if (cloudData.user && cloudData.user.firstName) setUser(cloudData.user);
-        // Upload merged data back
-        await uploadAll(userId, { txs: merged, lists, user });
-      } else {
-        // No cloud data — upload local data
+        // If we had local data not in cloud, upload the merge
+        if (txs.length > 0) {
+          await uploadAll(userId, { txs: merged, lists: cloudData.lists || lists, user: cloudData.user || user });
+        }
+      } else if (txs.length > 0) {
+        // No cloud data but have local — upload to cloud
         await uploadAll(userId, { txs, lists, user });
       }
+      // else: both empty — nothing to do
     } catch (e) {
       console.error('Sync error:', e);
     } finally {
