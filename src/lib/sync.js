@@ -39,7 +39,7 @@ export const syncTransactions = async (userId, txs) => {
     type:              tx.type              || '',
     date:              tx.date              || '',
     description:       tx.description      || '',
-    amount:            parseFloat(tx.amount) || 0,
+    amount:            parseFloat(String(tx.amount).replace(',', '.')) || 0,
     category:          tx.category         || '',
     location:          tx.location         || '',
     payment:           tx.payment          || '',
