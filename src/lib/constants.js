@@ -48,7 +48,27 @@ export const K = { db:"ml_data", prf:"ml_prefs", lst:"ml_lists", usr:"ml_user", 
 export const BACKUP_REMIND_AFTER_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 export const BACKUP_SNOOZE_MS       =  7 * 24 * 60 * 60 * 1000; //  7 days
 
-// ─── Currencies ───────────────────────────────────────────────────────────────
+// ─── Countries (auto-detect) ──────────────────────────────────────────────────
+export const COUNTRIES = [
+  { code:"HR", name:"Hrvatska",       nameEN:"Croatia",       currency:"EUR", timezone:"Europe/Zagreb" },
+  { code:"BA", name:"Bosna i Hercegovina", nameEN:"Bosnia & Herzegovina", currency:"BAM", timezone:"Europe/Sarajevo" },
+  { code:"RS", name:"Srbija",         nameEN:"Serbia",        currency:"RSD", timezone:"Europe/Belgrade" },
+  { code:"SI", name:"Slovenija",      nameEN:"Slovenia",      currency:"EUR", timezone:"Europe/Ljubljana" },
+  { code:"ME", name:"Crna Gora",      nameEN:"Montenegro",    currency:"EUR", timezone:"Europe/Belgrade" },
+  { code:"MK", name:"Sjeverna Makedonija", nameEN:"North Macedonia", currency:"EUR", timezone:"Europe/Belgrade" },
+  { code:"AT", name:"Austrija",       nameEN:"Austria",       currency:"EUR", timezone:"Europe/Vienna" },
+  { code:"DE", name:"Njemačka",       nameEN:"Germany",       currency:"EUR", timezone:"Europe/Berlin" },
+  { code:"CH", name:"Švicarska",      nameEN:"Switzerland",   currency:"CHF", timezone:"Europe/Zurich" },
+  { code:"IT", name:"Italija",        nameEN:"Italy",         currency:"EUR", timezone:"Europe/Rome" },
+  { code:"HU", name:"Mađarska",       nameEN:"Hungary",       currency:"HUF", timezone:"Europe/Budapest" },
+  { code:"CZ", name:"Češka",          nameEN:"Czech Republic", currency:"CZK", timezone:"Europe/Prague" },
+  { code:"PL", name:"Poljska",        nameEN:"Poland",        currency:"PLN", timezone:"Europe/Warsaw" },
+  { code:"FR", name:"Francuska",      nameEN:"France",        currency:"EUR", timezone:"Europe/Paris" },
+  { code:"GB", name:"Velika Britanija", nameEN:"United Kingdom", currency:"GBP", timezone:"Europe/London" },
+  { code:"US", name:"SAD",            nameEN:"United States",  currency:"USD", timezone:"America/New_York" },
+  { code:"AE", name:"UAE",            nameEN:"UAE",            currency:"USD", timezone:"Asia/Dubai" },
+  { code:"AU", name:"Australija",     nameEN:"Australia",      currency:"USD", timezone:"Australia/Sydney" },
+];
 export const CURRENCIES = [
   { code:"EUR", name:"Euro (€)" },
   { code:"USD", name:"US Dollar ($)" },
