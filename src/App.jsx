@@ -110,9 +110,12 @@ export default function App() {
 
   useEffect(()=>{
     const fn = async () => {
-      if (!secRef.current.pinHash) return; // no PIN = nothing to lock
+      if (!secRef.current.pinHash) return;
       if (document.hidden) {
-        setUnlocked(false);
+        // Only lock if no biometry — biometry users stay unlocked on minimize.
+        // On full app close, sessionStorage clears anyway so PIN is required.
+        const hasBio = secRef.current.bioEnabled && secRef.current.bioCredId;
+        if (!hasBio) setUnlocked(false);
       } else {
         try {
           const cachedKey = await loadKeyFromSession();
@@ -122,13 +125,15 @@ export default function App() {
             setLists(data.lists); setUser(data.user);
             setEncKey(cachedKey);
             setUnlocked(true);
+          } else if (!secRef.current.bioEnabled) {
+            setUnlocked(false);
           }
-        } catch { /* stay locked */ }
+        } catch { setUnlocked(false); }
       }
     };
     document.addEventListener("visibilitychange", fn);
     return () => document.removeEventListener("visibilitychange", fn);
-  },[]); // register once, use secRef for fresh sec value
+  },[]);
 
   // ─── Backfill firstUseAt for users who onboarded before this feature ──────
   // Without this, existing users would never see the backup reminder because
