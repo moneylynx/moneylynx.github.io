@@ -108,16 +108,12 @@ export default function App() {
   // Clean up old localStorage session key (from previous implementation).
   useEffect(()=>{ try { localStorage.removeItem("ml_sk"); } catch {} }, []);
 
-  // sessionStorage clears on app close → PIN/biometry required on reopen.
-  // On foreground return within same session → session key still in
-  // sessionStorage → silent unlock (no PIN, no biometry prompt).
   useEffect(()=>{
-    if (!sec.pinHash) return;
     const fn = async () => {
+      if (!secRef.current.pinHash) return; // no PIN = nothing to lock
       if (document.hidden) {
         setUnlocked(false);
       } else {
-        // Try session cache — works for minimize/restore within same session.
         try {
           const cachedKey = await loadKeyFromSession();
           if (cachedKey) {
@@ -127,14 +123,12 @@ export default function App() {
             setEncKey(cachedKey);
             setUnlocked(true);
           }
-          // If no cachedKey: LockScreen shows, biometry auto-triggers.
         } catch { /* stay locked */ }
       }
     };
     document.addEventListener("visibilitychange", fn);
     return () => document.removeEventListener("visibilitychange", fn);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[sec.pinHash]);
+  },[]); // register once, use secRef for fresh sec value
 
   // ─── Backfill firstUseAt for users who onboarded before this feature ──────
   // Without this, existing users would never see the backup reminder because
@@ -406,20 +400,16 @@ export default function App() {
     <LockScreen C={C} sec={sec} t={t}
       onUnlock={async (pin, isLegacy, bioOnly) => {
         if (bioOnly) {
-          // Biometry path: try to restore AES key from sessionStorage first.
           const cachedKey = await loadKeyFromSession();
           if (cachedKey) {
-            // Session has a cached key — decrypt data and unlock without PIN.
             const data = await loadAndDecryptAll(cachedKey, DEF_LISTS);
             setTxs(data.txs); setDrafts(data.drafts); setLists(data.lists); setUser(data.user);
             setEncKey(cachedKey);
             updS({attempts:0, lockedUntil:null});
+            await cacheKeyToSession(cachedKey); // renew session cache
             setUnlocked(true);
-          } else {
-            // No cached key — biometry passed but we still need PIN to decrypt.
-            // LockScreen will surface the PIN form with a helpful message.
-            // (This happens on first unlock of a new session.)
           }
+          // No cachedKey → stay on LockScreen, user must enter PIN
           return;
         }
         await handleCryptoUnlock(pin, isLegacy);
