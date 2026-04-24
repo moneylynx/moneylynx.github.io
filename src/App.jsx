@@ -167,6 +167,36 @@ export default function App() {
   // Clean up old localStorage session key (from previous implementation).
   useEffect(()=>{ try { localStorage.removeItem("ml_sk"); } catch {} }, []);
 
+  // ─── Realtime sync listener ────────────────────────────────────────────────
+  // Listens for changes in Supabase and refreshes local transactions.
+  useEffect(() => {
+    if (!supaUser) return;
+    let debounceTimer;
+    const channel = supabase
+      .channel('transactions-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'transactions',
+        filter: `user_id=eq.${supaUser.id}`,
+      }, () => {
+        // Debounce 1.5s to avoid multiple rapid fetches
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+          try {
+            const { fetchTransactions } = await import('./lib/sync.js');
+            const cloudTxs = await fetchTransactions(supaUser.id);
+            if (cloudTxs) setTxs(cloudTxs);
+          } catch (e) { console.error('Realtime fetch error:', e); }
+        }, 1500);
+      })
+      .subscribe();
+    return () => {
+      clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [supaUser?.id]);
+
   useEffect(()=>{
     const fn = async () => {
       if (!secRef.current.pinHash) return;
@@ -342,8 +372,24 @@ export default function App() {
   };
 
 
+  // ─── Cloud sync helpers ────────────────────────────────────────────────────
+  const cloudSync = async (newTxs) => {
+    if (!supaUser) return;
+    try { await uploadAll(supaUser.id, { txs: newTxs, lists, user }); }
+    catch (e) { console.error("cloudSync error:", e); }
+  };
+
+  const cloudDel = async (localId) => {
+    if (!supaUser) return;
+    try {
+      const { deleteTransaction } = await import('./lib/sync.js');
+      await deleteTransaction(supaUser.id, localId);
+    } catch (e) { console.error("cloudDel error:", e); }
+  };
+
   const addTx = tx => {
     const inst = parseInt(tx.installments) || 0;
+    let newTxs;
     if (inst > 1) {
       const tot = parseFloat(tx.amount) || 0;
       const mo  = Math.round(tot/inst*100)/100;
@@ -351,7 +397,6 @@ export default function App() {
       const gid = Date.now().toString();
       const sd  = new Date(tx.date);
       const isYearly = tx.installmentPeriod === "Y";
-      
       const arr = [];
       for (let i=0; i<inst; i++) {
         const d = new Date(sd.getFullYear() + (isYearly ? i : 0), sd.getMonth() + (isYearly ? 0 : i), Math.min(sd.getDate(),28));
@@ -368,14 +413,23 @@ export default function App() {
           notes: tx.notes ? `${tx.notes} | ${t("Obrok")} ${i+1}/${inst}` : `${t("Obrok")} ${i+1}/${inst} · ${fmtEur(tot)}`,
         });
       }
-      setTxs(p=>[...p,...arr]);
+      setTxs(p => { newTxs = [...p, ...arr]; cloudSync(newTxs); return newTxs; });
     } else {
-      setTxs(p=>[...p, { ...tx, id:Date.now().toString(), installments:0 }]);
+      const newTx = { ...tx, id:Date.now().toString(), installments:0 };
+      setTxs(p => { newTxs = [...p, newTx]; cloudSync(newTxs); return newTxs; });
     }
     setPage("dashboard");
   };
 
-  const updTx  = tx => { setTxs(p=>p.map(x=>x.id===tx.id?tx:x)); setEditId(null); setPage("transactions"); };
+  const updTx = tx => {
+    setTxs(p => {
+      const newTxs = p.map(x => x.id===tx.id ? tx : x);
+      cloudSync(newTxs);
+      return newTxs;
+    });
+    setEditId(null);
+    setPage("transactions");
+  };
 
   // ─── Undo toast infrastructure ─────────────────────────────────────────────
   // Instead of deleting immediately, we stash the removed items and show a
@@ -408,13 +462,15 @@ export default function App() {
     const removed = txs.find(x => x.id === id);
     if (!removed) return;
     setTxs(p => p.filter(x => x.id !== id));
-    startUndo(t("Stavka obrisana"), () => setTxs(p => [...p, removed]));
+    cloudDel(id);
+    startUndo(t("Stavka obrisana"), () => { setTxs(p => [...p, removed]); cloudSync([...txs, removed]); });
   };
   const delGrp = g => {
     const removed = txs.filter(x => x.installmentGroup === g);
     if (!removed.length) return;
     setTxs(p => p.filter(x => x.installmentGroup !== g));
-    startUndo(t("Grupa obrisana") + ` (${removed.length})`, () => setTxs(p => [...p, ...removed]));
+    removed.forEach(r => cloudDel(r.id));
+    startUndo(t("Grupa obrisana") + ` (${removed.length})`, () => { setTxs(p => [...p, ...removed]); cloudSync([...txs, ...removed]); });
   };
   const delDraft = id => {
     const removed = drafts.find(d => d.id === id);
