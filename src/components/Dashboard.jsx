@@ -46,6 +46,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
       date: x.date,
       description: x.description,
       category: x.category,
+      location: x.location,
       amount: parseFloat(x.amount) || 0,
       status: x.status,
     }));
@@ -65,6 +66,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
         date: dueDate,
         description: r.description,
         category: r.category,
+        location: r.location,
         amount: parseFloat(r.amount) || 0,
         recurring: r,
       });
@@ -296,9 +298,11 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                         <div style={{ fontSize:12, fontWeight:600, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                           {item.description || t(item.category)}
                         </div>
-                        <div style={{ fontSize:10, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:1 }}>
+                        <div style={{ fontSize:10, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:1, flexWrap:"wrap" }}>
                           <Ic n="cal" s={9} c={C.textMuted}/>
                           {new Date(item.date).getDate()}.{new Date(item.date).getMonth()+1}.
+                          {item.category && item.category !== "Ostalo" && <span>· {t(item.category)}</span>}
+                          {item.location && item.location !== "Ostalo" && <span>· {t(item.location)}</span>}
                           {item.kind==="recurring" && <span style={{ color:C.accent, fontWeight:600 }}>· {t("Redovno")}</span>}
                         </div>
                       </div>
