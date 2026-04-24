@@ -75,17 +75,17 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
     setBusy(true);
     setErr("");
     try {
-      // Determine hash version and verify accordingly.
       let isCorrect = false;
       let isLegacy  = false;
+      console.log("tryPin: version=", sec.pinHashVersion, "pinSalt=", sec.pinSalt?.slice(0,8), "pinHash=", sec.pinHash?.slice(0,8));
       if (sec.pinHashVersion === "v2") {
-        // PBKDF2 verification
         const h = await hashPinV2(pin, sec.pinSalt);
         isCorrect = h === sec.pinHash;
+        console.log("tryPin v2: computed=", h?.slice(0,8), "stored=", sec.pinHash?.slice(0,8), "match=", isCorrect);
       } else {
-        // Legacy SHA-256 — verify, then trigger silent migration.
         const h = await hashPinLegacy(pin);
         isCorrect = h === sec.pinHash;
+        console.log("tryPin legacy: computed=", h?.slice(0,8), "stored=", sec.pinHash?.slice(0,8), "match=", isCorrect);
         if (isCorrect) isLegacy = true;
       }
 
