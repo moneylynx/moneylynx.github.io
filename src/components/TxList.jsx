@@ -37,7 +37,15 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
       );
     }
 
-    if (q) f = f.filter(x=>x.description?.toLowerCase().includes(q.toLowerCase())||x.category?.toLowerCase().includes(q.toLowerCase()));
+    if (q) {
+      const ql = q.toLowerCase();
+      f = f.filter(x =>
+        x.description?.toLowerCase().includes(ql) ||
+        x.category?.toLowerCase().includes(ql) ||
+        x.location?.toLowerCase().includes(ql) ||
+        x.notes?.toLowerCase().includes(ql)
+      );
+    }
 
     if (filter === "pending" || filter === "processing" || filter === "overdue") {
         return f.sort((a,b)=>new Date(a.date)-new Date(b.date));
