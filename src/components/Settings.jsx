@@ -1115,6 +1115,8 @@ SETTINGS
 • Active Year — switch year for analysis
 • Manage Obligations — edit/delete recurring obligations
 • List Customization — add your own categories, locations, payment methods, budget limits
+• Currency — select display currency (EUR, USD, HRK, GBP, CHF, BAM, RSD, HUF, CZK, PLN)
+• Time zone — select your time zone (Europe, Americas, Asia, Australia)
 • Account — sign out, manual "Sync to cloud" button
 
 CLOUD SYNC
@@ -1154,6 +1156,8 @@ POSTAVKE
 • Aktivna godina — prebaci godinu za analizu
 • Upravljaj obvezama — uredi/obriši redovne obveze
 • Prilagodba popisa — vlastite kategorije, lokacije, načini plaćanja, budžet limiti
+• Valuta — odaberi valutu prikaza (EUR, USD, HRK, GBP, CHF, BAM, RSD, HUF, CZK, PLN)
+• Vremenska zona — odaberi svoju vremensku zonu (Europa, Amerika, Azija, Australija)
 • Račun — odjava, gumb "Sinkroniziraj s oblakom"
 
 CLOUD SINKRONIZACIJA
