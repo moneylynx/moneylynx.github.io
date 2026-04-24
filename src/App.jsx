@@ -58,7 +58,7 @@ export default function App() {
   // Filters
   const [txFilter, setTxFilter]           = useState("pending");
   const [statTab, setStatTab]             = useState("expected");
-  const [statMonth, setStatMonth]         = useState("YEAR");
+  const [statMonth, setStatMonth]         = useState(()=>MONTHS[new Date().getMonth()]);
   const [statExpFilter, setStatExpFilter] = useState({recurring:true, rate:true, kredit:true, processing:true});
 
   const lang = prefs.lang || "hr";
