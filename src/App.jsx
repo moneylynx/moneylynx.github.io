@@ -246,7 +246,6 @@ export default function App() {
     const key     = await deriveEncKey(pin, encSalt);
     await encryptAndSaveAll(key, { txs, drafts, lists, user });
     const newSec = { ...secRef.current, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0, lockedUntil:null };
-    console.log("handleFirstSetPin: saving sec pinHash=", pinHash?.slice(0,8), "pinSalt=", pinSalt?.slice(0,8));
     save(K.sec, newSec); // immediate save — don't rely on useEffect timing
     setSec(newSec);
     secRef.current = newSec;
@@ -394,7 +393,7 @@ export default function App() {
   if (!prefs.onboarded) {
     return (
       <div style={wrap}><style>{gs}</style>
-        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} finish={() => { updP({onboarded:true, firstUseAt: Date.now()}); setUnlocked(true); }} />
+        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} onSetPin={handleFirstSetPin} finish={() => { updP({onboarded:true, firstUseAt: Date.now()}); setUnlocked(true); }} />
       </div>
     );
   }

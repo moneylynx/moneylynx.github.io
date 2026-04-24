@@ -77,15 +77,12 @@ function LockScreen({ C, sec, onUnlock, onWipe, t }) {
     try {
       let isCorrect = false;
       let isLegacy  = false;
-      console.log("tryPin: version=", sec.pinHashVersion, "pinSalt=", sec.pinSalt?.slice(0,8), "pinHash=", sec.pinHash?.slice(0,8));
       if (sec.pinHashVersion === "v2") {
         const h = await hashPinV2(pin, sec.pinSalt);
         isCorrect = h === sec.pinHash;
-        console.log("tryPin v2: computed=", h?.slice(0,8), "stored=", sec.pinHash?.slice(0,8), "match=", isCorrect);
       } else {
         const h = await hashPinLegacy(pin);
         isCorrect = h === sec.pinHash;
-        console.log("tryPin legacy: computed=", h?.slice(0,8), "stored=", sec.pinHash?.slice(0,8), "match=", isCorrect);
         if (isCorrect) isLegacy = true;
       }
 
@@ -229,7 +226,7 @@ function SetupPin({ C, onSave, onSkip, isChange=false, t }) {
 }
 
 // ─── OnboardingScreen ────────────────────────────────────────────────────────
-function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, updSec, finish, t }) {
+function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, updSec, finish, onSetPin, t }) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState(user.firstName || "");
   const [theme, setTheme] = useState(prefs.theme || "auto");
@@ -263,7 +260,7 @@ function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, 
             {[1,2,3].map(i => <div key={i} style={{ width: i===step ? 24 : 8, height: 6, borderRadius:4, background: i===step ? C.accent : C.border, transition:"all .3s" }}/>)}
         </div>
         <SetupPin C={C} isChange={false} t={t}
-          onSave={hash => { updSec({pinHash:hash, attempts:0, lockedUntil:null}); finish(); }}
+          onSave={pin => { onSetPin ? onSetPin(pin) : finish(); }}
           onSkip={finish} 
         />
       </div>
