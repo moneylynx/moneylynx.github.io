@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 // ─── Lib ──────────────────────────────────────────────────────────────────────
 import { K, DEF_LISTS, T, MONTHS, MSHORT, MSHORT_EN, BACKUP_SNOOZE_MS } from "./lib/constants.js";
 import { createT, EN_DICT } from "./lib/i18n.js";
-import { load, save, saveRaw, loadRaw, fmtEur, curYear } from "./lib/helpers.js";
+import { load, save, saveRaw, loadRaw, fmtEur, fmtCurrency, fDateTZ, curYear } from "./lib/helpers.js";
 import {
   bytesToHex, deriveEncKey, hashPinV2, hashPinLegacy,
   encryptJSON, encryptAndSaveAll, loadAndDecryptAll,
@@ -16,6 +16,7 @@ import { uploadAll, downloadAll } from "./lib/sync.js";
 import { Ic, QuickAddModal, ActionHubModal } from "./components/ui.jsx";
 import { LockScreen, SetupPin, OnboardingScreen } from "./components/auth.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import TxForm from "./components/TxForm.jsx";
 import TxList from "./components/TxList.jsx";
@@ -29,7 +30,7 @@ export default function App() {
 
   const [txs, setTxs] = useState(() => _hasPin ? [] : load(K.db, []));
   const [drafts, setDrafts] = useState(() => _hasPin ? [] : load(K.drf, []));
-  const [prefs,setPrefs]= useState(()=>load(K.prf,{theme:"auto",year:curYear(), onboarded:false, lang:"hr"}));
+  const [prefs,setPrefs]= useState(()=>load(K.prf,{theme:"auto",year:curYear(), onboarded:false, lang:"hr", currency:"EUR", timezone:"Europe/Zagreb"}));
   const [user, setUser] = useState(()=> _hasPin ? {} : load(K.usr,{firstName:"",lastName:"",phone:"",email:""}));
   const [sec,  setSec]  = useState(()=>load(K.sec,{pinHash:null,bioEnabled:false,bioCredId:null,attempts:0,totalFailed:0,lockedUntil:null}));
   const [lists,setLists] = useState(() => _hasPin ? DEF_LISTS : load(K.lst, DEF_LISTS));
@@ -41,7 +42,26 @@ export default function App() {
   // ─── Supabase auth state ───────────────────────────────────────────────────
   const [supaUser, setSupaUser]   = useState(null);  // logged-in Supabase user
   const [authReady, setAuthReady] = useState(false); // auth state resolved
-  const [syncing, setSyncing]     = useState(false);  // sync in progress
+  const [syncing, setSyncing]     = useState(false);
+  const [syncError, setSyncError] = useState(null);  // null | string
+  const [isOnline, setIsOnline]   = useState(()=> typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  // ─── Online / offline detection ───────────────────────────────────────────
+  useEffect(() => {
+    const goOnline  = () => {
+      setIsOnline(true);
+      setSyncError(null);
+      // Auto-retry sync when coming back online
+      if (supaUser) handleSyncAfterLogin(supaUser.id);
+    };
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online",  goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online",  goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
   const [page, setPage] = useState("dashboard");
   const [editId,setEditId]   = useState(null);
@@ -123,13 +143,12 @@ export default function App() {
 
   // ─── Sync: upload local data after login ──────────────────────────────────
   const handleSyncAfterLogin = async (userId) => {
-    setSyncing(true);
+    if (!navigator.onLine) { setSyncError(t("Nema internetske veze. Podaci su lokalni.")); return; }
+    setSyncing(true); setSyncError(null);
     try {
       const cloudData = await downloadAll(userId, DEF_LISTS);
       const cloudTxs = cloudData.txs || [];
-
       if (cloudTxs.length > 0) {
-        // Cloud has data — merge with any local data (cloud wins for conflicts)
         const merged = [
           ...cloudTxs,
           ...txs.filter(t => !cloudTxs.find(c => c.id === t.id))
@@ -137,17 +156,15 @@ export default function App() {
         setTxs(merged);
         if (cloudData.lists && Object.keys(cloudData.lists).length > 0) setLists(cloudData.lists);
         if (cloudData.user && cloudData.user.firstName) setUser(cloudData.user);
-        // If we had local data not in cloud, upload the merge
         if (txs.length > 0) {
           await uploadAll(userId, { txs: merged, lists: cloudData.lists || lists, user: cloudData.user || user });
         }
       } else if (txs.length > 0) {
-        // No cloud data but have local — upload to cloud
         await uploadAll(userId, { txs, lists, user });
       }
-      // else: both empty — nothing to do
     } catch (e) {
       console.error('Sync error:', e);
+      setSyncError(t("Greška pri sinkronizaciji. Pokušaj ponovo."));
     } finally {
       setSyncing(false);
     }
@@ -634,11 +651,51 @@ export default function App() {
     );
   }
 
-  const shared = { C, year:prefs.year, lists, user, t, lang };
+  const currency = prefs.currency || "EUR";
+  const timezone = prefs.timezone || "Europe/Zagreb";
+  const fmt  = (n) => fmtCurrency(n, currency);
+  const fmtD = (d) => fDateTZ(d, timezone);
+  const shared = { C, year:prefs.year, lists, user, t, lang, fmt, fmtD, currency, timezone };
 
   return (
     <div style={{ ...wrap, paddingBottom:88 }}>
       <style>{gs}</style>
+
+      {/* Offline banner */}
+      {!isOnline && (
+        <div style={{
+          position:"fixed", top:0, left:"50%", transform:"translateX(-50%)",
+          width:"100%", maxWidth:480, zIndex:301,
+          background:"#374151", color:"#fff",
+          padding:`max(10px, env(safe-area-inset-top)) 16px 10px`,
+          display:"flex", alignItems:"center", gap:8,
+          borderBottom:"1px solid #4B5563",
+        }}>
+          <Ic n="alert" s={14} c="#FCD34D"/>
+          <span style={{ fontSize:12, fontWeight:600 }}>{t("Nema internetske veze — radite offline")}</span>
+        </div>
+      )}
+
+      {/* Sync error banner */}
+      {syncError && isOnline && (
+        <div style={{
+          position:"fixed", top:0, left:"50%", transform:"translateX(-50%)",
+          width:"100%", maxWidth:480, zIndex:301,
+          background:`${C.expense}E8`, color:"#fff",
+          padding:`max(10px, env(safe-area-inset-top)) 16px 10px`,
+          display:"flex", alignItems:"center", justifyContent:"space-between",
+          borderBottom:`1px solid ${C.expense}`,
+        }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <Ic n="alert" s={14} c="#fff"/>
+            <span style={{ fontSize:12, fontWeight:600 }}>{syncError}</span>
+          </div>
+          <button onClick={()=>{ setSyncError(null); if(supaUser) handleSyncAfterLogin(supaUser.id); }}
+            style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:8, padding:"4px 10px", color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer" }}>
+            {t("Pokušaj ponovo")}
+          </button>
+        </div>
+      )}
 
       {/* Service Worker update banner — appears when a new app version is ready. */}
       {swUpdate && (
@@ -736,3 +793,11 @@ export default function App() {
   );
 }
 
+// Wrap with ErrorBoundary so crashes show friendly message instead of blank screen
+export function AppWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
