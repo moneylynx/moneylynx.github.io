@@ -4,7 +4,8 @@ import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, CHART_COLORS } from '../lib/const
 import { fmtEur, fDate, monthOf, curYear } from '../lib/helpers.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
 
-function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expFilter, setExpFilter, t, lang }) {
+function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expFilter, setExpFilter, t, lang, fmt: fmtProp }) {
+  const fmt = fmtProp || fmtEur;
   const isYear = selMonth === "YEAR";
   const isAll = selMonth === "ALL";
   const isMonth = !isYear && !isAll;
@@ -12,7 +13,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
   const yd = data.filter(x=>new Date(x.date).getFullYear()===year);
   const fd = isMonth ? yd.filter(x=>monthOf(x.date)===selMonth) : yd;
   const W  = Math.min(window.innerWidth??480,480)-64;
-  const tt = { contentStyle:{background:C.cardAlt,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:11}, formatter:v=>fmtEur(v) };
+  const tt = { contentStyle:{background:C.cardAlt,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:11}, formatter:v=>fmt(v) };
   const curMIdx = new Date().getMonth();
   const rec = lists.recurring || [];
 
@@ -181,9 +182,9 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:6 }}>
               {[
-                { lb:t("Primici"), val:fmtEur(mDetail.inc), col:C.income },
-                { lb:t("Troškovi"), val:fmtEur(mDetail.exp), col:C.expense },
-                { lb:t("Bilanca"), val:fmtEur(mDetail.bal), col:mDetail.bal>=0?C.income:C.expense },
+                { lb:t("Primici"), val:fmt(mDetail.inc), col:C.income },
+                { lb:t("Troškovi"), val:fmt(mDetail.exp), col:C.expense },
+                { lb:t("Bilanca"), val:fmt(mDetail.bal), col:mDetail.bal>=0?C.income:C.expense },
                 { lb:t("Stavki"), val:mDetail.count, col:C.accent },
               ].map(({lb,val,col})=>(
                 <div key={lb} style={{ textAlign:"center" }}>
@@ -203,7 +204,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
           <div style={chartCard}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
               <span style={{ fontSize:12, fontWeight:600, color:C.textMuted }}>{t("Ukupno očekivano")}</span>
-              <span style={{ fontSize:16, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.expense }}>{fmtEur(expTotal)}</span>
+              <span style={{ fontSize:16, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.expense }}>{fmt(expTotal)}</span>
             </div>
             <div style={{ display:"flex", gap:6, marginBottom:12, flexWrap:"wrap" }}>
               {[
@@ -229,7 +230,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
                       <div style={{ fontSize:10, color:C.textMuted }}>{typeLabel[e.type]}{e.cat?` · ${t(e.cat)}`:""}{e.remainLabel?` · ${e.remainLabel}`:""}{e.endDate&&!e.remainLabel?` · ${t("do")} ${fDate(e.endDate)}`:""}</div>
                     </div>
                   </div>
-                  <span style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:typeColor[e.type], flexShrink:0, marginLeft:8 }}>{fmtEur(e.amount)}</span>
+                  <span style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:typeColor[e.type], flexShrink:0, marginLeft:8 }}>{fmt(e.amount)}</span>
                 </div>
               ))
             }
@@ -238,7 +239,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
 
         {tab==="categories" && (
           <div style={chartCard}>
-            {catD.length>0 ? <><PieChart width={W} height={200}><Pie data={catD} cx="50%" cy="50%" innerRadius={40} outerRadius={80} dataKey="value" stroke="none">{catD.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}</Pie><Tooltip {...tt}/></PieChart><div style={{marginTop:10}}>{catD.map((c,i)=><div key={c.name} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<catD.length-1?`1px solid ${C.border}`:"none",fontSize:12,color:C.text}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:9,height:9,borderRadius:3,background:CHART_COLORS[i%CHART_COLORS.length]}}/>{t(c.name)}</div><span style={{fontFamily:"'JetBrains Mono',monospace"}}>{fmtEur(c.value)}</span></div>)}</div></> : <p style={{textAlign:"center",color:C.textMuted,padding:20,fontSize:13}}>{t("Nema podataka")}</p>}
+            {catD.length>0 ? <><PieChart width={W} height={200}><Pie data={catD} cx="50%" cy="50%" innerRadius={40} outerRadius={80} dataKey="value" stroke="none">{catD.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}</Pie><Tooltip {...tt}/></PieChart><div style={{marginTop:10}}>{catD.map((c,i)=><div key={c.name} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<catD.length-1?`1px solid ${C.border}`:"none",fontSize:12,color:C.text}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:9,height:9,borderRadius:3,background:CHART_COLORS[i%CHART_COLORS.length]}}/>{t(c.name)}</div><span style={{fontFamily:"'JetBrains Mono',monospace"}}>{fmt(c.value)}</span></div>)}</div></> : <p style={{textAlign:"center",color:C.textMuted,padding:20,fontSize:13}}>{t("Nema podataka")}</p>}
           </div>
         )}
 
@@ -313,9 +314,9 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
               {trendData.map(d=>(
                 <div key={d.name} style={{ flex:1, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"10px 12px" }}>
                   <div style={{ fontSize:11, fontWeight:700, color:C.textMuted, marginBottom:6 }}>{d.name}</div>
-                  <div style={{ fontSize:11, color:C.income }}>↑ {fmtEur(d[t("Primici")])}</div>
-                  <div style={{ fontSize:11, color:C.expense }}>↓ {fmtEur(d[t("Troškovi")])}</div>
-                  <div style={{ fontSize:12, fontWeight:700, color:d[t("Saldo")]>=0?C.income:C.expense, marginTop:4 }}>= {fmtEur(d[t("Saldo")])}</div>
+                  <div style={{ fontSize:11, color:C.income }}>↑ {fmt(d[t("Primici")])}</div>
+                  <div style={{ fontSize:11, color:C.expense }}>↓ {fmt(d[t("Troškovi")])}</div>
+                  <div style={{ fontSize:12, fontWeight:700, color:d[t("Saldo")]>=0?C.income:C.expense, marginTop:4 }}>= {fmt(d[t("Saldo")])}</div>
                 </div>
               ))}
             </div>

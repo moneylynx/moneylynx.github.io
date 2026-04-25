@@ -4,7 +4,8 @@ import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, DEF_LISTS, T, CHART_COLORS, BACKU
 import { fmtEur, monthOf, curYear, curMonthIdx, needsBackupReminder } from '../lib/helpers.js';
 import { Ic } from './ui.jsx';
 
-function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser }) {
+function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD }) {
+  const fmt = fmtProp || fmtEur;
   const cmIdx = curMonthIdx();
   const cm  = MONTHS[cmIdx]; 
   const cmName = lang==="en" ? MONTHS_EN[cmIdx] : cm;
@@ -121,12 +122,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   const mm  = String(now.getMonth()+1).padStart(2,"0");
   const yy  = now.getFullYear();
   const W   = Math.min(window.innerWidth??480,480)-64;
-  const tt  = { contentStyle:{background:C.cardAlt,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:11}, formatter:v=>fmtEur(v) };
+  const tt  = { contentStyle:{background:C.cardAlt,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:11}, formatter:v=>fmt(v) };
   const dn  = [user.firstName, user.lastName].filter(Boolean).join(" ");
 
   const cards = [
-    { icon:<Ic n="up"    s={13} c={C.income}/>,  label:`${cmName} ${t("primici")}`,  val:fmtEur(mI), color:C.income  },
-    { icon:<Ic n="down"  s={13} c={C.expense}/>, label:`${cmName} ${t("plaćeno")}`,  val:fmtEur(mE), color:C.expense },
+    { icon:<Ic n="up"    s={13} c={C.income}/>,  label:`${cmName} ${t("primici")}`,  val:fmt(mI), color:C.income  },
+    { icon:<Ic n="down"  s={13} c={C.expense}/>, label:`${cmName} ${t("plaćeno")}`,  val:fmt(mE), color:C.expense },
   ];
 
   return (
@@ -208,7 +209,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
             <div style={{ fontSize:10, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.textMuted, marginTop:1, marginRight:-6 }}>{yy}.</div>
           </div>
           <div style={{ fontSize:11, color:C.textSub, marginBottom:4, textAlign:"left" }}>{t("Bilanca")} {year}.</div>
-          <div style={{ fontSize:28, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:bal>=0?C.income:C.expense, textAlign:"left", paddingRight:65 }}>{fmtEur(bal)}</div>
+          <div style={{ fontSize:28, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:bal>=0?C.income:C.expense, textAlign:"left", paddingRight:65 }}>{fmt(bal)}</div>
           <div style={{ position:"absolute", right:-20, top:-20, width:90, height:90, borderRadius:"50%", background:`${bal>=0?C.income:C.expense}10` }}/>
         </div>
 
@@ -252,7 +253,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                           <div style={{ width:7, height:7, borderRadius:2, background:CHART_COLORS[i%CHART_COLORS.length], flexShrink:0 }}/>
                           <span style={{ color:C.textSub, maxWidth:80, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t(c.name)}</span>
                         </div>
-                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:600, fontSize:11 }}>{fmtEur(c.value)}</span>
+                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:600, fontSize:11 }}>{fmt(c.value)}</span>
                       </div>
                     ))}
                   </div>
@@ -280,7 +281,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     {todoItems.length > 0 && <span style={{ background:`${C.warning}25`, borderRadius:10, padding:"1px 7px", fontSize:10, fontWeight:700, color:C.warning }}>{todoItems.length}</span>}
                   </div>
                   <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.warning }}>
-                    {fmtEur(todoItems.reduce((s,i)=>s+i.amount,0))}
+                    {fmt(todoItems.reduce((s,i)=>s+i.amount,0))}
                   </div>
                 </div>
                 {/* Skrolabili srednji dio — sve stavke */}
@@ -307,7 +308,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                         </div>
                       </div>
                       <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.text, flexShrink:0 }}>
-                        {fmtEur(item.amount)}
+                        {fmt(item.amount)}
                       </div>
                       <button
                         onClick={()=>payTodoItem(item)}

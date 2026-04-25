@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { fmtEur, fDate } from '../lib/helpers.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
 
-function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, t }) {
+function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, t, fmt: fmtProp }) {
+  const fmt = fmtProp || fmtEur;
   const [q, setQ]          = useState("");
   const [delCfm,setDelCfm] = useState(null);
   const [grpCfm,setGrpCfm] = useState(null);
@@ -134,7 +135,7 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
                 </div>
                 
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", flexShrink:0, marginLeft:10 }}>
-                  <div style={{ fontSize:15, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:tx.type==="Primitak"?C.income:C.expense }}>{tx.type==="Primitak"?"+":"-"}{fmtEur(+tx.amount)}</div>
+                  <div style={{ fontSize:15, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:tx.type==="Primitak"?C.income:C.expense }}>{tx.type==="Primitak"?"+":"-"}{fmt(+tx.amount)}</div>
                   <div style={{ display:"flex", gap:5, marginTop:"auto", justifyContent:"flex-end" }}>
                     {(tx.status==="Čeka plaćanje" || tx.status==="U obradi") && <button title={t("Plati")} onClick={()=>onPay(tx.id)} style={{ background:`${C.income}18`, border:`1px solid ${C.income}40`, borderRadius:8, padding:"5px 8px", cursor:"pointer" }}><Ic n="check" s={13} c={C.income}/></button>}
                     <button title={t("Uredi")} onClick={()=>onEdit(tx.id)} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:8, padding:"5px 8px", cursor:"pointer" }}><Ic n="edit" s={13} c={C.accent}/></button>

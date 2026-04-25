@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { K, MAX_ATT, LOCK_SEC, WIPE_AT } from '../lib/constants.js';
-import { save } from '../lib/helpers.js';
+import { K, MAX_ATT, LOCK_SEC, WIPE_AT, COUNTRIES, CURRENCIES, TIMEZONES } from '../lib/constants.js';
+import { save, currencySymbol } from '../lib/helpers.js';
 import { hashPinV2, hashPinLegacy, loadKeyFromSession } from '../lib/crypto.js';
 import { Ic } from './ui.jsx';
 
@@ -327,7 +327,7 @@ function LanguageScreen({ C, onSelect }) {
 }
 
 // ─── OnboardingScreen ────────────────────────────────────────────────────────
-function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, updSec, finish, onSetPin, t }) {
+function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, updSec, finish, onSetPin, onAddFirstTx, t }) {
   const TOTAL_STEPS = 4;
   const [step, setStep] = useState(1);
   const [name, setName] = useState(user.firstName || "");
@@ -349,8 +349,6 @@ function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, 
       const browserTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (browserTZ) {
         setTimezone(browserTZ);
-        // Find matching country
-        const { COUNTRIES } = require('../lib/constants.js');
         const match = COUNTRIES.find(c => c.timezone === browserTZ);
         if (match) {
           setCountry(match.code);
@@ -361,7 +359,6 @@ function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, 
   }, []);
 
   const handleCountryChange = (code) => {
-    const { COUNTRIES } = require('../lib/constants.js');
     const c = COUNTRIES.find(x => x.code === code);
     if (c) {
       setCountry(code);
@@ -432,7 +429,6 @@ function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, 
 
   // ─── Step 2: Country / Currency / Timezone ──────────────────────────────
   if (step === 2) {
-    const { COUNTRIES, CURRENCIES, TIMEZONES } = require('../lib/constants.js');
     const lang = prefs.lang || "hr";
     return (
       <div className="su" style={{ width:"100%", minHeight:"100vh", background:"inherit", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px 16px" }}>
@@ -509,7 +505,6 @@ function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, 
 
   // ─── Step 4: Interactive first expense ──────────────────────────────────
   if (step === 4) {
-    const { currencySymbol } = require('../lib/helpers.js');
     const sym = currencySymbol(prefs.currency || currency);
     return (
       <div className="su" style={{ width:"100%", minHeight:"100vh", background:"inherit", display:"flex", alignItems:"center", justifyContent:"center", padding:"24px 16px" }}>
@@ -533,15 +528,14 @@ function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, 
           </div>
 
           {nextBtn(() => {
-            // If user entered something, create a transaction
-            if (firstDesc.trim() && parseFloat(firstAmt) > 0) {
-              updLists(l => ({...l, _firstTx: {
+            if (firstDesc.trim() && parseFloat(firstAmt) > 0 && onAddFirstTx) {
+              onAddFirstTx({
                 description: firstDesc.trim(),
                 amount: parseFloat(firstAmt),
                 type: "Isplata", category: "Ostalo", location: "Ostalo",
                 payment: "Gotovina", status: "Plaćeno",
                 date: new Date().toISOString().split("T")[0],
-              }}));
+              });
             }
             finish();
           }, t("Završi postavljanje"))}
