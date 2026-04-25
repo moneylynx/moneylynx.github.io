@@ -1183,8 +1183,12 @@ All rights reserved.
 UVJETI KORIŠTENJA (HR)
 Ova aplikacija licencirana je isključivo za osobnu, nekomercijalnu upotrebu. Zabranjeno je: redistribuirati, prodavati, mijenjati ili koristiti kod, dizajn ili sadržaj ove aplikacije u komercijalne svrhe bez pisanog dopuštenja autora.
 
+Korištenjem ove aplikacije prihvaćate ove uvjete, Odricanje odgovornosti te Politiku privatnosti i kolačića.
+
 TERMS OF USE (EN)
 This application is licensed for personal, non-commercial use only. Redistribution, sale, modification, or commercial use of the code, design, or content of this application without the author's written permission is prohibited.
+
+By using this application you accept these terms, the Disclaimer, and the Privacy & Cookies Policy.
 
 KOMPONENTE OTVORENOG KODA / OPEN SOURCE COMPONENTS
 Ova aplikacija koristi sljedeće open-source biblioteke:
@@ -1193,6 +1197,12 @@ Ova aplikacija koristi sljedeće open-source biblioteke:
 • Recharts 2.12 — MIT License — recharts/recharts
 • Vite 5 — MIT License — vitejs/vite
 • Capacitor 8 — MIT License — ionic-team/capacitor
+• Supabase JS 2.x — MIT License — supabase/supabase-js
+
+HOSTING I USLUGE / HOSTING & SERVICES
+• Web hosting: Vercel (vercel.com)
+• Baza podataka i autentifikacija: Supabase (supabase.com)
+• OAuth: Google Sign-In
 
 Pune tekstove licenci za ove biblioteke možete pronaći na:
 Full license texts available at: https://opensource.org/licenses/MIT`
@@ -1206,14 +1216,23 @@ Moja lova is provided "as is" without warranty of any kind, express or implied, 
 FINANCIAL DECISIONS
 This app is a personal budgeting tool only. It does not provide financial, investment, tax, or legal advice. All financial decisions made based on data entered into this app are the sole responsibility of the user. The author is not liable for any financial loss or damage arising from the use of this application.
 
-DATA LOSS
-The author is not responsible for loss of data resulting from: device failure, accidental deletion, uninstallation of the app, browser cache clearing, or any other cause. Users are strongly advised to regularly export backups.
+DATA & SECURITY
+• Local data is encrypted with AES-256 when PIN protection is enabled
+• Cloud data is stored on Supabase servers secured with Row Level Security (RLS) — each user can only access their own data
+• PIN hashes use PBKDF2 (SHA-256) and are never transmitted to any server
+• The author is not responsible for data loss resulting from: device failure, forgotten PIN without cloud backup, accidental deletion, browser cache clearing, or third-party service outages
+• Users are strongly advised to enable cloud sync (sign in with Google or email) for automatic backup
 
-ACCURACY
-The app performs calculations based on user-entered data. The accuracy of all outputs depends entirely on the accuracy of the data entered.
+CLOUD SYNC & AVAILABILITY
+• Real-time sync requires an active internet connection
+• The author does not guarantee continuous availability of the service
+• Data may be temporarily unavailable during maintenance or third-party outages (Supabase, Vercel)
+• Offline mode preserves local data; sync resumes automatically when connection returns
 
-AVAILABILITY
-The author does not guarantee continuous availability of the web version (moja-lova-app.vercel.app). The app may be unavailable due to maintenance, updates, or third-party service outages.` :
+CURRENCY & CALCULATIONS
+• Currency display is for presentation purposes only and does not perform real-time conversion
+• All calculations are based on user-entered amounts in their selected currency
+• The accuracy of all outputs depends entirely on the accuracy of the data entered` :
 `ODRICANJE ODGOVORNOSTI
 
 Aplikacija Moja lova pruža se "kakva jest" bez ikakvih izričitih ili implicitnih jamstava, uključujući, ali ne ograničavajući se na jamstva prodajnosti, prikladnosti za određenu svrhu ili nekršenja prava.
@@ -1221,69 +1240,159 @@ Aplikacija Moja lova pruža se "kakva jest" bez ikakvih izričitih ili implicitn
 FINANCIJSKE ODLUKE
 Ova aplikacija je isključivo alat za osobno budžetiranje. Ne pruža financijske, investicijske, porezne niti pravne savjete. Sve financijske odluke donesene na temelju podataka unesenih u aplikaciju isključiva su odgovornost korisnika. Autor nije odgovoran za financijske gubitke ili štete nastale korištenjem aplikacije.
 
-GUBITAK PODATAKA
-Autor nije odgovoran za gubitak podataka uslijed: kvara uređaja, slučajnog brisanja, deinstalacije aplikacije, brisanja predmemorije preglednika ili bilo kojeg drugog uzroka. Korisnicima se snažno preporuča redovit izvoz sigurnosnih kopija.
+PODACI I SIGURNOST
+• Lokalni podaci su enkriptirani AES-256 algoritmom kada je PIN zaštita uključena
+• Cloud podaci pohranjeni su na Supabase poslužiteljima zaštićenim Row Level Security (RLS) — svaki korisnik može pristupiti samo svojim podacima
+• PIN hash koristi PBKDF2 (SHA-256) i nikad se ne prenosi na server
+• Autor nije odgovoran za gubitak podataka uslijed: kvara uređaja, zaboravljenog PIN-a bez cloud backupa, slučajnog brisanja, brisanja predmemorije preglednika ili zastoja usluga trećih strana
+• Korisnicima se snažno preporuča omogućiti cloud sinkronizaciju (prijava Google ili email računom) za automatski backup
 
-TOČNOST
-Aplikacija vrši izračune na temelju korisnikovih podataka. Točnost svih rezultata u potpunosti ovisi o točnosti unesenih podataka.
+CLOUD SINKRONIZACIJA I DOSTUPNOST
+• Sinkronizacija u stvarnom vremenu zahtijeva aktivnu internetsku vezu
+• Autor ne jamči neprekidnu dostupnost usluge
+• Podaci mogu biti privremeno nedostupni tijekom održavanja ili zastoja trećih strana (Supabase, Vercel)
+• Offline rad čuva lokalne podatke; sinkronizacija se automatski nastavlja pri povratku veze
 
-DOSTUPNOST
-Autor ne jamči neprekidnu dostupnost web verzije (moja-lova-app.vercel.app). Aplikacija može biti nedostupna zbog održavanja, ažuriranja ili zastoja usluga trećih strana.`
+VALUTE I IZRAČUNI
+• Prikaz valute služi isključivo u prezentacijske svrhe i ne vrši konverziju u stvarnom vremenu
+• Svi izračuni temelje se na korisnikovim unesenim iznosima u odabranoj valuti
+• Točnost svih rezultata u potpunosti ovisi o točnosti unesenih podataka`
     },
     privacy: {
       title: t("Privatnost i kolačići"),
       body: lang === "en" ? `PRIVACY & COOKIES POLICY
+Last updated: April 2026
 
-DATA COLLECTION
-Moja lova does not collect, transmit, or store any personal data on external servers. All data entered into the app (transactions, categories, profile information) is stored exclusively on your device using browser localStorage or, in the Android app, the device's local storage.
+DATA STORAGE
+Moja lova stores data in two ways depending on your usage:
 
-No data is sent to the developer, third parties, or any cloud service without your explicit action (e.g. you choosing to export and email your data).
+1. LOCAL STORAGE (without account)
+All data is stored exclusively on your device using browser localStorage. No data is sent to any server. If you clear browser data or switch devices, your data will be lost unless you manually exported a backup.
+
+2. CLOUD STORAGE (with account)
+When you sign in with Google or email/password, your data is stored on Supabase servers (supabase.com) in addition to your device. This enables:
+• Real-time sync between your devices
+• Automatic backup of all transactions, lists and preferences
+• Account recovery if you lose your device or forget your PIN
+
+DATA COLLECTED WHEN SIGNED IN
+• Email address (from Google OAuth or manual registration)
+• Display name (from Google profile or manually entered)
+• Transaction data you enter (amounts, descriptions, categories, dates)
+• App preferences (theme, language, currency, timezone)
+
+Data is protected by Row Level Security (RLS) — only you can access your data. The developer cannot view individual user data.
+
+AUTHENTICATION
+• Google Sign-In: handled by Supabase Auth using OAuth 2.0 with PKCE flow. Your Google password is never shared with the app.
+• Email/password: passwords are hashed by Supabase using bcrypt. The app never sees or stores your raw password.
+
+ENCRYPTION
+When PIN protection is enabled:
+• Local data is encrypted with AES-256-GCM
+• The encryption key is derived from your PIN using PBKDF2 (100,000 iterations, SHA-256)
+• PIN hash and encryption salt are stored locally and never transmitted
 
 COOKIES
-The web version (moja-lova-app.vercel.app) does not use tracking cookies, advertising cookies, or analytics cookies. The app may use browser storage (localStorage) to save your preferences and data — this is not a "cookie" in the traditional sense but serves a similar local storage function.
+The web version does not use tracking, advertising, or analytics cookies. The app uses:
+• localStorage — for app data and preferences
+• sessionStorage — for temporary session encryption keys
+• Supabase auth tokens — stored in localStorage for session persistence
 
 THIRD-PARTY SERVICES
-The web app is hosted on Vercel (vercel.com). Vercel may log standard server access data (IP address, browser type, access times) as part of normal hosting operations. Please refer to Vercel's privacy policy for details.
+• Supabase (supabase.com) — database, authentication, real-time sync
+• Vercel (vercel.com) — web hosting
+• Google (accounts.google.com) — OAuth sign-in
+• Google Fonts (fonts.googleapis.com) — font loading
 
-The app loads fonts from Google Fonts CDN (fonts.googleapis.com). Google may collect standard CDN access logs. Please refer to Google's privacy policy for details.
+These services may collect standard access logs (IP address, browser type). Please refer to their respective privacy policies.
 
-YOUR RIGHTS
-Since no personal data is collected or stored by the developer, there is no data to request, correct, or delete on our end. Your data is entirely under your control on your own device.
+YOUR RIGHTS (GDPR)
+You can:
+• Export all your data at any time (Settings → Backup)
+• Delete your cloud data by signing out and requesting deletion
+• Delete your local data by clearing browser storage
+• Use the app without an account (local-only mode)
+
+For data deletion requests: see "Contact us" section.
 
 CONTACT
-For privacy-related questions: see the "Contact us" section.` :
+For privacy-related questions: bvivoda@gmail.com` :
 `POLITIKA PRIVATNOSTI I KOLAČIĆA
+Posljednje ažuriranje: travanj 2026.
 
-PRIKUPLJANJE PODATAKA
-Moja lova ne prikuplja, ne prenosi niti pohranjuje nikakve osobne podatke na vanjskim poslužiteljima. Svi podaci uneseni u aplikaciju (transakcije, kategorije, podaci profila) pohranjuju se isključivo na tvom uređaju putem browser localStorage-a ili, u Android verziji, lokalne pohrane uređaja.
+POHRANA PODATAKA
+Moja lova pohranjuje podatke na dva načina ovisno o vašem korištenju:
 
-Nikakvi podaci ne šalju se programeru, trećim stranama niti nijednoj usluzi u oblaku bez tvoje izričite radnje (npr. kad odlučiš izvesti i e-mailom poslati svoje podatke).
+1. LOKALNA POHRANA (bez računa)
+Svi podaci pohranjuju se isključivo na vašem uređaju putem browser localStorage-a. Nikakvi podaci ne šalju se na server. Ako obrišete podatke preglednika ili promijenite uređaj, podaci će biti izgubljeni osim ako ste ručno izvezli backup.
+
+2. CLOUD POHRANA (s računom)
+Kad se prijavite Google ili email/lozinka računom, vaši podaci pohranjuju se i na Supabase poslužiteljima (supabase.com). To omogućuje:
+• Sinkronizaciju u stvarnom vremenu između uređaja
+• Automatski backup svih transakcija, popisa i postavki
+• Oporavak računa ako izgubite uređaj ili zaboravite PIN
+
+PODACI KOJI SE PRIKUPLJAJU PRI PRIJAVI
+• Email adresa (iz Google OAuth-a ili ručne registracije)
+• Ime (iz Google profila ili ručno uneseno)
+• Podaci o transakcijama koje unosite (iznosi, opisi, kategorije, datumi)
+• Postavke aplikacije (tema, jezik, valuta, vremenska zona)
+
+Podaci su zaštićeni Row Level Security (RLS) — samo vi možete pristupiti svojim podacima. Programer ne može pregledavati pojedinačne korisničke podatke.
+
+AUTENTIFIKACIJA
+• Google prijava: obrađuje Supabase Auth koristeći OAuth 2.0 s PKCE protokolom. Vaša Google lozinka nikad se ne dijeli s aplikacijom.
+• Email/lozinka: lozinke hashira Supabase koristeći bcrypt. Aplikacija nikad ne vidi niti pohranjuje vašu lozinku u izvornom obliku.
+
+ENKRIPCIJA
+Kada je PIN zaštita uključena:
+• Lokalni podaci enkriptirani su AES-256-GCM algoritmom
+• Ključ za enkripciju derivira se iz PIN-a koristeći PBKDF2 (100.000 iteracija, SHA-256)
+• PIN hash i salt za enkripciju pohranjuju se lokalno i nikad se ne prenose
 
 KOLAČIĆI
-Web verzija (moja-lova-app.vercel.app) ne koristi kolačiće za praćenje, oglašavanje niti analitiku. Aplikacija može koristiti browser localStorage za pohranu tvojih postavki i podataka — to nije "kolačić" u tradicionalnom smislu, ali služi sličnoj lokalnoj funkciji pohrane.
+Web verzija ne koristi kolačiće za praćenje, oglašavanje niti analitiku. Aplikacija koristi:
+• localStorage — za podatke i postavke aplikacije
+• sessionStorage — za privremene ključeve sesijske enkripcije
+• Supabase auth tokene — pohranjene u localStorage za trajnost sesije
 
 USLUGE TREĆIH STRANA
-Web aplikacija je hostirana na Vercelu (vercel.com). Vercel može bilježiti standardne podatke o pristupu poslužitelju (IP adresa, vrsta preglednika, vremena pristupa) kao dio normalnog rada hostinga.
+• Supabase (supabase.com) — baza podataka, autentifikacija, sinkronizacija
+• Vercel (vercel.com) — web hosting
+• Google (accounts.google.com) — OAuth prijava
+• Google Fonts (fonts.googleapis.com) — učitavanje fontova
 
-Aplikacija učitava fontove s Google Fonts CDN-a (fonts.googleapis.com). Google može prikupljati standardne CDN pristupne zapise.
+Ove usluge mogu prikupljati standardne pristupne zapise (IP adresa, vrsta preglednika). Molimo pogledajte njihove politike privatnosti.
 
-TVOJA PRAVA
-Budući da programer ne prikuplja niti pohranjuje osobne podatke, nema podataka koje bismo morali ispraviti ili obrisati s naše strane. Tvoji podaci u potpunosti su pod tvojom kontrolom, na tvom uređaju.`
+VAŠA PRAVA (GDPR)
+Možete:
+• Izvesti sve podatke u bilo kojem trenutku (Postavke → Backup)
+• Obrisati cloud podatke odjavom i zahtjevom za brisanje
+• Obrisati lokalne podatke brisanjem pohrane preglednika
+• Koristiti aplikaciju bez računa (samo lokalni način)
+
+Za zahtjeve za brisanje podataka: pogledajte sekciju "Kontaktiraj nas".
+
+KONTAKT
+Za pitanja o privatnosti: bvivoda@gmail.com`
     },
     contact: {
       title: t("Kontaktiraj nas"),
-      body: `Moja lova
-Autor: Bojan Vivoda
+      body: `Moja lova — v1.3
+${lang === "en" ? "Author" : "Autor"}: Bojan Vivoda
+Email: bvivoda@gmail.com
 
-${lang === "en" ? "For questions, suggestions or bug reports, please reach out via:" : "Za pitanja, prijedloge ili prijavu grešaka, obratite se putem:"}
+${lang === "en" ? "For questions, suggestions or bug reports:" : "Za pitanja, prijedloge ili prijavu grešaka:"}
 
 GitHub: github.com/bvivoda/Moja-lova-app
-${lang === "en" ? "Web app:" : "Web aplikacija:"} moja-lova-app.vercel.app
+${lang === "en" ? "Web app" : "Web aplikacija"}: moja-lova-app.vercel.app
 
 ${lang === "en" ? "When reporting a bug, please include:" : "Kod prijave greške, navedite:"}
-${lang === "en" ? "• App version (1.2)" : "• Verziju aplikacije (1.2)"}
+${lang === "en" ? "• App version (see Diagnostics)" : "• Verziju aplikacije (vidi Dijagnostika)"}
 ${lang === "en" ? "• Device and OS version" : "• Uređaj i verziju OS-a"}
-${lang === "en" ? "• Steps to reproduce the issue" : "• Korake koji reproduciraju problem"}`
+${lang === "en" ? "• Steps to reproduce the issue" : "• Korake koji reproduciraju problem"}
+${lang === "en" ? "• Screenshot if possible" : "• Screenshot ako je moguće"}`
     },
     feedback: {
       title: t("Pošalji povratnu informaciju"),
@@ -1296,45 +1405,53 @@ Ways to provide feedback:
 • GitHub Issues — for bug reports and feature requests:
   github.com/bvivoda/Moja-lova-app/issues
 
-• GitHub Discussions — for general suggestions and ideas
+• Email — bvivoda@gmail.com
 
 Please describe:
 1. What you were trying to do
 2. What happened instead
 3. What you expected to happen
-4. Your device and OS version
+4. Your device, OS and browser version
+5. Whether you use cloud sync or local-only mode
 
 Thank you for using Moja lova!` :
 `POŠALJI POVRATNU INFORMACIJU
 
 Hvala na povratnoj informaciji! Pomaže nam poboljšati aplikaciju za sve.
 
-Načini pružanja povratnih informacija:
+Načini slanja povratnih informacija:
 
 • GitHub Issues — za prijave grešaka i zahtjeve za nove značajke:
   github.com/bvivoda/Moja-lova-app/issues
 
-• GitHub Discussions — za opće prijedloge i ideje
+• Email — bvivoda@gmail.com
 
 Molimo opiši:
 1. Što si pokušavao napraviti
 2. Što se umjesto toga dogodilo
 3. Što si očekivao da se dogodi
-4. Tvoj uređaj i verziju OS-a
+4. Tvoj uređaj, OS i verziju preglednika
+5. Koristiš li cloud sinkronizaciju ili samo lokalni način
 
 Hvala što koristiš Moja lova!`
     },
     diagnostics: {
       title: t("Dijagnostika"),
       body: [
-        `${lang==="en"?"App version":"Verzija aplikacije"}: 1.2`,
+        `${lang==="en"?"App version":"Verzija aplikacije"}: 1.3`,
         `${lang==="en"?"Platform":"Platforma"}: ${typeof window !== "undefined" && window.Capacitor && window.Capacitor.isNativePlatform() ? "Android APK" : "Web / PWA"}`,
         `${lang==="en"?"User Agent":"User Agent"}: ${typeof navigator !== "undefined" ? navigator.userAgent : "N/A"}`,
-        `${lang==="en"?"Language":"Jezik"}: ${typeof navigator !== "undefined" ? navigator.language : "N/A"}`,
+        `${lang==="en"?"Language":"Jezik"}: ${lang === "hr" ? "Hrvatski" : "English"}`,
+        `${lang==="en"?"Currency":"Valuta"}: ${(() => { try { const p = JSON.parse(localStorage.getItem("ml_prefs")||"{}"); return p.currency || "EUR"; } catch { return "EUR"; } })()}`,
+        `${lang==="en"?"Timezone":"Vremenska zona"}: ${(() => { try { const p = JSON.parse(localStorage.getItem("ml_prefs")||"{}"); return p.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return "N/A"; } })()}`,
         `${lang==="en"?"Screen":"Zaslon"}: ${typeof window !== "undefined" ? `${window.screen.width}×${window.screen.height}` : "N/A"}`,
         `${lang==="en"?"Online":"Online"}: ${typeof navigator !== "undefined" ? (navigator.onLine ? (lang==="en"?"Yes":"Da") : (lang==="en"?"No":"Ne")) : "N/A"}`,
+        `${lang==="en"?"Cloud sync":"Cloud sinkronizacija"}: ${(() => { try { const s = localStorage.getItem("sb-lbicxdhqzieegphgfzgd-auth-token"); return s ? (lang==="en"?"Active":"Aktivna") : (lang==="en"?"Not signed in":"Nije prijavljen"); } catch { return "N/A"; } })()}`,
+        `${lang==="en"?"PIN protection":"PIN zaštita"}: ${(() => { try { const s = JSON.parse(localStorage.getItem("ml_sec")||"{}"); return s.pinHash ? (lang==="en"?"Enabled":"Uključena") : (lang==="en"?"Disabled":"Isključena"); } catch { return "N/A"; } })()}`,
+        `${lang==="en"?"Biometrics":"Biometrija"}: ${(() => { try { const s = JSON.parse(localStorage.getItem("ml_sec")||"{}"); return s.bioEnabled ? (lang==="en"?"Enabled":"Uključena") : (lang==="en"?"Disabled":"Isključena"); } catch { return "N/A"; } })()}`,
         `${lang==="en"?"Service Worker":"Service Worker"}: ${"serviceWorker" in navigator ? (lang==="en"?"Supported":"Podržan") : (lang==="en"?"Not supported":"Nije podržan")}`,
         `${lang==="en"?"Storage available":"Pohrana dostupna"}: ${(() => { try { const t = "ml_test"; localStorage.setItem(t,"1"); localStorage.removeItem(t); return lang==="en"?"Yes":"Da"; } catch { return lang==="en"?"No":"Ne"; }})()}`,
+        `${lang==="en"?"Transactions":"Transakcije"}: ${(() => { try { const d = JSON.parse(localStorage.getItem("ml_db")||"[]"); return d.length; } catch { return "N/A"; } })()}`,
       ].join("\n")
     },
   };
