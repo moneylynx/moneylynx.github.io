@@ -184,6 +184,19 @@ export default function App() {
   // Clean up sync debounce timer on unmount
   useEffect(() => () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); }, []);
 
+  // Auto-detect language from browser timezone on first launch
+  useEffect(() => {
+    if (!prefs.langChosen) {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const isHR = tz === "Europe/Zagreb";
+        updP({ lang: isHR ? "hr" : "en", langChosen: true });
+      } catch {
+        updP({ lang: "en", langChosen: true });
+      }
+    }
+  }, []);
+
   // Clean up old localStorage session key (from previous implementation).
   useEffect(()=>{ try { localStorage.removeItem("ml_sk"); } catch {} }, []);
 
@@ -567,19 +580,6 @@ export default function App() {
       </div>
     </div>
   );
-
-  // Auto-detect language from browser timezone on first launch
-  useEffect(() => {
-    if (!prefs.langChosen) {
-      try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const isHR = tz === "Europe/Zagreb";
-        updP({ lang: isHR ? "hr" : "en", langChosen: true });
-      } catch {
-        updP({ lang: "en", langChosen: true });
-      }
-    }
-  }, []);
 
   // Show AuthScreen if not logged in (and auth state is resolved)
   if (authReady && !supaUser) {
