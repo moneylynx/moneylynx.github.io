@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { signIn, signUp, signInGoogle } from '../lib/supabase.js';
 import { Ic } from './ui.jsx';
 
-export default function AuthScreen({ C, t, onSuccess }) {
+export default function AuthScreen({ C, t, lang, onLangChange, onSuccess }) {
   const [mode, setMode]       = useState('login'); // 'login' | 'register'
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
@@ -80,6 +80,16 @@ export default function AuthScreen({ C, t, onSuccess }) {
   return (
     <div style={{ width:'100%', minHeight:'100vh', background:C.bg, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
       <div style={{ width:'100%', maxWidth:360 }}>
+
+        {/* Discrete language toggle — top right */}
+        {onLangChange && (
+          <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:12 }}>
+            <button onClick={()=>onLangChange(lang==='hr'?'en':'hr')}
+              style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:10, padding:'5px 10px', fontSize:11, fontWeight:600, color:C.textMuted, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+              {lang==='hr'?'🇬🇧 EN':'🇭🇷 HR'}
+            </button>
+          </div>
+        )}
 
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:32 }}>
