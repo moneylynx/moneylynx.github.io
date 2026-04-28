@@ -1,234 +1,26 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="hr">
-  <head>
+<head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0EA5E9" />
+    <meta name="description" content="Moja lova — osobne financije / personal finance tracker" />
+    
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#EFF6FF"/>
-    <meta name="apple-mobile-web-app-capable" content="yes"/>
-    <meta name="mobile-web-app-capable" content="yes"/>
-    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+    
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Moja lova" />
+    
     <title>Moja lova</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-
-      body {
-        background: #EFF6FF;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      }
-
-      /* ─── Splash screen ─────────────────────────────────── */
-      #splash {
-        position: fixed;
-        inset: 0;
-        background: #EFF6FF;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        transition: opacity 0.5s ease, transform 0.5s ease;
-      }
-
-      #splash.hide {
-        opacity: 0;
-        transform: scale(1.05);
-        pointer-events: none;
-      }
-
-      /* Container for icon + orbiting dots */
-      .splash-orbit {
-        position: relative;
-        width: 120px;
-        height: 120px;
-        margin-bottom: 28px;
-      }
-
-      /* Central icon */
-      .splash-icon {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        transform: scale(0.6);
-        animation: iconReveal 0.6s ease forwards 1.4s;
-      }
-
-      .splash-icon-inner {
-        width: 72px;
-        height: 72px;
-        border-radius: 20px;
-        background: linear-gradient(135deg, #38BDF8, #0EA5E9);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 0 30px #38BDF840, 0 4px 20px rgba(14,165,233,0.25);
-      }
-
-      .splash-icon-inner svg {
-        width: 38px;
-        height: 38px;
-      }
-
-      /* 4 orbiting dots */
-      .dot-orbit {
-        position: absolute;
-        inset: 0;
-        animation: orbitSpin 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-      }
-
-      .dot {
-        position: absolute;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: #0EA5E9;
-        top: 50%;
-        left: 50%;
-        margin: -5px 0 0 -5px;
-        opacity: 0.9;
-        box-shadow: 0 0 8px #0EA5E9;
-      }
-
-      .dot:nth-child(1) { transform: translate(0, -48px); animation: dotShrink1 1.2s ease forwards; }
-      .dot:nth-child(2) { transform: translate(48px, 0);  animation: dotShrink2 1.2s ease forwards; }
-      .dot:nth-child(3) { transform: translate(0, 48px);  animation: dotShrink3 1.2s ease forwards; }
-      .dot:nth-child(4) { transform: translate(-48px, 0); animation: dotShrink4 1.2s ease forwards; }
-
-      @keyframes dotShrink1 {
-        0%   { transform: translate(0, -48px) scale(1); opacity: 0.9; }
-        60%  { transform: translate(0, -20px) scale(0.8); opacity: 0.7; }
-        100% { transform: translate(0, 0) scale(0); opacity: 0; }
-      }
-      @keyframes dotShrink2 {
-        0%   { transform: translate(48px, 0) scale(1); opacity: 0.9; }
-        60%  { transform: translate(20px, 0) scale(0.8); opacity: 0.7; }
-        100% { transform: translate(0, 0) scale(0); opacity: 0; }
-      }
-      @keyframes dotShrink3 {
-        0%   { transform: translate(0, 48px) scale(1); opacity: 0.9; }
-        60%  { transform: translate(0, 20px) scale(0.8); opacity: 0.7; }
-        100% { transform: translate(0, 0) scale(0); opacity: 0; }
-      }
-      @keyframes dotShrink4 {
-        0%   { transform: translate(-48px, 0) scale(1); opacity: 0.9; }
-        60%  { transform: translate(-20px, 0) scale(0.8); opacity: 0.7; }
-        100% { transform: translate(0, 0) scale(0); opacity: 0; }
-      }
-
-      @keyframes orbitSpin {
-        0%   { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-
-      @keyframes iconReveal {
-        0%   { opacity: 0; transform: scale(0.6); }
-        60%  { transform: scale(1.1); opacity: 1; }
-        100% { transform: scale(1); opacity: 1; }
-      }
-
-      .splash-title {
-        font-size: 28px;
-        font-weight: 700;
-        color: #0EA5E9;
-        letter-spacing: 0.5px;
-        opacity: 0;
-        transform: translateY(10px);
-        animation: fadeUp 0.5s ease forwards 1.7s;
-      }
-
-      .splash-sub {
-        font-size: 13px;
-        color: #64748B;
-        margin-top: 6px;
-        opacity: 0;
-        animation: fadeUp 0.5s ease forwards 1.9s;
-      }
-
-      @keyframes fadeUp {
-        to { opacity: 1; transform: translateY(0); }
-      }
-
-      .splash-dots {
-        display: flex;
-        gap: 6px;
-        margin-top: 32px;
-        opacity: 0;
-        animation: fadeUp 0.4s ease forwards 2.1s;
-      }
-
-      .splash-dots span {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: #0EA5E9;
-        animation: dotPulse 1.2s ease-in-out infinite;
-      }
-      .splash-dots span:nth-child(2) { animation-delay: 0.2s; }
-      .splash-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-      @keyframes dotPulse {
-        0%, 100% { opacity: 0.3; transform: scale(0.8); }
-        50%       { opacity: 1;   transform: scale(1.2); }
-      }
-    </style>
-  </head>
+</head>
   <body>
-
-    <!-- Splash screen — hidden by JS once React mounts -->
-    <div id="splash">
-      <div class="splash-orbit">
-        <!-- 4 dots orbiting inward -->
-        <div class="dot-orbit">
-          <div class="dot"></div>
-          <div class="dot"></div>
-          <div class="dot"></div>
-          <div class="dot"></div>
-        </div>
-        <!-- Icon revealed after dots converge -->
-        <div class="splash-icon">
-          <div class="splash-icon-inner">
-            <!-- Wallet icon (matches app Ic "wallet") -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="1" y="4" width="22" height="16" rx="2"/>
-              <line x1="1" y1="10" x2="23" y2="10"/>
-              <circle cx="16" cy="15" r="1" fill="#fff" stroke="none"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <div class="splash-title">Moja lova</div>
-      <div class="splash-sub">Osobna financijska aplikacija</div>
-
-      <div class="splash-dots">
-        <span></span><span></span><span></span>
-      </div>
-    </div>
-
     <div id="root"></div>
-
-    <script type="module" src="src/main.jsx"></script>
-
-    <script>
-      // Hide splash once React has mounted (root has children)
-      const observer = new MutationObserver(() => {
-        const root = document.getElementById('root');
-        if (root && root.children.length > 0) {
-          const splash = document.getElementById('splash');
-          if (splash) {
-            splash.classList.add('hide');
-            setTimeout(() => splash.remove(), 600);
-          }
-          observer.disconnect();
-        }
-      });
-      observer.observe(document.getElementById('root'), { childList: true });
-    </script>
-
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -8,40 +8,10 @@ export const fmtEur = n => {
   return n < 0 ? `-${s} €` : `${s} €`;
 };
 
-// Currency formatter — uses Intl.NumberFormat with selected currency
-export const fmtCurrency = (n, currency = "EUR") => {
-  if (n == null || isNaN(n)) {
-    try {
-      return new Intl.NumberFormat("hr-HR", { style:"currency", currency, minimumFractionDigits:2 }).format(0);
-    } catch { return "0,00 €"; }
-  }
-  try {
-    return new Intl.NumberFormat("hr-HR", { style:"currency", currency, minimumFractionDigits:2 }).format(n);
-  } catch { return fmtEur(n); }
-};
-
-// Currency symbol only
-export const currencySymbol = (currency = "EUR") => {
-  try {
-    const parts = new Intl.NumberFormat("hr-HR", { style:"currency", currency }).formatToParts(0);
-    return parts.find(p => p.type === "currency")?.value || currency;
-  } catch { return currency; }
-};
-
 export const fDate = d => {
   if (!d) return "";
   const dt = new Date(d);
   return `${String(dt.getDate()).padStart(2,"0")}.${String(dt.getMonth()+1).padStart(2,"0")}.${dt.getFullYear()}.`;
-};
-
-// Date formatter with timezone
-export const fDateTZ = (d, timezone) => {
-  if (!d) return "";
-  if (!timezone) return fDate(d);
-  try {
-    const dt = new Date(d);
-    return dt.toLocaleDateString("hr-HR", { timeZone: timezone, day:"2-digit", month:"2-digit", year:"numeric" }).replace(/\//g, ".");
-  } catch { return fDate(d); }
 };
 
 export const monthOf = d => d ? MONTHS[new Date(d).getMonth()] ?? MONTHS[0] : MONTHS[0];

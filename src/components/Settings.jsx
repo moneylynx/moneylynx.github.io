@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { K, DEF_LISTS, T, MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, MAX_ATT, BACKUP_SNOOZE_MS, CURRENCIES, TIMEZONES } from '../lib/constants.js';
+import { K, DEF_LISTS, MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, BACKUP_SNOOZE_MS } from '../lib/constants.js';
 import { fmtEur, fDate, load, save, curYear, buildCSV, buildSummary, nativeSaveAndShare, isCapacitor } from '../lib/helpers.js';
 import { hashPinV2, hashPinLegacy } from '../lib/crypto.js';
 import { Ic, StickyHeader } from './ui.jsx';
@@ -524,7 +524,7 @@ function RecurringEditor({ C, items, lists, onBack, t }) {
 }
 
 // ─── GeneralSettings ──────────────────────────────────────────────────────────
-function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, t, lang }) {
+function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, t, lang }) {
   const [pinChg,  setPinChg]  = useState(false);
   const [rmPin,   setRmPin]   = useState(false);
   const [vPin,    setVPin]    = useState("");
@@ -608,7 +608,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   };
 
   // Restore — validates payload, confirms, writes to localStorage, reloads.
-  const fullImport = async (e) => {
+  const fullImport = (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = ""; // allow re-selecting the same file
     if (!file) return;
@@ -646,8 +646,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           // Set lastBackupAt=now since successful import means data exists in a backup file.
           save(K.prf, { ...load(K.prf,{}), ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
         }
-        // Set flag so App.jsx knows to sync after reload
-        try { localStorage.setItem("ml_sync_needed", "1"); } catch {}
         alert(t("Podaci su uspješno vraćeni. Aplikacija će se ponovno učitati."));
         window.location.reload();
       } catch {
@@ -679,9 +677,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
 
   const toggleBio = async () => {
     if (sec.bioEnabled) {
-      const currentSec = JSON.parse(localStorage.getItem("ml_sec") || "{}");
-      const newSec = { ...currentSec, bioEnabled: false, bioCredId: null };
-      localStorage.setItem("ml_sec", JSON.stringify(newSec));
       updSec({ bioEnabled: false, bioCredId: null });
       return;
     }
@@ -704,10 +699,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       };
       const cred = await navigator.credentials.create(createOpt);
       const idBase64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
-      // Read current sec directly from localStorage to avoid stale prop.
-      const currentSec = JSON.parse(localStorage.getItem("ml_sec") || "{}");
-      const newSec = { ...currentSec, bioEnabled: true, bioCredId: idBase64 };
-      localStorage.setItem("ml_sec", JSON.stringify(newSec));
       updSec({ bioEnabled: true, bioCredId: idBase64 });
       alert(t("Biometrija uspješno aktivirana!"));
     } catch (e) {
@@ -789,28 +780,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                 return <button key={id} onClick={()=>updPrefs({lang:id})} style={{ padding:"10px 6px", borderRadius:11, border:`1.5px solid ${a?C.accent:C.border}`, background:a?`${C.accent}15`:"transparent", color:a?C.accent:C.textMuted, fontSize:12, fontWeight:a?700:500, cursor:"pointer" }}>{lb}</button>;
               })}
             </div>
-          </div>
-
-          {/* Currency selector */}
-          <div style={{ marginBottom:16 }}>
-            <p style={{ fontSize:12, color:C.textMuted, marginBottom:8 }}>{t("Valuta")}</p>
-            <select value={prefs.currency||"EUR"} onChange={e=>updPrefs({currency:e.target.value})}
-              style={{ width:"100%", height:42, padding:"0 12px", background:C.cardAlt, border:`1.5px solid ${C.border}`, borderRadius:11, color:C.text, fontSize:13 }}>
-              {CURRENCIES.map(c => (
-                <option key={c.code} value={c.code}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Timezone selector */}
-          <div style={{ marginBottom:4 }}>
-            <p style={{ fontSize:12, color:C.textMuted, marginBottom:8 }}>{t("Vremenska zona")}</p>
-            <select value={prefs.timezone||"Europe/Zagreb"} onChange={e=>updPrefs({timezone:e.target.value})}
-              style={{ width:"100%", height:42, padding:"0 12px", background:C.cardAlt, border:`1.5px solid ${C.border}`, borderRadius:11, color:C.text, fontSize:13 }}>
-              {TIMEZONES.map(tz => (
-                <option key={tz.value} value={tz.value}>{tz.label}</option>
-              ))}
-            </select>
           </div>
         </div>
 
@@ -895,28 +864,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           </label>
         </div>
 
-        {/* Account section */}
-        {supaUser && (
-          <div style={{ marginTop:14, marginBottom:6 }}>
-            <SL text={t("Račun")} icon="user"/>
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:"12px 14px", marginBottom:7, display:"flex", alignItems:"center", gap:10 }}>
-              <div style={{ width:36, height:36, borderRadius:10, background:`${C.accent}20`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                <Ic n="user" s={18} c={C.accent}/>
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:600, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                  {supaUser.user_metadata?.full_name || supaUser.email}
-                </div>
-                <div style={{ fontSize:11, color:C.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                  {supaUser.email}
-                </div>
-              </div>
-            </div>
-            <Row icon="unlock" label={t("Odjava")} danger onClick={onSignOut} right={false}/>
-            {onSyncToCloud && <Row icon="repeat" label={t("Sinkroniziraj s oblakom")} onClick={async()=>{ await onSyncToCloud(txs, lists, user); alert(t("Sinkronizacija završena.")); }} right={false}/>}
-          </div>
-        )}
-
         <div style={{ marginTop:14, marginBottom:6 }}>
           <SL text={t("Opasna zona")} icon="alert"/>
           {!confirm
@@ -934,7 +881,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="wallet" s={20} c="#fff"/></div>
-            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} .4</div></div>
+            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.2</div></div>
             {onAbout && (
               <button onClick={onAbout}
                 style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
@@ -1091,86 +1038,64 @@ function AboutScreen({ C, onBack, t, lang }) {
       title: t("Pomoć"),
       body: lang === "en" ? `
 GETTING STARTED
-Open the app at moja-lova-app.vercel.app. Sign in with Google or email/password. After login, data syncs automatically across all your devices in real time.
+Open the app and tap the blue + button at the bottom to record your first transaction. Choose between Expense or Income, fill in the amount, description, category, location and payment method.
 
-ADDING TRANSACTIONS
-Tap the blue + button at the bottom. Required fields: Amount and Description. Optional fields (auto-filled as "Other" if empty): Category and Location. Default payment: Cash. Default status: Paid.
-
-TRANSACTION TYPES
+TRANSACTIONS
 • Expense: a payment or cost
 • Income: money received (salary, transfer…)
-• Recurring obligation: monthly repeating expense. Enable "Recurring obligation?" in the Expense form.
-• Installments: purchase spread over months. Each installment appears in its own due month in Statistics.
+• Recurring obligation: a monthly repeating expense (subscription, loan, rent). Enable the "Recurring obligation?" toggle inside the Expense form.
+• Installments: a purchase spread over multiple months (e.g. 24 installments for an appliance). Enable the "Installments?" toggle inside the Expense form.
 
-HOME SCREEN
-Shows yearly balance, monthly income/expenses, top spending categories and "To pay this month" — all unpaid obligations including overdue from past months. Tap Pay to mark as paid instantly.
+DASHBOARD
+The home screen shows your yearly balance, monthly income/expenses, top spending categories and a "To pay this month" list. Tap Pay next to any item to mark it as paid instantly.
 
 TRANSACTIONS SCREEN
-Opens on "Overdue" filter (all unpaid with past due date). Each filter has its own left border color. A red "Duplicate?" badge appears if two transactions share the same amount, date and description. Search works on description, category, location and notes.
+Filters at the top let you view: All, Pending, Paid, Processing, Income. The default view shows "Pending" so you immediately see what needs attention.
 
 STATISTICS
-Opens on the current month. Periods: month / year / all time. Tabs: Expected, Categories, Overview/Balance, Payments & Locations, 3yr Trend. Installments shown in their due month — not all at once.
+Four views: Expected obligations, Categories, Overview/Balance, Payments & Locations. Use the month pills to narrow down to a specific period.
 
 SETTINGS
-• Active Year — switch year for analysis
-• Manage Obligations — edit/delete recurring obligations
-• List Customization — add your own categories, locations, payment methods, budget limits
-• Currency — select display currency (EUR, USD, HRK, GBP, CHF, BAM, RSD, HUF, CZK, PLN)
-• Time zone — select your time zone (Europe, Americas, Asia, Australia)
-• Account — sign out, manual "Sync to cloud" button
-
-CLOUD SYNC
-Green dot = synced. Yellow dot = syncing. Real-time: changes on one device appear instantly on others. Works offline — syncs on reconnection.
+• Active Year — switch the year you're analyzing
+• Manage Obligations — edit or delete recurring obligations
+• List Customization — add your own categories, locations, payment methods
+• General Settings — profile, theme, language, security, backup
 
 BACKUP & RESTORE
-Export: Settings → Account → Export (Backup). Import: Settings → Account → Import (Restore). Cloud users are protected automatically.
+Your data lives only on your device. Go to Settings → General → Export (Backup) and use Copy, Share, or Download to save your data. To restore, use Settings → General → Import (Restore) and pick your JSON backup file.
 
 PIN & BIOMETRICS
-Set a 4-6 digit PIN in Settings → Security. After 5 wrong attempts: locked 30s. After 10: all data wiped. Biometrics: first session requires PIN once, then fingerprint/Face ID works independently.
-
-MINIMIZE BEHAVIOR
-After minimizing and reopening, the app always returns to the Home screen.
+Set a 4-6 digit PIN in Settings → General → Set PIN Protection. After 5 wrong attempts the app locks for 30 seconds. After 10 wrong attempts all data is wiped. Enable Face ID / fingerprint in Settings → General → Biometrics.
 `.trim() : `
 POČETAK RADA
-Otvori aplikaciju na moja-lova-app.vercel.app. Prijavi se Google računom ili emailom/lozinkom. Nakon prijave, podaci se automatski sinkroniziraju između svih uređaja u stvarnom vremenu.
+Otvori aplikaciju i pritisni plavi + gumb na dnu za unos prve transakcije. Odaberi Isplata ili Primitak, unesi iznos, opis, kategoriju, lokaciju i način plaćanja.
 
-UNOS TRANSAKCIJA
-Pritisni plavi + gumb na dnu. Obavezna polja: Iznos i Opis. Opcionalna polja (automatski "Ostalo" ako su prazna): Kategorija i Lokacija. Zadano plaćanje: Gotovina. Zadani status: Plaćeno.
-
-VRSTE TRANSAKCIJA
+TRANSAKCIJE
 • Isplata: plaćanje ili trošak
 • Primitak: primljeni novac (plaća, uplata…)
-• Redovna obveza: trošak koji se ponavlja svaki mjesec. Uključi "Redovna obveza?" u formi za Isplatu.
-• Obročna otplata: kupnja raspoređena na više mjeseci. Svaki obrok se prikazuje u svom mjesecu dospijeća u Statistici.
+• Redovna obveza: trošak koji se ponavlja svaki mjesec (pretplata, kredit, najam). Uključi prekidač "Redovna obveza?" unutar forme za Isplatu.
+• Obročna otplata: kupnja raspoređena na više mjeseci (npr. 24 rate za uređaj). Uključi prekidač "Obročna otplata?" unutar forme za Isplatu.
 
 POČETNI EKRAN
-Prikazuje godišnju bilancu, primike/troškove za tekući mjesec, top kategorije i "Za platiti ovog mjeseca" — sve neplaćene obveze uključujući dospjele iz prošlih mjeseci. Pritisni Plati za trenutnu oznaku.
+Prikazuje godišnju bilancu, primike/troškove za tekući mjesec, top kategorije potrošnje i popis "Za platiti ovog mjeseca". Pritisni Plati pored stavke da je odmah označi kao plaćenu.
 
 EKRAN TRANSAKCIJE
-Otvara se na filteru "Dospjelo" (sve neplaćeno s prošlim datumom). Svaki filter ima svoju boju lijevog ruba kartice. Crvena oznaka "Duplikat?" upozorava ako dvije transakcije imaju isti iznos, datum i opis. Pretraga radi po opisu, kategoriji, lokaciji i napomenama.
+Filteri na vrhu: Sve, Čeka plaćanje, Plaćeno, U obradi, Primici. Zadani prikaz je "Čeka plaćanje" da odmah vidiš što treba platiti.
 
 STATISTIKA
-Otvara se na tekućem mjesecu. Periodi: mjesec / godina / sve. Tabovi: Očekivano, Kategorije, Pregled/Saldo, Plaćanje/Lokacije, Trend 3g. Rate se prikazuju u svom mjesecu dospijeća — ne sve odjednom.
+Četiri prikaza: Očekivano, Kategorije, Pregled/Saldo, Plaćanje i Lokacije. Koristi pill gumbe za odabir određenog mjeseca ili cijele godine.
 
 POSTAVKE
 • Aktivna godina — prebaci godinu za analizu
-• Upravljaj obvezama — uredi/obriši redovne obveze
-• Prilagodba popisa — vlastite kategorije, lokacije, načini plaćanja, budžet limiti
-• Valuta — odaberi valutu prikaza (EUR, USD, HRK, GBP, CHF, BAM, RSD, HUF, CZK, PLN)
-• Vremenska zona — odaberi svoju vremensku zonu (Europa, Amerika, Azija, Australija)
-• Račun — odjava, gumb "Sinkroniziraj s oblakom"
+• Upravljaj obvezama — uredi ili obriši redovne obveze
+• Prilagodba popisa — dodaj vlastite kategorije, lokacije, načine plaćanja
+• Opće postavke — profil, tema, jezik, sigurnost, backup
 
-CLOUD SINKRONIZACIJA
-Zelena točkica = sinkronizirano. Žuta točkica = sinkronizacija u tijeku. Realtime: promjene na jednom uređaju odmah vidljive na drugom. Radi offline — sinkronizira pri povratku konekcije.
-
-BACKUP I VRAĆANJE
-Izvozi: Postavke → Račun → Izvezi (Backup). Uvezi: Postavke → Račun → Učitaj (Restore). Cloud korisnici su automatski zaštićeni.
+BACKUP I VRAĆANJE PODATAKA
+Podaci se čuvaju isključivo na tvom uređaju. Idi u Postavke → Opće → Izvezi (Backup) i koristi Kopiraj, Podijeli ili Preuzmi za spremanje podataka. Za vraćanje: Postavke → Opće → Učitaj (Restore).
 
 PIN I BIOMETRIJA
-Postavi 4-6 znamenkasti PIN u Postavke → Sigurnost. Nakon 5 krivih: zaključano 30s. Nakon 10 krivih: svi podaci se brišu. Biometrija: prva sesija uvijek traži PIN jednom, zatim otisak prsta/lice radi samostalno.
-
-PONAŠANJE PRI MINIMIZIRANJU
-Nakon minimiziranja i ponovnog otvaranja, aplikacija uvijek vraća na Početni ekran.
+Postavi 4-6 znamenkasti PIN u Postavke → Opće → Postavi PIN zaštitu. Nakon 5 krivih pokušaja aplikacija se zaključa 30 sekundi. Nakon 10 krivih pokušaja svi podaci se brišu. Fingerprint/Face ID aktiviraj u Postavke → Opće → Biometrija.
 `.trim()
     },
     licences: {
@@ -1183,12 +1108,8 @@ All rights reserved.
 UVJETI KORIŠTENJA (HR)
 Ova aplikacija licencirana je isključivo za osobnu, nekomercijalnu upotrebu. Zabranjeno je: redistribuirati, prodavati, mijenjati ili koristiti kod, dizajn ili sadržaj ove aplikacije u komercijalne svrhe bez pisanog dopuštenja autora.
 
-Korištenjem ove aplikacije prihvaćate ove uvjete, Odricanje odgovornosti te Politiku privatnosti i kolačića.
-
 TERMS OF USE (EN)
 This application is licensed for personal, non-commercial use only. Redistribution, sale, modification, or commercial use of the code, design, or content of this application without the author's written permission is prohibited.
-
-By using this application you accept these terms, the Disclaimer, and the Privacy & Cookies Policy.
 
 KOMPONENTE OTVORENOG KODA / OPEN SOURCE COMPONENTS
 Ova aplikacija koristi sljedeće open-source biblioteke:
@@ -1197,12 +1118,6 @@ Ova aplikacija koristi sljedeće open-source biblioteke:
 • Recharts 2.12 — MIT License — recharts/recharts
 • Vite 5 — MIT License — vitejs/vite
 • Capacitor 8 — MIT License — ionic-team/capacitor
-• Supabase JS 2.x — MIT License — supabase/supabase-js
-
-HOSTING I USLUGE / HOSTING & SERVICES
-• Web hosting: Vercel (vercel.com)
-• Baza podataka i autentifikacija: Supabase (supabase.com)
-• OAuth: Google Sign-In
 
 Pune tekstove licenci za ove biblioteke možete pronaći na:
 Full license texts available at: https://opensource.org/licenses/MIT`
@@ -1216,23 +1131,14 @@ Moja lova is provided "as is" without warranty of any kind, express or implied, 
 FINANCIAL DECISIONS
 This app is a personal budgeting tool only. It does not provide financial, investment, tax, or legal advice. All financial decisions made based on data entered into this app are the sole responsibility of the user. The author is not liable for any financial loss or damage arising from the use of this application.
 
-DATA & SECURITY
-• Local data is encrypted with AES-256 when PIN protection is enabled
-• Cloud data is stored on Supabase servers secured with Row Level Security (RLS) — each user can only access their own data
-• PIN hashes use PBKDF2 (SHA-256) and are never transmitted to any server
-• The author is not responsible for data loss resulting from: device failure, forgotten PIN without cloud backup, accidental deletion, browser cache clearing, or third-party service outages
-• Users are strongly advised to enable cloud sync (sign in with Google or email) for automatic backup
+DATA LOSS
+The author is not responsible for loss of data resulting from: device failure, accidental deletion, uninstallation of the app, browser cache clearing, or any other cause. Users are strongly advised to regularly export backups.
 
-CLOUD SYNC & AVAILABILITY
-• Real-time sync requires an active internet connection
-• The author does not guarantee continuous availability of the service
-• Data may be temporarily unavailable during maintenance or third-party outages (Supabase, Vercel)
-• Offline mode preserves local data; sync resumes automatically when connection returns
+ACCURACY
+The app performs calculations based on user-entered data. The accuracy of all outputs depends entirely on the accuracy of the data entered.
 
-CURRENCY & CALCULATIONS
-• Currency display is for presentation purposes only and does not perform real-time conversion
-• All calculations are based on user-entered amounts in their selected currency
-• The accuracy of all outputs depends entirely on the accuracy of the data entered` :
+AVAILABILITY
+The author does not guarantee continuous availability of the web version (moja-lova-app.vercel.app). The app may be unavailable due to maintenance, updates, or third-party service outages.` :
 `ODRICANJE ODGOVORNOSTI
 
 Aplikacija Moja lova pruža se "kakva jest" bez ikakvih izričitih ili implicitnih jamstava, uključujući, ali ne ograničavajući se na jamstva prodajnosti, prikladnosti za određenu svrhu ili nekršenja prava.
@@ -1240,159 +1146,69 @@ Aplikacija Moja lova pruža se "kakva jest" bez ikakvih izričitih ili implicitn
 FINANCIJSKE ODLUKE
 Ova aplikacija je isključivo alat za osobno budžetiranje. Ne pruža financijske, investicijske, porezne niti pravne savjete. Sve financijske odluke donesene na temelju podataka unesenih u aplikaciju isključiva su odgovornost korisnika. Autor nije odgovoran za financijske gubitke ili štete nastale korištenjem aplikacije.
 
-PODACI I SIGURNOST
-• Lokalni podaci su enkriptirani AES-256 algoritmom kada je PIN zaštita uključena
-• Cloud podaci pohranjeni su na Supabase poslužiteljima zaštićenim Row Level Security (RLS) — svaki korisnik može pristupiti samo svojim podacima
-• PIN hash koristi PBKDF2 (SHA-256) i nikad se ne prenosi na server
-• Autor nije odgovoran za gubitak podataka uslijed: kvara uređaja, zaboravljenog PIN-a bez cloud backupa, slučajnog brisanja, brisanja predmemorije preglednika ili zastoja usluga trećih strana
-• Korisnicima se snažno preporuča omogućiti cloud sinkronizaciju (prijava Google ili email računom) za automatski backup
+GUBITAK PODATAKA
+Autor nije odgovoran za gubitak podataka uslijed: kvara uređaja, slučajnog brisanja, deinstalacije aplikacije, brisanja predmemorije preglednika ili bilo kojeg drugog uzroka. Korisnicima se snažno preporuča redovit izvoz sigurnosnih kopija.
 
-CLOUD SINKRONIZACIJA I DOSTUPNOST
-• Sinkronizacija u stvarnom vremenu zahtijeva aktivnu internetsku vezu
-• Autor ne jamči neprekidnu dostupnost usluge
-• Podaci mogu biti privremeno nedostupni tijekom održavanja ili zastoja trećih strana (Supabase, Vercel)
-• Offline rad čuva lokalne podatke; sinkronizacija se automatski nastavlja pri povratku veze
+TOČNOST
+Aplikacija vrši izračune na temelju korisnikovih podataka. Točnost svih rezultata u potpunosti ovisi o točnosti unesenih podataka.
 
-VALUTE I IZRAČUNI
-• Prikaz valute služi isključivo u prezentacijske svrhe i ne vrši konverziju u stvarnom vremenu
-• Svi izračuni temelje se na korisnikovim unesenim iznosima u odabranoj valuti
-• Točnost svih rezultata u potpunosti ovisi o točnosti unesenih podataka`
+DOSTUPNOST
+Autor ne jamči neprekidnu dostupnost web verzije (moja-lova-app.vercel.app). Aplikacija može biti nedostupna zbog održavanja, ažuriranja ili zastoja usluga trećih strana.`
     },
     privacy: {
       title: t("Privatnost i kolačići"),
       body: lang === "en" ? `PRIVACY & COOKIES POLICY
-Last updated: April 2026
 
-DATA STORAGE
-Moja lova stores data in two ways depending on your usage:
+DATA COLLECTION
+Moja lova does not collect, transmit, or store any personal data on external servers. All data entered into the app (transactions, categories, profile information) is stored exclusively on your device using browser localStorage or, in the Android app, the device's local storage.
 
-1. LOCAL STORAGE (without account)
-All data is stored exclusively on your device using browser localStorage. No data is sent to any server. If you clear browser data or switch devices, your data will be lost unless you manually exported a backup.
-
-2. CLOUD STORAGE (with account)
-When you sign in with Google or email/password, your data is stored on Supabase servers (supabase.com) in addition to your device. This enables:
-• Real-time sync between your devices
-• Automatic backup of all transactions, lists and preferences
-• Account recovery if you lose your device or forget your PIN
-
-DATA COLLECTED WHEN SIGNED IN
-• Email address (from Google OAuth or manual registration)
-• Display name (from Google profile or manually entered)
-• Transaction data you enter (amounts, descriptions, categories, dates)
-• App preferences (theme, language, currency, timezone)
-
-Data is protected by Row Level Security (RLS) — only you can access your data. The developer cannot view individual user data.
-
-AUTHENTICATION
-• Google Sign-In: handled by Supabase Auth using OAuth 2.0 with PKCE flow. Your Google password is never shared with the app.
-• Email/password: passwords are hashed by Supabase using bcrypt. The app never sees or stores your raw password.
-
-ENCRYPTION
-When PIN protection is enabled:
-• Local data is encrypted with AES-256-GCM
-• The encryption key is derived from your PIN using PBKDF2 (100,000 iterations, SHA-256)
-• PIN hash and encryption salt are stored locally and never transmitted
+No data is sent to the developer, third parties, or any cloud service without your explicit action (e.g. you choosing to export and email your data).
 
 COOKIES
-The web version does not use tracking, advertising, or analytics cookies. The app uses:
-• localStorage — for app data and preferences
-• sessionStorage — for temporary session encryption keys
-• Supabase auth tokens — stored in localStorage for session persistence
+The web version (moja-lova-app.vercel.app) does not use tracking cookies, advertising cookies, or analytics cookies. The app may use browser storage (localStorage) to save your preferences and data — this is not a "cookie" in the traditional sense but serves a similar local storage function.
 
 THIRD-PARTY SERVICES
-• Supabase (supabase.com) — database, authentication, real-time sync
-• Vercel (vercel.com) — web hosting
-• Google (accounts.google.com) — OAuth sign-in
-• Google Fonts (fonts.googleapis.com) — font loading
+The web app is hosted on Vercel (vercel.com). Vercel may log standard server access data (IP address, browser type, access times) as part of normal hosting operations. Please refer to Vercel's privacy policy for details.
 
-These services may collect standard access logs (IP address, browser type). Please refer to their respective privacy policies.
+The app loads fonts from Google Fonts CDN (fonts.googleapis.com). Google may collect standard CDN access logs. Please refer to Google's privacy policy for details.
 
-YOUR RIGHTS (GDPR)
-You can:
-• Export all your data at any time (Settings → Backup)
-• Delete your cloud data by signing out and requesting deletion
-• Delete your local data by clearing browser storage
-• Use the app without an account (local-only mode)
-
-For data deletion requests: see "Contact us" section.
+YOUR RIGHTS
+Since no personal data is collected or stored by the developer, there is no data to request, correct, or delete on our end. Your data is entirely under your control on your own device.
 
 CONTACT
-For privacy-related questions: bvivoda@gmail.com` :
+For privacy-related questions: see the "Contact us" section.` :
 `POLITIKA PRIVATNOSTI I KOLAČIĆA
-Posljednje ažuriranje: travanj 2026.
 
-POHRANA PODATAKA
-Moja lova pohranjuje podatke na dva načina ovisno o vašem korištenju:
+PRIKUPLJANJE PODATAKA
+Moja lova ne prikuplja, ne prenosi niti pohranjuje nikakve osobne podatke na vanjskim poslužiteljima. Svi podaci uneseni u aplikaciju (transakcije, kategorije, podaci profila) pohranjuju se isključivo na tvom uređaju putem browser localStorage-a ili, u Android verziji, lokalne pohrane uređaja.
 
-1. LOKALNA POHRANA (bez računa)
-Svi podaci pohranjuju se isključivo na vašem uređaju putem browser localStorage-a. Nikakvi podaci ne šalju se na server. Ako obrišete podatke preglednika ili promijenite uređaj, podaci će biti izgubljeni osim ako ste ručno izvezli backup.
-
-2. CLOUD POHRANA (s računom)
-Kad se prijavite Google ili email/lozinka računom, vaši podaci pohranjuju se i na Supabase poslužiteljima (supabase.com). To omogućuje:
-• Sinkronizaciju u stvarnom vremenu između uređaja
-• Automatski backup svih transakcija, popisa i postavki
-• Oporavak računa ako izgubite uređaj ili zaboravite PIN
-
-PODACI KOJI SE PRIKUPLJAJU PRI PRIJAVI
-• Email adresa (iz Google OAuth-a ili ručne registracije)
-• Ime (iz Google profila ili ručno uneseno)
-• Podaci o transakcijama koje unosite (iznosi, opisi, kategorije, datumi)
-• Postavke aplikacije (tema, jezik, valuta, vremenska zona)
-
-Podaci su zaštićeni Row Level Security (RLS) — samo vi možete pristupiti svojim podacima. Programer ne može pregledavati pojedinačne korisničke podatke.
-
-AUTENTIFIKACIJA
-• Google prijava: obrađuje Supabase Auth koristeći OAuth 2.0 s PKCE protokolom. Vaša Google lozinka nikad se ne dijeli s aplikacijom.
-• Email/lozinka: lozinke hashira Supabase koristeći bcrypt. Aplikacija nikad ne vidi niti pohranjuje vašu lozinku u izvornom obliku.
-
-ENKRIPCIJA
-Kada je PIN zaštita uključena:
-• Lokalni podaci enkriptirani su AES-256-GCM algoritmom
-• Ključ za enkripciju derivira se iz PIN-a koristeći PBKDF2 (100.000 iteracija, SHA-256)
-• PIN hash i salt za enkripciju pohranjuju se lokalno i nikad se ne prenose
+Nikakvi podaci ne šalju se programeru, trećim stranama niti nijednoj usluzi u oblaku bez tvoje izričite radnje (npr. kad odlučiš izvesti i e-mailom poslati svoje podatke).
 
 KOLAČIĆI
-Web verzija ne koristi kolačiće za praćenje, oglašavanje niti analitiku. Aplikacija koristi:
-• localStorage — za podatke i postavke aplikacije
-• sessionStorage — za privremene ključeve sesijske enkripcije
-• Supabase auth tokene — pohranjene u localStorage za trajnost sesije
+Web verzija (moja-lova-app.vercel.app) ne koristi kolačiće za praćenje, oglašavanje niti analitiku. Aplikacija može koristiti browser localStorage za pohranu tvojih postavki i podataka — to nije "kolačić" u tradicionalnom smislu, ali služi sličnoj lokalnoj funkciji pohrane.
 
 USLUGE TREĆIH STRANA
-• Supabase (supabase.com) — baza podataka, autentifikacija, sinkronizacija
-• Vercel (vercel.com) — web hosting
-• Google (accounts.google.com) — OAuth prijava
-• Google Fonts (fonts.googleapis.com) — učitavanje fontova
+Web aplikacija je hostirana na Vercelu (vercel.com). Vercel može bilježiti standardne podatke o pristupu poslužitelju (IP adresa, vrsta preglednika, vremena pristupa) kao dio normalnog rada hostinga.
 
-Ove usluge mogu prikupljati standardne pristupne zapise (IP adresa, vrsta preglednika). Molimo pogledajte njihove politike privatnosti.
+Aplikacija učitava fontove s Google Fonts CDN-a (fonts.googleapis.com). Google može prikupljati standardne CDN pristupne zapise.
 
-VAŠA PRAVA (GDPR)
-Možete:
-• Izvesti sve podatke u bilo kojem trenutku (Postavke → Backup)
-• Obrisati cloud podatke odjavom i zahtjevom za brisanje
-• Obrisati lokalne podatke brisanjem pohrane preglednika
-• Koristiti aplikaciju bez računa (samo lokalni način)
-
-Za zahtjeve za brisanje podataka: pogledajte sekciju "Kontaktiraj nas".
-
-KONTAKT
-Za pitanja o privatnosti: bvivoda@gmail.com`
+TVOJA PRAVA
+Budući da programer ne prikuplja niti pohranjuje osobne podatke, nema podataka koje bismo morali ispraviti ili obrisati s naše strane. Tvoji podaci u potpunosti su pod tvojom kontrolom, na tvom uređaju.`
     },
     contact: {
       title: t("Kontaktiraj nas"),
-      body: `Moja lova — v.4
-${lang === "en" ? "Author" : "Autor"}: Bojan Vivoda
-Email: bvivoda@gmail.com
+      body: `Moja lova
+Autor: Bojan Vivoda
 
-${lang === "en" ? "For questions, suggestions or bug reports:" : "Za pitanja, prijedloge ili prijavu grešaka:"}
+${lang === "en" ? "For questions, suggestions or bug reports, please reach out via:" : "Za pitanja, prijedloge ili prijavu grešaka, obratite se putem:"}
 
 GitHub: github.com/bvivoda/Moja-lova-app
-${lang === "en" ? "Web app" : "Web aplikacija"}: moja-lova-app.vercel.app
+${lang === "en" ? "Web app:" : "Web aplikacija:"} moja-lova-app.vercel.app
 
 ${lang === "en" ? "When reporting a bug, please include:" : "Kod prijave greške, navedite:"}
-${lang === "en" ? "• App version (see Diagnostics)" : "• Verziju aplikacije (vidi Dijagnostika)"}
+${lang === "en" ? "• App version (1.2)" : "• Verziju aplikacije (1.2)"}
 ${lang === "en" ? "• Device and OS version" : "• Uređaj i verziju OS-a"}
-${lang === "en" ? "• Steps to reproduce the issue" : "• Korake koji reproduciraju problem"}
-${lang === "en" ? "• Screenshot if possible" : "• Screenshot ako je moguće"}`
+${lang === "en" ? "• Steps to reproduce the issue" : "• Korake koji reproduciraju problem"}`
     },
     feedback: {
       title: t("Pošalji povratnu informaciju"),
@@ -1405,53 +1221,45 @@ Ways to provide feedback:
 • GitHub Issues — for bug reports and feature requests:
   github.com/bvivoda/Moja-lova-app/issues
 
-• Email — bvivoda@gmail.com
+• GitHub Discussions — for general suggestions and ideas
 
 Please describe:
 1. What you were trying to do
 2. What happened instead
 3. What you expected to happen
-4. Your device, OS and browser version
-5. Whether you use cloud sync or local-only mode
+4. Your device and OS version
 
 Thank you for using Moja lova!` :
 `POŠALJI POVRATNU INFORMACIJU
 
 Hvala na povratnoj informaciji! Pomaže nam poboljšati aplikaciju za sve.
 
-Načini slanja povratnih informacija:
+Načini pružanja povratnih informacija:
 
 • GitHub Issues — za prijave grešaka i zahtjeve za nove značajke:
   github.com/bvivoda/Moja-lova-app/issues
 
-• Email — bvivoda@gmail.com
+• GitHub Discussions — za opće prijedloge i ideje
 
 Molimo opiši:
 1. Što si pokušavao napraviti
 2. Što se umjesto toga dogodilo
 3. Što si očekivao da se dogodi
-4. Tvoj uređaj, OS i verziju preglednika
-5. Koristiš li cloud sinkronizaciju ili samo lokalni način
+4. Tvoj uređaj i verziju OS-a
 
 Hvala što koristiš Moja lova!`
     },
     diagnostics: {
       title: t("Dijagnostika"),
       body: [
-        `${lang==="en"?"App version":"Verzija aplikacije"}: .4`,
+        `${lang==="en"?"App version":"Verzija aplikacije"}: 1.2`,
         `${lang==="en"?"Platform":"Platforma"}: ${typeof window !== "undefined" && window.Capacitor && window.Capacitor.isNativePlatform() ? "Android APK" : "Web / PWA"}`,
         `${lang==="en"?"User Agent":"User Agent"}: ${typeof navigator !== "undefined" ? navigator.userAgent : "N/A"}`,
-        `${lang==="en"?"Language":"Jezik"}: ${lang === "hr" ? "Hrvatski" : "English"}`,
-        `${lang==="en"?"Currency":"Valuta"}: ${(() => { try { const p = JSON.parse(localStorage.getItem("ml_prefs")||"{}"); return p.currency || "EUR"; } catch { return "EUR"; } })()}`,
-        `${lang==="en"?"Timezone":"Vremenska zona"}: ${(() => { try { const p = JSON.parse(localStorage.getItem("ml_prefs")||"{}"); return p.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return "N/A"; } })()}`,
+        `${lang==="en"?"Language":"Jezik"}: ${typeof navigator !== "undefined" ? navigator.language : "N/A"}`,
         `${lang==="en"?"Screen":"Zaslon"}: ${typeof window !== "undefined" ? `${window.screen.width}×${window.screen.height}` : "N/A"}`,
         `${lang==="en"?"Online":"Online"}: ${typeof navigator !== "undefined" ? (navigator.onLine ? (lang==="en"?"Yes":"Da") : (lang==="en"?"No":"Ne")) : "N/A"}`,
-        `${lang==="en"?"Cloud sync":"Cloud sinkronizacija"}: ${(() => { try { const s = localStorage.getItem("sb-lbicxdhqzieegphgfzgd-auth-token"); return s ? (lang==="en"?"Active":"Aktivna") : (lang==="en"?"Not signed in":"Nije prijavljen"); } catch { return "N/A"; } })()}`,
-        `${lang==="en"?"PIN protection":"PIN zaštita"}: ${(() => { try { const s = JSON.parse(localStorage.getItem("ml_sec")||"{}"); return s.pinHash ? (lang==="en"?"Enabled":"Uključena") : (lang==="en"?"Disabled":"Isključena"); } catch { return "N/A"; } })()}`,
-        `${lang==="en"?"Biometrics":"Biometrija"}: ${(() => { try { const s = JSON.parse(localStorage.getItem("ml_sec")||"{}"); return s.bioEnabled ? (lang==="en"?"Enabled":"Uključena") : (lang==="en"?"Disabled":"Isključena"); } catch { return "N/A"; } })()}`,
         `${lang==="en"?"Service Worker":"Service Worker"}: ${"serviceWorker" in navigator ? (lang==="en"?"Supported":"Podržan") : (lang==="en"?"Not supported":"Nije podržan")}`,
         `${lang==="en"?"Storage available":"Pohrana dostupna"}: ${(() => { try { const t = "ml_test"; localStorage.setItem(t,"1"); localStorage.removeItem(t); return lang==="en"?"Yes":"Da"; } catch { return lang==="en"?"No":"Ne"; }})()}`,
-        `${lang==="en"?"Transactions":"Transakcije"}: ${(() => { try { const d = JSON.parse(localStorage.getItem("ml_db")||"[]"); return d.length; } catch { return "N/A"; } })()}`,
       ].join("\n")
     },
   };
@@ -1475,7 +1283,7 @@ Hvala što koristiš Moja lova!`
               </div>
               <div>
                 <div style={{ fontSize:17, fontWeight:700, color:C.text }}>Moja lova</div>
-                <div style={{ fontSize:12, color:C.textMuted }}>{t("Verzija")} .4 · © 2026 Bojan Vivoda</div>
+                <div style={{ fontSize:12, color:C.textMuted }}>{t("Verzija")} 1.2 · © 2026 Bojan Vivoda</div>
               </div>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
@@ -1555,13 +1363,13 @@ function BudgetEditor({ C, cats, budgets, onBack, t }) {
 }
 
 // ─── Settings (Glavni izbornik) ───────────────────────────────────────────────
-function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, t, lang }) {
+function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, lists, setLists, subPg, setSubPg, year, sec, updSec, setUnlocked, setSetupMode, onChangePinCrypto, onRemovePinCrypto, t, lang }) {
   const cy = curYear();
   const years = Array.from({length:12},(_,i)=>cy-5+i);
 
   if (subPg) {
     if (subPg === "general") {
-      return <GeneralSettings C={C} txs={txs} setTxs={setTxs} drafts={drafts} lists={lists} setLists={setLists} prefs={prefs} updPrefs={updPrefs} user={user} updUser={updUser} sec={sec} updSec={updSec} year={year} setSetupMode={setSetupMode} setUnlocked={setUnlocked} onBack={()=>setSubPg(null)} onAbout={()=>setSubPg("about")} onChangePinCrypto={onChangePinCrypto} onRemovePinCrypto={onRemovePinCrypto} supaUser={supaUser} onSignOut={onSignOut} onSyncToCloud={onSyncToCloud} t={t} lang={lang} />;
+      return <GeneralSettings C={C} txs={txs} setTxs={setTxs} drafts={drafts} lists={lists} setLists={setLists} prefs={prefs} updPrefs={updPrefs} user={user} updUser={updUser} sec={sec} updSec={updSec} year={year} setSetupMode={setSetupMode} setUnlocked={setUnlocked} onBack={()=>setSubPg(null)} onAbout={()=>setSubPg("about")} onChangePinCrypto={onChangePinCrypto} onRemovePinCrypto={onRemovePinCrypto} t={t} lang={lang} />;
     }
     if (subPg === "recurring") {
       return <RecurringEditor C={C} items={lists.recurring||[]} lists={lists} t={t} onBack={arr=>{ setLists(l=>({...l,recurring:arr})); setSubPg(null); }}/>;
@@ -1613,27 +1421,6 @@ function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, list
       
       <div style={{ padding:"12px 16px 0" }}>
 
-        {/* Account section — shown when logged in via Supabase */}
-        {supaUser && (
-          <div style={{ background:C.card, border:`1px solid ${C.accent}30`, borderLeft:`4px solid ${C.accent}`, borderRadius:13, padding:"12px 14px", marginBottom:12 }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <div style={{ width:34, height:34, borderRadius:10, background:`${C.accent}20`, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  <Ic n="user" s={16} c={C.accent}/>
-                </div>
-                <div>
-                  <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{supaUser.user_metadata?.full_name || supaUser.email}</div>
-                  <div style={{ fontSize:11, color:C.textMuted }}>{supaUser.email}</div>
-                </div>
-              </div>
-              <button onClick={onSignOut}
-                style={{ padding:"6px 12px", background:`${C.expense}15`, border:`1px solid ${C.expense}40`, borderRadius:8, color:C.expense, fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                {t("Odjava")}
-              </button>
-            </div>
-          </div>
-        )}
-
         <div style={{ marginTop:4, marginBottom:6 }}>
           <SL text={t("Aktivna godina")} icon="cal"/>
           <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:13 }}>
@@ -1668,7 +1455,7 @@ function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, list
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="wallet" s={20} c="#fff"/></div>
-            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} .4</div></div>
+            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.2</div></div>
             <button onClick={()=>setSubPg("about")}
               style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
               <span style={{ fontSize:14, fontWeight:700, color:C.accent, fontFamily:"serif", lineHeight:1 }}>i</span>

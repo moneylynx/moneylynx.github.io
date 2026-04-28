@@ -77,31 +77,31 @@ export const loadAndDecryptAll = async (key, defLists) => {
   return { txs, drafts, lists, user };
 };
 
-// ─── Session key cache ────────────────────────────────────────────────────────
-// sessionStorage clears automatically when the tab/app is closed.
-// This means:
-//   - minimize → restore (same session) = no PIN needed ✓
-//   - close app → reopen = PIN or biometry required ✓
+// ─── Session key cache (localStorage with 7-day expiry) ──────────────────────
 const SESSION_KEY = "ml_sk";
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const cacheKeyToSession = async (key) => {
   try {
     const raw = await crypto.subtle.exportKey("raw", key);
-    sessionStorage.setItem(SESSION_KEY, bytesToB64(new Uint8Array(raw)));
+    const payload = { k: bytesToB64(new Uint8Array(raw)), t: Date.now() };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
   } catch { /* non-critical */ }
 };
 
 export const loadKeyFromSession = async () => {
   try {
-    const b64 = sessionStorage.getItem(SESSION_KEY);
-    if (!b64) return null;
-    return crypto.subtle.importKey(
-      "raw", b64ToBytes(b64),
-      { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]
-    );
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const { k, t } = JSON.parse(raw);
+    if (!k || !t || Date.now() - t > SESSION_MAX_AGE_MS) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return crypto.subtle.importKey("raw", b64ToBytes(k), { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
   } catch { return null; }
 };
 
 export const clearSessionKey = () => {
-  try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
 };

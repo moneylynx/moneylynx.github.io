@@ -3,20 +3,16 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 // ─── Lib ──────────────────────────────────────────────────────────────────────
 import { K, DEF_LISTS, T, MONTHS, MSHORT, MSHORT_EN, BACKUP_SNOOZE_MS } from "./lib/constants.js";
 import { createT, EN_DICT } from "./lib/i18n.js";
-import { load, save, saveRaw, loadRaw, fmtEur, fmtCurrency, fDateTZ, curYear } from "./lib/helpers.js";
+import { load, save, saveRaw, loadRaw, fmtEur, curYear } from "./lib/helpers.js";
 import {
   bytesToHex, deriveEncKey, hashPinV2, hashPinLegacy,
   encryptJSON, encryptAndSaveAll, loadAndDecryptAll,
   cacheKeyToSession, loadKeyFromSession, clearSessionKey,
 } from "./lib/crypto.js";
-import { supabase, signOut, onAuthChange } from "./lib/supabase.js";
-import { uploadAll, downloadAll } from "./lib/sync.js";
 
 // ─── Components ───────────────────────────────────────────────────────────────
 import { Ic, QuickAddModal, ActionHubModal } from "./components/ui.jsx";
 import { LockScreen, SetupPin, OnboardingScreen } from "./components/auth.jsx";
-import AuthScreen from "./components/AuthScreen.jsx";
-import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import TxForm from "./components/TxForm.jsx";
 import TxList from "./components/TxList.jsx";
@@ -25,51 +21,30 @@ import Settings from "./components/Settings.jsx";
 import { RecurringScreen } from "./components/Settings.jsx";
 
 export default function App() {
+  // Detect at startup whether data is protected by a PIN.
+  // If yes, encrypted data keys start empty — they're filled async after unlock.
+  // sec and prefs are ALWAYS plaintext (needed before unlock for theme/lang).
   const _sec = load(K.sec, {});
   const _hasPin = !!_sec.pinHash;
 
   const [txs, setTxs] = useState(() => _hasPin ? [] : load(K.db, []));
   const [drafts, setDrafts] = useState(() => _hasPin ? [] : load(K.drf, []));
-  const [prefs,setPrefs]= useState(()=>load(K.prf,{theme:"auto",year:curYear(), onboarded:false, lang:"hr", currency:"EUR", timezone:"Europe/Zagreb"}));
+  const [prefs,setPrefs]= useState(()=>load(K.prf,{theme:"auto",year:curYear(), onboarded:false, lang:"hr"}));
   const [user, setUser] = useState(()=> _hasPin ? {} : load(K.usr,{firstName:"",lastName:"",phone:"",email:""}));
   const [sec,  setSec]  = useState(()=>load(K.sec,{pinHash:null,bioEnabled:false,bioCredId:null,attempts:0,totalFailed:0,lockedUntil:null}));
   const [lists,setLists] = useState(() => _hasPin ? DEF_LISTS : load(K.lst, DEF_LISTS));
 
+  // AES-GCM key lives ONLY in memory. Never persisted.
+  // null = no PIN / not yet unlocked. Set on successful PIN entry.
   const [encKey, setEncKey] = useState(null);
-  const secRef = useRef(sec);
-  useEffect(() => { secRef.current = sec; }, [sec]);
-
-  // ─── Supabase auth state ───────────────────────────────────────────────────
-  const [supaUser, setSupaUser]   = useState(null);  // logged-in Supabase user
-  const [authReady, setAuthReady] = useState(false); // auth state resolved
-  const [syncing, setSyncing]     = useState(false);
-  const [syncError, setSyncError] = useState(null);  // null | string
-  const [isOnline, setIsOnline]   = useState(()=> typeof navigator !== "undefined" ? navigator.onLine : true);
-
-  // ─── Online / offline detection ───────────────────────────────────────────
-  useEffect(() => {
-    const goOnline  = () => {
-      setIsOnline(true);
-      setSyncError(null);
-      // Auto-retry sync when coming back online
-      if (supaUser) handleSyncAfterLogin(supaUser.id);
-    };
-    const goOffline = () => setIsOnline(false);
-    window.addEventListener("online",  goOnline);
-    window.addEventListener("offline", goOffline);
-    return () => {
-      window.removeEventListener("online",  goOnline);
-      window.removeEventListener("offline", goOffline);
-    };
-  }, []);
 
   const [page, setPage] = useState("dashboard");
   const [editId,setEditId]   = useState(null);
   const [draftEdit,setDraftEdit] = useState(null);
   const [subPg, setSubPg]    = useState(null);
-  const [unlocked,setUnlocked] = useState(()=>!load(K.sec,{}).pinHash);
-  const [setupMode, setSetupMode] = useState(false);
-  const [swUpdate, setSwUpdate] = useState(null);
+  const [unlocked,setUnlocked] = useState(false);
+  const [setupMode, setSetupMode] = useState(false); // shows SetupPin screen from Settings when user has no PIN yet
+  const [swUpdate, setSwUpdate] = useState(null);     // ServiceWorker waiting — trigger via banner click
 
   // Modal controls
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -78,7 +53,7 @@ export default function App() {
   // Filters
   const [txFilter, setTxFilter]           = useState("pending");
   const [statTab, setStatTab]             = useState("expected");
-  const [statMonth, setStatMonth]         = useState(()=>MONTHS[new Date().getMonth()]);
+  const [statMonth, setStatMonth]         = useState("YEAR");
   const [statExpFilter, setStatExpFilter] = useState({recurring:true, rate:true, kredit:true, processing:true});
 
   const lang = prefs.lang || "hr";
@@ -127,135 +102,52 @@ export default function App() {
   },[user]);
   useEffect(()=>save(K.sec,sec),[sec]);        // always plaintext
 
-  // ─── Supabase auth listener ────────────────────────────────────────────────
+  // ─── Auto-unlock via session cache ────────────────────────────────────────
+  // On initial mount AND whenever the app returns from background:
+  //   - if a valid cached AES key exists (< 7 days old) → decrypt & unlock silently
+  //   - otherwise leave unlocked=false so the LockScreen appears and user auths.
+  // This means biometry + PIN flow happens only on first session (or after
+  // 7-day expiry / explicit PIN removal). Minimize/maximize cycles don't
+  // re-prompt for either.
   useEffect(() => {
-    // Check current session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSupaUser(session?.user ?? null);
-      setAuthReady(true);
-    });
-    // Listen for auth changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSupaUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // ─── Sync: upload local data after login ──────────────────────────────────
-  const handleSyncAfterLogin = async (userId) => {
-    if (!navigator.onLine) { setSyncError(t("Nema internetske veze. Podaci su lokalni.")); return; }
-    setSyncing(true); setSyncError(null);
-    try {
-      const cloudData = await downloadAll(userId, DEF_LISTS);
-      const cloudTxs = cloudData.txs || [];
-      if (cloudTxs.length > 0) {
-        const merged = [
-          ...cloudTxs,
-          ...txs.filter(t => !cloudTxs.find(c => c.id === t.id))
-        ];
-        setTxs(merged);
-        if (cloudData.lists && Object.keys(cloudData.lists).length > 0) setLists(cloudData.lists);
-        if (cloudData.user && cloudData.user.firstName) setUser(cloudData.user);
-        if (txs.length > 0) {
-          await uploadAll(userId, { txs: merged, lists: cloudData.lists || lists, user: cloudData.user || user });
-        }
-      } else if (txs.length > 0) {
-        await uploadAll(userId, { txs, lists, user });
-      }
-    } catch (e) {
-      console.error('Sync error:', e);
-      setSyncError(t("Greška pri sinkronizaciji. Pokušaj ponovo."));
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  // ─── Auto-sync when user logs in ──────────────────────────────────────────
-  useEffect(() => {
-    if (supaUser && unlocked) {
-      const needsSync = localStorage.getItem("ml_sync_needed");
-      if (needsSync) localStorage.removeItem("ml_sync_needed");
-      handleSyncAfterLogin(supaUser.id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supaUser?.id]);
-
-
-  // Clean up sync debounce timer on unmount
-  useEffect(() => () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); }, []);
-
-  // Auto-detect language from browser timezone on first launch
-  useEffect(() => {
-    if (!prefs.langChosen) {
+    if (!sec.pinHash || unlocked) return;
+    (async () => {
       try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const isHR = tz === "Europe/Zagreb";
-        updP({ lang: isHR ? "hr" : "en", langChosen: true });
-      } catch {
-        updP({ lang: "en", langChosen: true });
-      }
-    }
-  }, []);
-
-  // Clean up old localStorage session key (from previous implementation).
-  useEffect(()=>{ try { localStorage.removeItem("ml_sk"); } catch {} }, []);
-
-  // ─── Realtime sync listener ────────────────────────────────────────────────
-  // Listens for changes in Supabase and refreshes local transactions.
-  useEffect(() => {
-    if (!supaUser) return;
-    let debounceTimer;
-    const channel = supabase
-      .channel('transactions-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'transactions',
-        filter: `user_id=eq.${supaUser.id}`,
-      }, () => {
-        // Debounce 1.5s to avoid multiple rapid fetches
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(async () => {
-          try {
-            const { fetchTransactions } = await import('./lib/sync.js');
-            const cloudTxs = await fetchTransactions(supaUser.id);
-            if (cloudTxs) setTxs(cloudTxs);
-          } catch (e) { console.error('Realtime fetch error:', e); }
-        }, 1500);
-      })
-      .subscribe();
-    return () => {
-      clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
-    };
-  }, [supaUser?.id]);
+        const cachedKey = await loadKeyFromSession();
+        if (!cachedKey) return;
+        const data = await loadAndDecryptAll(cachedKey, DEF_LISTS);
+        setTxs(data.txs); setDrafts(data.drafts);
+        setLists(data.lists); setUser(data.user);
+        setEncKey(cachedKey);
+        setUnlocked(true);
+      } catch { /* stay locked */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
 
   useEffect(()=>{
+    if (!sec.pinHash) return;
     const fn = async () => {
-      if (!secRef.current.pinHash) return;
       if (document.hidden) {
         setUnlocked(false);
-        setPage("dashboard"); // always return to home when app goes to background
       } else {
-        const hasBio = secRef.current.bioEnabled && secRef.current.bioCredId;
-        if (!hasBio) setUnlocked(false);
-        else {
-          try {
-            const cachedKey = await loadKeyFromSession();
-            if (cachedKey) {
-              const data = await loadAndDecryptAll(cachedKey, DEF_LISTS);
-              setTxs(data.txs); setDrafts(data.drafts);
-              setLists(data.lists); setUser(data.user);
-              setEncKey(cachedKey);
-              setUnlocked(true);
-            }
-          } catch { /* stay locked */ }
-        }
+        // App returning to foreground — try silent auto-unlock from cache.
+        try {
+          const cachedKey = await loadKeyFromSession();
+          if (cachedKey) {
+            const data = await loadAndDecryptAll(cachedKey, DEF_LISTS);
+            setTxs(data.txs); setDrafts(data.drafts);
+            setLists(data.lists); setUser(data.user);
+            setEncKey(cachedKey);
+            setUnlocked(true);
+          }
+        } catch { /* stay locked — LockScreen will handle it */ }
       }
     };
     document.addEventListener("visibilitychange", fn);
     return () => document.removeEventListener("visibilitychange", fn);
-  },[]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[sec.pinHash]);
 
   // ─── Backfill firstUseAt for users who onboarded before this feature ──────
   // Without this, existing users would never see the backup reminder because
@@ -345,8 +237,8 @@ export default function App() {
         setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0 }));
         setTxs(data.txs); setDrafts(data.drafts); setLists(data.lists); setUser(data.user);
       } else {
-        // Already v2 — derive key using fresh sec from ref.
-        key = await deriveEncKey(pin, secRef.current.encSalt);
+        // Already v2 — derive key and decrypt.
+        key = await deriveEncKey(pin, sec.encSalt);
         const data = await loadAndDecryptAll(key, DEF_LISTS);
         setTxs(data.txs); setDrafts(data.drafts); setLists(data.lists); setUser(data.user);
       }
@@ -366,14 +258,9 @@ export default function App() {
     const pinHash = await hashPinV2(pin, pinSalt);
     const key     = await deriveEncKey(pin, encSalt);
     await encryptAndSaveAll(key, { txs, drafts, lists, user });
-    const newSec = { ...secRef.current, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0, lockedUntil:null };
-    save(K.sec, newSec); // immediate save — don't rely on useEffect timing
-    setSec(newSec);
-    secRef.current = newSec;
+    setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0, lockedUntil:null }));
     setEncKey(key);
-    // Do NOT cache key here — user must enter PIN on next open.
-    // Key is cached only after successful unlock (handleCryptoUnlock).
-    setUnlocked(true);
+    await cacheKeyToSession(key);
     setSetupMode(false);
   };
 
@@ -384,13 +271,9 @@ export default function App() {
     const pinHash = await hashPinV2(newPin, pinSalt);
     const newKey  = await deriveEncKey(newPin, encSalt);
     await encryptAndSaveAll(newKey, { txs, drafts, lists, user });
-    const newSec = { ...secRef.current, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0 };
-    save(K.sec, newSec); // immediate save
-    setSec(newSec);
-    secRef.current = newSec;
+    setSec(v => ({ ...v, pinHash, pinSalt, encSalt, pinHashVersion:"v2", attempts:0, totalFailed:0 }));
     setEncKey(newKey);
-    // Clear old session cache — user must re-enter new PIN on next open.
-    clearSessionKey();
+    await cacheKeyToSession(newKey);
   };
 
   // Called after PIN verified during removal — save all data as plaintext.
@@ -405,48 +288,6 @@ export default function App() {
   };
 
 
-  // ─── Cloud sync helpers ────────────────────────────────────────────────────
-  // Pending queue of transactions to sync — accumulated across rapid calls.
-  const syncQueueRef = useRef([]);
-  const syncTimerRef = useRef(null);
-
-  // Debounced batch sync — collects all changed txs within 800ms
-  // and sends them in a single Supabase upsert call.
-  const queueSync = useCallback((changedTxs) => {
-    if (!supaUser) return;
-    // Merge into queue (deduplicate by id — latest wins)
-    changedTxs.forEach(tx => {
-      const idx = syncQueueRef.current.findIndex(q => q.id === tx.id);
-      if (idx >= 0) syncQueueRef.current[idx] = tx;
-      else syncQueueRef.current.push(tx);
-    });
-    // Reset debounce timer
-    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(async () => {
-      const batch = syncQueueRef.current.splice(0); // drain queue
-      if (!batch.length) return;
-      try {
-        const { syncTransactions } = await import('./lib/sync.js');
-        await syncTransactions(supaUser.id, batch);
-      } catch (e) { console.error("queueSync error:", e); }
-    }, 800);
-  }, [supaUser]);
-
-  // Full upload — used for manual sync and login sync only
-  const cloudSync = useCallback(async (newTxs) => {
-    if (!supaUser) return;
-    try { await uploadAll(supaUser.id, { txs: newTxs, lists, user }); }
-    catch (e) { console.error("cloudSync error:", e); }
-  }, [supaUser, lists, user]);
-
-  const cloudDel = async (localId) => {
-    if (!supaUser) return;
-    try {
-      const { deleteTransaction } = await import('./lib/sync.js');
-      await deleteTransaction(supaUser.id, localId);
-    } catch (e) { console.error("cloudDel error:", e); }
-  };
-
   const addTx = tx => {
     const inst = parseInt(tx.installments) || 0;
     if (inst > 1) {
@@ -456,6 +297,7 @@ export default function App() {
       const gid = Date.now().toString();
       const sd  = new Date(tx.date);
       const isYearly = tx.installmentPeriod === "Y";
+      
       const arr = [];
       for (let i=0; i<inst; i++) {
         const d = new Date(sd.getFullYear() + (isYearly ? i : 0), sd.getMonth() + (isYearly ? 0 : i), Math.min(sd.getDate(),28));
@@ -472,23 +314,14 @@ export default function App() {
           notes: tx.notes ? `${tx.notes} | ${t("Obrok")} ${i+1}/${inst}` : `${t("Obrok")} ${i+1}/${inst} · ${fmtEur(tot)}`,
         });
       }
-      // Queue all installments as single batch — 1 Supabase call instead of 12
-      setTxs(p => { const newTxs = [...p, ...arr]; queueSync(arr); return newTxs; });
+      setTxs(p=>[...p,...arr]);
     } else {
-      const newTx = { ...tx, id:Date.now().toString(), installments:0 };
-      setTxs(p => { queueSync([newTx]); return [...p, newTx]; });
+      setTxs(p=>[...p, { ...tx, id:Date.now().toString(), installments:0 }]);
     }
     setPage("dashboard");
   };
 
-  const updTx = tx => {
-    setTxs(p => {
-      queueSync([tx]);
-      return p.map(x => x.id===tx.id ? tx : x);
-    });
-    setEditId(null);
-    setPage("transactions");
-  };
+  const updTx  = tx => { setTxs(p=>p.map(x=>x.id===tx.id?tx:x)); setEditId(null); setPage("transactions"); };
 
   // ─── Undo toast infrastructure ─────────────────────────────────────────────
   // Instead of deleting immediately, we stash the removed items and show a
@@ -521,15 +354,13 @@ export default function App() {
     const removed = txs.find(x => x.id === id);
     if (!removed) return;
     setTxs(p => p.filter(x => x.id !== id));
-    cloudDel(id);
-    startUndo(t("Stavka obrisana"), () => { setTxs(p => [...p, removed]); queueSync([removed]); });
+    startUndo(t("Stavka obrisana"), () => setTxs(p => [...p, removed]));
   };
   const delGrp = g => {
     const removed = txs.filter(x => x.installmentGroup === g);
     if (!removed.length) return;
     setTxs(p => p.filter(x => x.installmentGroup !== g));
-    removed.forEach(r => cloudDel(r.id));
-    startUndo(t("Grupa obrisana") + ` (${removed.length})`, () => { setTxs(p => [...p, ...removed]); queueSync(removed); });
+    startUndo(t("Grupa obrisana") + ` (${removed.length})`, () => setTxs(p => [...p, ...removed]));
   };
   const delDraft = id => {
     const removed = drafts.find(d => d.id === id);
@@ -555,8 +386,6 @@ export default function App() {
     @keyframes su{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     @keyframes fi{from{opacity:0}to{opacity:1}}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-    @keyframes shimmer{0%,100%{opacity:.4}50%{opacity:.8}}
     .su{animation:su .25s ease-out both} .fi{animation:fi .2s ease-out both}
     input[type=date]::-webkit-calendar-picker-indicator{filter:${theme==="dark"?"invert(1)":"none"};opacity:.5;}
     select{appearance:none;-webkit-appearance:none;}
@@ -568,118 +397,38 @@ export default function App() {
 
   const wrap = { background:C.bg, minHeight:"100vh", width:"100%", color:C.text, fontFamily:"'Inter',sans-serif", maxWidth:480, margin:"0 auto", transition:"background .3s,color .3s" };
 
-  // Show loading while auth state resolves (prevents white flash)
-  if (!authReady) return (
-    <div style={{...wrap, display:"flex", alignItems:"center", justifyContent:"center"}}>
-      <style>{gs}</style>
-      <div style={{ textAlign:"center" }}>
-        <div style={{ width:56, height:56, borderRadius:16, background:`linear-gradient(135deg,${C.accent},${C.accentDk||C.accent})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", animation:"pulse 1.5s ease-in-out infinite" }}>
-          <Ic n="wallet" s={26} c="#fff"/>
-        </div>
-        <span style={{ color:C.textMuted, fontSize:13 }}>Moja lova</span>
-      </div>
-    </div>
-  );
-
-  // Show AuthScreen if not logged in (and auth state is resolved)
-  if (authReady && !supaUser) {
-    return (
-      <div style={wrap}><style>{gs}</style>
-        <AuthScreen C={C} t={t} lang={lang} onLangChange={(l) => updP({ lang: l })} onSuccess={(session) => setSupaUser(session?.user)}/>
-      </div>
-    );
-  }
-
-  // Sync indicator overlay
-  if (syncing) return (
-    <div style={{...wrap, padding:"0 16px"}}>
-      <style>{gs}</style>
-      {/* Header skeleton */}
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"16px 0 12px"}}>
-        <div style={{width:120, height:22, borderRadius:8, background:C.cardAlt, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-        <div style={{width:80, height:30, borderRadius:10, background:C.cardAlt, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-      </div>
-      {/* Balance card skeleton */}
-      <div style={{background:C.card, border:`1px solid ${C.border}`, borderRadius:18, padding:18, marginBottom:12}}>
-        <div style={{width:80, height:12, borderRadius:6, background:C.cardAlt, marginBottom:10, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-        <div style={{width:150, height:28, borderRadius:8, background:C.cardAlt, marginBottom:12, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-        <div style={{display:"flex", gap:10}}>
-          <div style={{flex:1, height:48, borderRadius:12, background:C.cardAlt, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-          <div style={{flex:1, height:48, borderRadius:12, background:C.cardAlt, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-        </div>
-      </div>
-      {/* Chart skeleton */}
-      <div style={{background:C.card, border:`1px solid ${C.border}`, borderRadius:18, padding:18, marginBottom:12, display:"flex", alignItems:"flex-end", gap:8, height:140}}>
-        {[60,85,45,95,70,55,80,40,90,65,75,50].map((h,i)=>(
-          <div key={i} style={{flex:1, height:`${h}%`, borderRadius:4, background:C.cardAlt, animation:`shimmer 1.4s ease-in-out ${i*0.08}s infinite`}}/>
-        ))}
-      </div>
-      {/* List skeleton */}
-      {[1,2,3].map(i=>(
-        <div key={i} style={{background:C.card, border:`1px solid ${C.border}`, borderLeft:`3px solid ${C.cardAlt}`, borderRadius:14, padding:13, marginBottom:8, display:"flex", alignItems:"center", gap:10}}>
-          <div style={{width:36, height:36, borderRadius:10, background:C.cardAlt, flexShrink:0, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-          <div style={{flex:1}}>
-            <div style={{width:"60%", height:12, borderRadius:6, background:C.cardAlt, marginBottom:7, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-            <div style={{width:"40%", height:10, borderRadius:6, background:C.cardAlt, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-          </div>
-          <div style={{width:60, height:16, borderRadius:6, background:C.cardAlt, animation:"shimmer 1.4s ease-in-out infinite"}}/>
-        </div>
-      ))}
-      {/* Sync label */}
-      <div style={{textAlign:"center", marginTop:8, display:"flex", alignItems:"center", justifyContent:"center", gap:8}}>
-        <span style={{width:8,height:8,borderRadius:"50%",background:C.warning,display:"inline-block",animation:"pulse 1s infinite"}}/>
-        <span style={{color:C.textMuted, fontSize:12}}>{t("Sinkronizacija podataka…")}</span>
-      </div>
-    </div>
-  );
-
   if (!prefs.onboarded) {
     return (
       <div style={wrap}><style>{gs}</style>
-        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} onSetPin={handleFirstSetPin}
-          onAddFirstTx={(tx) => {
-            const newTx = { ...tx, id: Date.now().toString(), installments: 0 };
-            setTxs(p => [...p, newTx]);
-            queueSync([newTx]);
-          }}
-          finish={() => { updP({onboarded:true, firstUseAt: Date.now()}); setUnlocked(true); }}
-        />
+        <OnboardingScreen C={C} prefs={prefs} updPrefs={updP} user={user} updUser={updU} lists={lists} updLists={setLists} updSec={updS} t={t} finish={() => { updP({onboarded:true, firstUseAt: Date.now()}); setUnlocked(true); }} />
       </div>
     );
   }
 
   if (sec.pinHash && !unlocked) return (
     <div style={wrap}><style>{gs}</style>
-    <LockScreen C={C} sec={sec} t={t} supaUser={supaUser}
+    <LockScreen C={C} sec={sec} t={t}
       onUnlock={async (pin, isLegacy, bioOnly) => {
         if (bioOnly) {
+          // Biometry path: try to restore AES key from sessionStorage first.
           const cachedKey = await loadKeyFromSession();
           if (cachedKey) {
+            // Session has a cached key — decrypt data and unlock without PIN.
             const data = await loadAndDecryptAll(cachedKey, DEF_LISTS);
             setTxs(data.txs); setDrafts(data.drafts); setLists(data.lists); setUser(data.user);
             setEncKey(cachedKey);
             updS({attempts:0, lockedUntil:null});
-            await cacheKeyToSession(cachedKey);
             setUnlocked(true);
+          } else {
+            // No cached key — biometry passed but we still need PIN to decrypt.
+            // LockScreen will surface the PIN form with a helpful message.
+            // (This happens on first unlock of a new session.)
           }
           return;
         }
         await handleCryptoUnlock(pin, isLegacy);
       }}
       onWipe={wipe}
-      onResetPin={async () => {
-        // Reset PIN — clear local encrypted data and re-download from cloud
-        const newSec = { pinHash:null, pinSalt:null, encSalt:null, pinHashVersion:null,
-                         bioEnabled:false, bioCredId:null, attempts:0, totalFailed:0, lockedUntil:null };
-        save(K.sec, newSec); setSec(newSec); secRef.current = newSec;
-        setEncKey(null); clearSessionKey();
-        // Clear encrypted data — will be re-fetched from cloud
-        save(K.db, []); save(K.drf, []); save(K.lst, DEF_LISTS); save(K.usr, {});
-        setTxs([]); setDrafts([]); setLists(DEF_LISTS); setUser({});
-        setUnlocked(true);
-        // Trigger cloud sync to re-download
-        if (supaUser) handleSyncAfterLogin(supaUser.id);
-      }}
     />
     </div>
   );
@@ -696,51 +445,11 @@ export default function App() {
     );
   }
 
-  const currency = prefs.currency || "EUR";
-  const timezone = prefs.timezone || "Europe/Zagreb";
-  const fmt  = (n) => fmtCurrency(n, currency);
-  const fmtD = (d) => fDateTZ(d, timezone);
-  const shared = { C, year:prefs.year, lists, user, t, lang, fmt, fmtD, currency, timezone };
+  const shared = { C, year:prefs.year, lists, user, t, lang };
 
   return (
     <div style={{ ...wrap, paddingBottom:88 }}>
       <style>{gs}</style>
-
-      {/* Offline banner */}
-      {!isOnline && (
-        <div style={{
-          position:"fixed", top:0, left:"50%", transform:"translateX(-50%)",
-          width:"100%", maxWidth:480, zIndex:301,
-          background:"#374151", color:"#fff",
-          padding:`max(10px, env(safe-area-inset-top)) 16px 10px`,
-          display:"flex", alignItems:"center", gap:8,
-          borderBottom:"1px solid #4B5563",
-        }}>
-          <Ic n="alert" s={14} c="#FCD34D"/>
-          <span style={{ fontSize:12, fontWeight:600 }}>{t("Nema internetske veze — radite offline")}</span>
-        </div>
-      )}
-
-      {/* Sync error banner */}
-      {syncError && isOnline && (
-        <div style={{
-          position:"fixed", top:0, left:"50%", transform:"translateX(-50%)",
-          width:"100%", maxWidth:480, zIndex:301,
-          background:`${C.expense}E8`, color:"#fff",
-          padding:`max(10px, env(safe-area-inset-top)) 16px 10px`,
-          display:"flex", alignItems:"center", justifyContent:"space-between",
-          borderBottom:`1px solid ${C.expense}`,
-        }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <Ic n="alert" s={14} c="#fff"/>
-            <span style={{ fontSize:12, fontWeight:600 }}>{syncError}</span>
-          </div>
-          <button onClick={()=>{ setSyncError(null); if(supaUser) handleSyncAfterLogin(supaUser.id); }}
-            style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:8, padding:"4px 10px", color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer" }}>
-            {t("Pokušaj ponovo")}
-          </button>
-        </div>
-      )}
 
       {/* Service Worker update banner — appears when a new app version is ready. */}
       {swUpdate && (
@@ -767,13 +476,13 @@ export default function App() {
         </div>
       )}
 
-      {page==="dashboard"    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} setTxFilter={setTxFilter} onQuickAdd={()=>setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg} syncing={syncing} supaUser={supaUser}/>}
+      {page==="dashboard"    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} setTxFilter={setTxFilter} onQuickAdd={()=>setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg}/>}
       {page==="add"          && <TxForm {...shared} txs={txs} draft={draftEdit} setLists={setLists} onSubmit={tx=>{ addTx(tx); if(draftEdit){ setDrafts(p=>p.filter(d=>d.id!==draftEdit.id)); setDraftEdit(null); } }} onCancel={()=>{ setPage("dashboard"); setDraftEdit(null); }} onGoRecurring={()=>setPage("recurring")}/>}
       {page==="edit"         && <TxForm {...shared} txs={txs} tx={txs.find(x=>x.id===editId)} setLists={setLists} onSubmit={updTx} onCancel={()=>{ setEditId(null); setPage("transactions"); }}/>}
       {page==="transactions" && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id=>{ setEditId(id); setPage("edit"); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id=>setTxs(p=>p.map(x=>x.id===id?{...x,status:"Plaćeno",date:new Date().toISOString().split("T")[0]}:x))}/>}
       {page==="charts"       && <Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/>}
       {page==="recurring"    && <RecurringScreen {...shared} data={txs} setTxs={setTxs} onBack={()=>setPage("dashboard")}/>}
-      {page==="settings"     && <Settings {...shared} txs={txs} setTxs={setTxs} drafts={drafts} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode} onChangePinCrypto={handleChangePinCrypto} onRemovePinCrypto={handleRemovePinCrypto} supaUser={supaUser} onSignOut={async()=>{ await signOut(); setSupaUser(null); }} onSyncToCloud={supaUser ? async(t,l,u)=>{ await uploadAll(supaUser.id, { txs:t||txs, lists:l||lists, user:u||user }); } : null}/>}
+      {page==="settings"     && <Settings {...shared} txs={txs} setTxs={setTxs} drafts={drafts} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode} onChangePinCrypto={handleChangePinCrypto} onRemovePinCrypto={handleRemovePinCrypto}/>}
 
       {showQuickAdd && <QuickAddModal C={C} t={t} onClose={()=>setShowQuickAdd(false)} onSave={d => { setDrafts(p=>[{id:Date.now().toString(), amount:d.amount, description:d.desc, date:new Date().toISOString()}, ...p]); setShowQuickAdd(false); }}/>}
       {showActionHub && <ActionHubModal C={C} t={t} drafts={drafts} onClose={()=>setShowActionHub(false)} onNew={()=>{ setPage("add"); setDraftEdit(null); setShowActionHub(false); }} onSelect={d=>{ setDraftEdit(d); setPage("add"); setShowActionHub(false); }} onDel={delDraft}/>}
@@ -838,11 +547,3 @@ export default function App() {
   );
 }
 
-// Wrap with ErrorBoundary so crashes show friendly message instead of blank screen
-export function AppWithBoundary() {
-  return (
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  );
-}
