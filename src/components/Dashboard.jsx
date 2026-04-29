@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell } from 'recharts';
-import { MONTHS, MSHORT, MSHORT_EN, CHART_COLORS, BACKUP_SNOOZE_MS } from '../lib/constants.js';
-import { fmtEur, monthOf, curYear, needsBackupReminder } from '../lib/helpers.js';
+import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, DEF_LISTS, T, CHART_COLORS, BACKUP_SNOOZE_MS } from '../lib/constants.js';
+import { fmtEur, monthOf, curYear, curMonthIdx, needsBackupReminder } from '../lib/helpers.js';
 import { Ic } from './ui.jsx';
 
-function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg }) {
+function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD }) {
+  const fmt = fmtProp || fmtEur;
   const cmIdx = curMonthIdx();
   const cm  = MONTHS[cmIdx]; 
   const cmName = lang==="en" ? MONTHS_EN[cmIdx] : cm;
@@ -33,18 +34,23 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   // Sorted by due date so the most urgent shows first.
   const todoItems = useMemo(() => {
     const items = [];
+    const today = new Date(); today.setHours(23,59,59,999);
 
-    // 1) Pending/processing transactions for current month.
-    md.filter(x => x.type === "Isplata" && (x.status === "Čeka plaćanje" || x.status === "U obradi"))
-      .forEach(x => items.push({
-        kind: "tx",
-        id: x.id,
-        date: x.date,
-        description: x.description,
-        category: x.category,
-        amount: parseFloat(x.amount) || 0,
-        status: x.status,
-      }));
+    // 1) Pending/processing transactions for current month AND overdue from past months
+    data.filter(x =>
+      x.type === "Isplata" &&
+      (x.status === "Čeka plaćanje" || x.status === "U obradi") &&
+      new Date(x.date) <= today
+    ).forEach(x => items.push({
+      kind: "tx",
+      id: x.id,
+      date: x.date,
+      description: x.description,
+      category: x.category,
+      location: x.location,
+      amount: parseFloat(x.amount) || 0,
+      status: x.status,
+    }));
 
     // 2) Recurring obligations that have NOT produced a transaction yet this month.
     const rec = lists.recurring || [];
@@ -61,13 +67,14 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
         date: dueDate,
         description: r.description,
         category: r.category,
+        location: r.location,
         amount: parseFloat(r.amount) || 0,
         recurring: r,
       });
     });
 
     return items.sort((a, b) => a.date.localeCompare(b.date));
-  }, [md, lists.recurring]);
+  }, [data, md, lists.recurring]);
 
   // Handle Pay action from the To-Do widget. Works for both kinds:
   // - tx: flip status to Plaćeno, stamp today's date
@@ -115,12 +122,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   const mm  = String(now.getMonth()+1).padStart(2,"0");
   const yy  = now.getFullYear();
   const W   = Math.min(window.innerWidth??480,480)-64;
-  const tt  = { contentStyle:{background:C.cardAlt,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:11}, formatter:v=>fmtEur(v) };
+  const tt  = { contentStyle:{background:C.cardAlt,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:11}, formatter:v=>fmt(v) };
   const dn  = [user.firstName, user.lastName].filter(Boolean).join(" ");
 
   const cards = [
-    { icon:<Ic n="up"    s={13} c={C.income}/>,  label:`${cmName} ${t("primici")}`,  val:fmtEur(mI), color:C.income  },
-    { icon:<Ic n="down"  s={13} c={C.expense}/>, label:`${cmName} ${t("plaćeno")}`,  val:fmtEur(mE), color:C.expense },
+    { icon:<Ic n="up"    s={13} c={C.income}/>,  label:`${cmName} ${t("primici")}`,  val:fmt(mI), color:C.income  },
+    { icon:<Ic n="down"  s={13} c={C.expense}/>, label:`${cmName} ${t("plaćeno")}`,  val:fmt(mE), color:C.expense },
   ];
 
   return (
@@ -129,13 +136,21 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
             <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
-              <Ic n="wallet" s={22} c={C.accent}/> {t("Moja lova")} <span style={{fontSize:14, color:C.textMuted, fontWeight:500, verticalAlign:"middle", position:"relative", top:2}}>· {year}.</span>
+              <Ic n="wallet" s={22} c={C.accent}/> {t("Money Lynx")} <span style={{fontSize:14, color:C.textMuted, fontWeight:500, verticalAlign:"middle", position:"relative", top:2}}>· {year}.</span>
             </h1>
             {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
-          <button onClick={onQuickAdd} style={{ background:`${C.warning}18`, border:`1px solid ${C.warning}50`, borderRadius:12, padding:"6px 10px", fontSize:12, fontWeight:700, color:C.warning, display:"flex", alignItems:"center", gap:5, cursor:"pointer", boxShadow:`0 2px 10px ${C.warning}20` }}>
-            <Ic n="zap" s={14} c={C.warning}/> {t("Brzi unos")}
-          </button>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            {syncing && (
+              <span title={t("Sinkronizacija…")} style={{ width:8, height:8, borderRadius:"50%", background:C.warning, display:"inline-block", animation:"pulse 1s infinite" }}/>
+            )}
+            {!syncing && supaUser && (
+              <span title={supaUser.email} style={{ width:8, height:8, borderRadius:"50%", background:C.income, display:"inline-block" }}/>
+            )}
+            <button onClick={onQuickAdd} style={{ background:`${C.warning}18`, border:`1px solid ${C.warning}50`, borderRadius:12, padding:"6px 10px", fontSize:12, fontWeight:700, color:C.warning, display:"flex", alignItems:"center", gap:5, cursor:"pointer", boxShadow:`0 2px 10px ${C.warning}20` }}>
+              <Ic n="zap" s={14} c={C.warning}/> {t("Brzi unos")}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -194,7 +209,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
             <div style={{ fontSize:10, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.textMuted, marginTop:1, marginRight:-6 }}>{yy}.</div>
           </div>
           <div style={{ fontSize:11, color:C.textSub, marginBottom:4, textAlign:"left" }}>{t("Bilanca")} {year}.</div>
-          <div style={{ fontSize:28, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:bal>=0?C.income:C.expense, textAlign:"left", paddingRight:65 }}>{fmtEur(bal)}</div>
+          <div style={{ fontSize:28, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:bal>=0?C.income:C.expense, textAlign:"left", paddingRight:65 }}>{fmt(bal)}</div>
           <div style={{ position:"absolute", right:-20, top:-20, width:90, height:90, borderRadius:"50%", background:`${bal>=0?C.income:C.expense}10` }}/>
         </div>
 
@@ -238,7 +253,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                           <div style={{ width:7, height:7, borderRadius:2, background:CHART_COLORS[i%CHART_COLORS.length], flexShrink:0 }}/>
                           <span style={{ color:C.textSub, maxWidth:80, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t(c.name)}</span>
                         </div>
-                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:600, fontSize:11 }}>{fmtEur(c.value)}</span>
+                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:600, fontSize:11 }}>{fmt(c.value)}</span>
                       </div>
                     ))}
                   </div>
@@ -246,8 +261,18 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               </div>
             )}
 
-            {/* Za platiti ovog mjeseca — fiksni header/footer, skrolabili srednji dio */}
-            {todoItems.length > 0 && (
+            {/* Za platiti ovog mjeseca — uvijek prikazano */}
+            {todoItems.length === 0 ? (
+              <div className="su" style={{ background:C.card, border:`1px solid ${C.income}40`, borderLeft:`4px solid ${C.income}`, borderRadius:14, padding:"12px 14px", marginBottom:10, display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:32, height:32, borderRadius:10, background:`${C.income}20`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <Ic n="check" s={16} c={C.income}/>
+                </div>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:C.income }}>{t("Ovaj mjesec nemate više obveza za platiti!")}</div>
+                  <div style={{ fontSize:10, color:C.textMuted, marginTop:2 }}>{cmName} {year}.</div>
+                </div>
+              </div>
+            ) : (
               <div className="su" style={{ background:C.card, border:`1px solid ${C.warning}40`, borderLeft:`4px solid ${C.warning}`, borderRadius:14, marginBottom:10, display:"flex", flexDirection:"column", maxHeight:"calc(100vh - 498px)", minHeight:280, overflow:"hidden" }}>
                 {/* Fiksni header */}
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 12px 8px", flexShrink:0 }}>
@@ -256,7 +281,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     {todoItems.length > 0 && <span style={{ background:`${C.warning}25`, borderRadius:10, padding:"1px 7px", fontSize:10, fontWeight:700, color:C.warning }}>{todoItems.length}</span>}
                   </div>
                   <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.warning }}>
-                    {fmtEur(todoItems.reduce((s,i)=>s+i.amount,0))}
+                    {fmt(todoItems.reduce((s,i)=>s+i.amount,0))}
                   </div>
                 </div>
                 {/* Skrolabili srednji dio — sve stavke */}
@@ -274,14 +299,16 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                         <div style={{ fontSize:12, fontWeight:600, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                           {item.description || t(item.category)}
                         </div>
-                        <div style={{ fontSize:10, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:1 }}>
+                        <div style={{ fontSize:10, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:1, flexWrap:"wrap" }}>
                           <Ic n="cal" s={9} c={C.textMuted}/>
                           {new Date(item.date).getDate()}.{new Date(item.date).getMonth()+1}.
+                          {item.category && item.category !== "Ostalo" && <span>· {t(item.category)}</span>}
+                          {item.location && item.location !== "Ostalo" && <span>· {t(item.location)}</span>}
                           {item.kind==="recurring" && <span style={{ color:C.accent, fontWeight:600 }}>· {t("Redovno")}</span>}
                         </div>
                       </div>
                       <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.text, flexShrink:0 }}>
-                        {fmtEur(item.amount)}
+                        {fmt(item.amount)}
                       </div>
                       <button
                         onClick={()=>payTodoItem(item)}

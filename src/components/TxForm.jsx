@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { MONTHS } from '../lib/constants.js';
-import { fmtEur } from '../lib/helpers.js';
+import { MONTHS, T } from '../lib/constants.js';
+import { fmtEur, save } from '../lib/helpers.js';
 import { Ic, StickyHeader } from './ui.jsx';
 
 function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRecurring, t }) {
@@ -9,12 +9,12 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
     type: "Isplata",
     description: draft.description,
     amount: draft.amount,
-    category: "", location: "", payment: "", status: "", notes: "", installments: 0, installmentPeriod: "M"
+    category: "", location: "", payment: "Gotovina", status: "Plaćeno", notes: "", installments: 0, installmentPeriod: "M"
   } : {
     date: new Date().toISOString().split("T")[0],
     type: "Isplata",
     description: "",
-    category: "", location: "", payment: "", status: "", amount: "", notes: "", installments: 0, installmentPeriod: "M"
+    category: "", location: "", payment: "Gotovina", status: "Plaćeno", amount: "", notes: "", installments: 0, installmentPeriod: "M"
   });
 
   const [form, setForm] = useState(init);
@@ -71,12 +71,12 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
     if (!tx && !draft) {
       upd({
         category: "",
-        status: isPrimitak ? "Plaćeno" : "",
-        payment: isPrimitak && CARD_PAYMENTS.includes(form.payment) ? "" : form.payment,
+        status: "Plaćeno", // always default to Plaćeno regardless of type
+        payment: isPrimitak && CARD_PAYMENTS.includes(form.payment) ? "Gotovina" : form.payment,
       });
     } else if (tx && isPrimitak) {
       if (!form.status) upd({ status: "Plaćeno" });
-      if (CARD_PAYMENTS.includes(form.payment)) upd({ payment: "" });
+      if (CARD_PAYMENTS.includes(form.payment)) upd({ payment: "Gotovina" });
     }
   },[form.type]);
   useEffect(()=>{ if (isGotov && inst>1) upd({ installments:0 }); },[form.payment]);
@@ -90,20 +90,21 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
     const amount = parseFloat(form.amount);
     if (!amount || amount <= 0)   { setErr({ msg: t("Unesite ispravan iznos"),    field:"amount"      }); return; }
     if (!form.description.trim()) { setErr({ msg: t("Unesite opis"),              field:"description" }); return; }
-    if (!form.category)           { setErr({ msg: t("Odaberite kategoriju"),      field:"category"    }); return; }
-    if (!form.location)           { setErr({ msg: t("Odaberite lokaciju"),        field:"location"    }); return; }
     if (!form.payment)            { setErr({ msg: t("Odaberite način plaćanja"),  field:"payment"     }); return; }
 
-    // Recurring-obligation branch: save into lists.recurring AND create a
-    // "Čeka plaćanje" transaction for the current month so the user sees it
-    // in the To-Do widget / Transactions list right away.
+    // Auto-fill optional fields with fallback values
+    const finalCategory = form.category || t("Ostalo");
+    const finalLocation = form.location || t("Ostalo");
+    const finalForm = { ...form, category: finalCategory, location: finalLocation };
+
+    // Recurring-obligation branch
     if (!tx && isRecurring && form.type === "Isplata") {
       const day = Math.max(1, Math.min(31, parseInt(recDueDay) || 1));
-      const months = parseInt(recMonths) || 0; // 0 = open-ended
+      const months = parseInt(recMonths) || 0;
       const rec = {
         id: Date.now().toString(),
         description: form.description.trim(),
-        amount, category: form.category, location: form.location,
+        amount, category: finalCategory, location: finalLocation,
         payment: form.payment, dueDay: day,
         months: months > 0 ? months : null,
         createdAt: Date.now(),
@@ -112,11 +113,10 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
       if (typeof setLists === "function") {
         setLists(l => ({ ...l, recurring: [...(l.recurring || []), rec] }));
       }
-      // Create the first occurrence as a Čeka plaćanje tx for this month.
       const now = new Date();
       const firstDate = new Date(now.getFullYear(), now.getMonth(), Math.min(day, 28));
       onSubmit({
-        ...form, amount, installments: 0,
+        ...finalForm, amount, installments: 0,
         date: firstDate.toISOString().split("T")[0],
         status: "Čeka plaćanje",
         recurringId: rec.id,
@@ -124,8 +124,8 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
       return;
     }
 
-    if (inst <= 1 && !form.status){ setErr({ msg: t("Odaberite status"),          field:"status"      }); return; }
-    onSubmit({ ...form, amount, installments: inst });
+    if (inst <= 1 && !finalForm.status){ setErr({ msg: t("Odaberite status"), field:"status" }); return; }
+    onSubmit({ ...finalForm, amount, installments: inst });
   };
 
   // Error-aware field border colour helper.

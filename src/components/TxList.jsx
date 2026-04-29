@@ -2,12 +2,38 @@ import { useState, useMemo, useEffect } from 'react';
 import { fmtEur, fDate } from '../lib/helpers.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
 
-function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, t }) {
+function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, t, fmt: fmtProp }) {
+  const fmt = fmtProp || fmtEur;
   const [q, setQ]          = useState("");
   const [delCfm,setDelCfm] = useState(null);
   const [grpCfm,setGrpCfm] = useState(null);
   const [page, setPage]    = useState(1);
   const PAGE_SIZE = 50;
+
+  // Default to overdue on mount
+  useEffect(() => { setFilter("overdue"); }, []);
+
+  // Color map for filter → left border color
+  const filterColor = {
+    all:        null, // use type-based color
+    expense:    C.income,
+    pending:    C.warning,
+    processing: "#FB923C",
+    income:     C.income,
+    overdue:    C.expense, // keep as-is
+  };
+
+  // Detect potential duplicates — same amount, date, description
+  const dupIds = useMemo(() => {
+    const seen = {};
+    const dups = new Set();
+    data.forEach(x => {
+      const key = `${x.date}|${x.amount}|${x.description?.trim().toLowerCase()}`;
+      if (seen[key]) { dups.add(x.id); dups.add(seen[key]); }
+      else seen[key] = x.id;
+    });
+    return dups;
+  }, [data]);
 
   const rows = useMemo(()=>{
     let f = data.filter(x=>new Date(x.date).getFullYear()===year);
@@ -24,7 +50,15 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
       );
     }
 
-    if (q) f = f.filter(x=>x.description?.toLowerCase().includes(q.toLowerCase())||x.category?.toLowerCase().includes(q.toLowerCase()));
+    if (q) {
+      const ql = q.toLowerCase();
+      f = f.filter(x =>
+        x.description?.toLowerCase().includes(ql) ||
+        x.category?.toLowerCase().includes(ql) ||
+        x.location?.toLowerCase().includes(ql) ||
+        x.notes?.toLowerCase().includes(ql)
+      );
+    }
 
     if (filter === "pending" || filter === "processing" || filter === "overdue") {
         return f.sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -76,20 +110,32 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
               <p style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Nema transakcija")}</p>
               <p style={{ fontSize:12, marginTop:4 }}>{q ? t("Pokušajte s drugim pojmom za pretragu.") : filter !== "all" ? t("Nema stavki za odabrani filter.") : t("Pritisnite + za dodavanje.")}</p>
             </div>
-          : pageRows.map((tx,i)=>(
-            <div key={tx.id} className="su" style={{ background:C.card, border:`1px solid ${C.border}`, borderLeft:`3px solid ${tx.installmentGroup?C.warning:tx.type==="Primitak"?C.income:C.expense}`, borderRadius:14, padding:13, marginBottom:8, animationDelay:`${i*.02}s` }}>
+          : pageRows.map((tx,i)=>{
+            // Left border color: filter-based (except overdue keeps type-based), fallback to type
+            const leftColor = filter === "overdue"
+              ? (tx.installmentGroup ? C.warning : tx.type==="Primitak" ? C.income : C.expense)
+              : filter === "all"
+                ? (tx.installmentGroup ? C.warning : tx.type==="Primitak" ? C.income : C.expense)
+                : (filterColor[filter] || (tx.type==="Primitak" ? C.income : C.expense));
+            return (
+            <div key={tx.id} className="su" style={{ background:C.card, border:`1px solid ${C.border}`, borderLeft:`3px solid ${leftColor}`, borderRadius:14, padding:13, marginBottom:8, animationDelay:`${i*.02}s` }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"stretch" }}>
                 <div style={{ flex:1, minWidth:0, textAlign:"left" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                     <span style={{ fontWeight:600, fontSize:14, color:C.text }}>{tx.description}</span>
                     {tx.installmentGroup && <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:10, background:`${C.warning}20`, color:C.warning }}>{tx.installmentNum}/{tx.installmentTotal}</span>}
+                    {dupIds.has(tx.id) && (
+                      <span title={t("Moguć duplikat")} style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:10, background:`${C.expense}20`, color:C.expense, display:"flex", alignItems:"center", gap:3 }}>
+                        <Ic n="alert" s={9} c={C.expense}/>{t("Duplikat?")}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>{fDate(tx.date)} · {t(tx.category)} · {t(tx.location)}</div>
                   <div style={{ fontSize:11, color:C.textMuted, marginTop:2 }}>{t(tx.payment)} · <span style={{ color:tx.status==="Plaćeno"?C.income:tx.status==="U obradi"?"#FB923C":C.warning }}>{t(tx.status)}</span></div>
                 </div>
                 
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", flexShrink:0, marginLeft:10 }}>
-                  <div style={{ fontSize:15, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:tx.type==="Primitak"?C.income:C.expense }}>{tx.type==="Primitak"?"+":"-"}{fmtEur(+tx.amount)}</div>
+                  <div style={{ fontSize:15, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:tx.type==="Primitak"?C.income:C.expense }}>{tx.type==="Primitak"?"+":"-"}{fmt(+tx.amount)}</div>
                   <div style={{ display:"flex", gap:5, marginTop:"auto", justifyContent:"flex-end" }}>
                     {(tx.status==="Čeka plaćanje" || tx.status==="U obradi") && <button title={t("Plati")} onClick={()=>onPay(tx.id)} style={{ background:`${C.income}18`, border:`1px solid ${C.income}40`, borderRadius:8, padding:"5px 8px", cursor:"pointer" }}><Ic n="check" s={13} c={C.income}/></button>}
                     <button title={t("Uredi")} onClick={()=>onEdit(tx.id)} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:8, padding:"5px 8px", cursor:"pointer" }}><Ic n="edit" s={13} c={C.accent}/></button>
@@ -117,7 +163,8 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
               )}
               {tx.notes && <div style={{ fontSize:11, color:C.textMuted, marginTop:7, fontStyle:"italic", borderTop:`1px solid ${C.border}`, paddingTop:7, textAlign:"left" }}>💬 {tx.notes}</div>}
             </div>
-          ))
+            );
+          })
         }
         <div style={{ textAlign:"center", padding:"10px 0", color:C.textMuted, fontSize:12 }}>
           {rows.length} transakcija · {year}.

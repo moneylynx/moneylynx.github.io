@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, AreaChart, Area, ResponsiveContainer } from 'recharts';
-import { MONTHS, MSHORT, MSHORT_EN, CHART_COLORS } from '../lib/constants.js';
-import { fmtEur, monthOf, curYear } from '../lib/helpers.js';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, PieChart, Pie, Cell, AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, CHART_COLORS } from '../lib/constants.js';
+import { fmtEur, fDate, monthOf, curYear } from '../lib/helpers.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
 
-function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expFilter, setExpFilter, t, lang }) {
+function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expFilter, setExpFilter, t, lang, fmt: fmtProp }) {
+  const fmt = fmtProp || fmtEur;
   const isYear = selMonth === "YEAR";
   const isAll = selMonth === "ALL";
   const isMonth = !isYear && !isAll;
@@ -12,7 +13,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
   const yd = data.filter(x=>new Date(x.date).getFullYear()===year);
   const fd = isMonth ? yd.filter(x=>monthOf(x.date)===selMonth) : yd;
   const W  = Math.min(window.innerWidth??480,480)-64;
-  const tt = { contentStyle:{background:C.cardAlt,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:11}, formatter:v=>fmtEur(v) };
+  const tt = { contentStyle:{background:C.cardAlt,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:11}, formatter:v=>fmt(v) };
   const curMIdx = new Date().getMonth();
   const rec = lists.recurring || [];
 
@@ -22,11 +23,11 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
     const mLabel = (lang==="en" ? MSHORT_EN : MSHORT)[i];
     return{
       name:mLabel,
-      [t("Primici")]:mt.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0),
-      [t("Troškovi")]:mt.filter(x=>x.type==="Isplata"&&x.status==="Plaćeno").reduce((s,x)=>s+(+x.amount||0),0),
-      [t("Čeka plaćanje")]:mt.filter(x=>x.status==="Čeka plaćanje").reduce((s,x)=>s+(+x.amount||0),0),
-      [t("U obradi")]:mt.filter(x=>x.status==="U obradi").reduce((s,x)=>s+(+x.amount||0),0),
-      [t("Obveze")]:recAmt,
+      inc:  mt.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0),
+      exp:  mt.filter(x=>x.type==="Isplata"&&x.status==="Plaćeno").reduce((s,x)=>s+(+x.amount||0),0),
+      ceka: mt.filter(x=>x.status==="Čeka plaćanje").reduce((s,x)=>s+(+x.amount||0),0),
+      obr:  mt.filter(x=>x.status==="U obradi").reduce((s,x)=>s+(+x.amount||0),0),
+      rec:  recAmt,
     };
   }),[yd,rec,lang,t]);
 
@@ -37,7 +38,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
       const mt=yd.filter(x=>monthOf(x.date)===m);
       c+=mt.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0)-mt.filter(x=>x.type==="Isplata").reduce((s,x)=>s+(+x.amount||0),0);
       const mLabel = (lang==="en" ? MSHORT_EN : MSHORT)[i];
-      return{ name:mLabel, Saldo:(isCurrentYear && i>curMIdx)?null:c };
+      return{ name:mLabel, saldo:(isCurrentYear && i>curMIdx)?null:c };
     });
   },[yd,year,lang]);
 
@@ -46,12 +47,14 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
   const locD  = useMemo(()=>{ const m={}; fd.forEach(x=>{ m[x.location]=(m[x.location]||0)+(+x.amount||0); }); return Object.entries(m).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value); },[fd]);
 
   const mDetail = useMemo(()=>{
-    if (!isMonth) return null;
-    const mt = yd.filter(x=>monthOf(x.date)===selMonth);
+    let mt;
+    if (isMonth)     mt = yd.filter(x=>monthOf(x.date)===selMonth);
+    else if (isYear) mt = yd;
+    else             mt = data; // isAll
     const inc = mt.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0);
     const exp = mt.filter(x=>x.type==="Isplata").reduce((s,x)=>s+(+x.amount||0),0);
     return { inc, exp, bal:inc-exp, count:mt.length };
-  },[selMonth, yd, isMonth]);
+  },[selMonth, yd, data, isMonth, isYear, isAll]);
 
   const expData = useMemo(()=>{
     const now  = new Date();
@@ -172,13 +175,16 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
         {mDetail && (
           <div className="su" style={{ background:`linear-gradient(135deg,${C.accent}15,${C.income}10)`, border:`1px solid ${C.accent}30`, borderRadius:14, padding:"12px 14px", marginBottom:12 }}>
             <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:8, display:"flex", alignItems:"center", gap:6 }}>
-              <Ic n="cal" s={14} c={C.accent}/>{activeMonthName} {year}.
+              <Ic n="cal" s={14} c={C.accent}/>
+              {isMonth && `${activeMonthName} ${year}.`}
+              {isYear  && `${year}. (${t("Sve")})`}
+              {isAll   && t("Sve ukupno")}
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:6 }}>
               {[
-                { lb:t("Primici"), val:fmtEur(mDetail.inc), col:C.income },
-                { lb:t("Troškovi"), val:fmtEur(mDetail.exp), col:C.expense },
-                { lb:t("Bilanca"), val:fmtEur(mDetail.bal), col:mDetail.bal>=0?C.income:C.expense },
+                { lb:t("Primici"), val:fmt(mDetail.inc), col:C.income },
+                { lb:t("Troškovi"), val:fmt(mDetail.exp), col:C.expense },
+                { lb:t("Bilanca"), val:fmt(mDetail.bal), col:mDetail.bal>=0?C.income:C.expense },
                 { lb:t("Stavki"), val:mDetail.count, col:C.accent },
               ].map(({lb,val,col})=>(
                 <div key={lb} style={{ textAlign:"center" }}>
@@ -198,7 +204,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
           <div style={chartCard}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
               <span style={{ fontSize:12, fontWeight:600, color:C.textMuted }}>{t("Ukupno očekivano")}</span>
-              <span style={{ fontSize:16, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.expense }}>{fmtEur(expTotal)}</span>
+              <span style={{ fontSize:16, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:C.expense }}>{fmt(expTotal)}</span>
             </div>
             <div style={{ display:"flex", gap:6, marginBottom:12, flexWrap:"wrap" }}>
               {[
@@ -224,7 +230,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
                       <div style={{ fontSize:10, color:C.textMuted }}>{typeLabel[e.type]}{e.cat?` · ${t(e.cat)}`:""}{e.remainLabel?` · ${e.remainLabel}`:""}{e.endDate&&!e.remainLabel?` · ${t("do")} ${fDate(e.endDate)}`:""}</div>
                     </div>
                   </div>
-                  <span style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:typeColor[e.type], flexShrink:0, marginLeft:8 }}>{fmtEur(e.amount)}</span>
+                  <span style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:typeColor[e.type], flexShrink:0, marginLeft:8 }}>{fmt(e.amount)}</span>
                 </div>
               ))
             }
@@ -233,7 +239,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
 
         {tab==="categories" && (
           <div style={chartCard}>
-            {catD.length>0 ? <><PieChart width={W} height={200}><Pie data={catD} cx="50%" cy="50%" innerRadius={40} outerRadius={80} dataKey="value" stroke="none">{catD.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}</Pie><Tooltip {...tt}/></PieChart><div style={{marginTop:10}}>{catD.map((c,i)=><div key={c.name} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<catD.length-1?`1px solid ${C.border}`:"none",fontSize:12,color:C.text}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:9,height:9,borderRadius:3,background:CHART_COLORS[i%CHART_COLORS.length]}}/>{t(c.name)}</div><span style={{fontFamily:"'JetBrains Mono',monospace"}}>{fmtEur(c.value)}</span></div>)}</div></> : <p style={{textAlign:"center",color:C.textMuted,padding:20,fontSize:13}}>{t("Nema podataka")}</p>}
+            {catD.length>0 ? <><PieChart width={W} height={200}><Pie data={catD} cx="50%" cy="50%" innerRadius={40} outerRadius={80} dataKey="value" stroke="none">{catD.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}</Pie><Tooltip {...tt}/></PieChart><div style={{marginTop:10}}>{catD.map((c,i)=><div key={c.name} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<catD.length-1?`1px solid ${C.border}`:"none",fontSize:12,color:C.text}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:9,height:9,borderRadius:3,background:CHART_COLORS[i%CHART_COLORS.length]}}/>{t(c.name)}</div><span style={{fontFamily:"'JetBrains Mono',monospace"}}>{fmt(c.value)}</span></div>)}</div></> : <p style={{textAlign:"center",color:C.textMuted,padding:20,fontSize:13}}>{t("Nema podataka")}</p>}
           </div>
         )}
 
@@ -241,16 +247,16 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
           <div style={chartCard}>
             {chartLbl("bar",t("Primici vs Troškovi"))}
             <BarChart width={W} height={260} data={mBar}><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="name" tick={{fill:C.textMuted,fontSize:9}} axisLine={false}/><YAxis tick={{fill:C.textMuted,fontSize:9}} axisLine={false} width={44} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(0)}k`:v}/><Tooltip {...tt}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey={t("Primici")} fill={C.income} radius={[3,3,0,0]}/>
-              <Bar dataKey={t("Troškovi")} fill={C.expense} radius={[3,3,0,0]}/>
-              <Bar dataKey={t("Čeka plaćanje")} fill={C.warning} radius={[3,3,0,0]}/>
-              <Bar dataKey={t("U obradi")} fill="#FB923C" radius={[3,3,0,0]}/>
-              <Bar dataKey={t("Obveze")} fill={`${C.accent}80`} radius={[3,3,0,0]}/>
+              <Bar dataKey="inc"  name={t("Primici")}         fill={C.income}          radius={[3,3,0,0]}/>
+              <Bar dataKey="exp"  name={t("Troškovi")}        fill={C.expense}         radius={[3,3,0,0]}/>
+              <Bar dataKey="ceka" name={t("Čeka plaćanje")}   fill={C.warning}         radius={[3,3,0,0]}/>
+              <Bar dataKey="obr"  name={t("U obradi")}        fill="#FB923C"           radius={[3,3,0,0]}/>
+              <Bar dataKey="rec"  name={t("Obveze")}          fill={`${C.accent}80`}   radius={[3,3,0,0]}/>
             </BarChart>
           </div>
           <div style={chartCard}>
             {chartLbl("up",t("Kumulativni saldo"))}
-            <AreaChart width={W} height={220} data={saldo}><defs><linearGradient id="saldoFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.accent} stopOpacity={0.25}/><stop offset="95%" stopColor={C.accent} stopOpacity={0.03}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="name" tick={{fill:C.textMuted,fontSize:9}} axisLine={false}/><YAxis tick={{fill:C.textMuted,fontSize:9}} axisLine={false} width={44} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(1)}k`:v}/><Tooltip {...tt}/><Area type="monotone" dataKey="Saldo" stroke={C.accent} strokeWidth={2.5} fill="url(#saldoFill)" dot={{fill:C.accent,r:3}} activeDot={{r:6}} connectNulls={false}/></AreaChart>
+            <AreaChart width={W} height={220} data={saldo}><defs><linearGradient id="saldoFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.accent} stopOpacity={0.25}/><stop offset="95%" stopColor={C.accent} stopOpacity={0.03}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke={C.border}/><XAxis dataKey="name" tick={{fill:C.textMuted,fontSize:9}} axisLine={false}/><YAxis tick={{fill:C.textMuted,fontSize:9}} axisLine={false} width={44} tickFormatter={v=>v>=1000?`${(v/1000).toFixed(1)}k`:v}/><Tooltip {...tt}/><Area type="monotone" dataKey="saldo" name={t("Kumulativni saldo")} stroke={C.accent} strokeWidth={2.5} fill="url(#saldoFill)" dot={{fill:C.accent,r:3}} activeDot={{r:6}} connectNulls={false}/></AreaChart>
           </div>
         </>}
 
@@ -308,9 +314,9 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
               {trendData.map(d=>(
                 <div key={d.name} style={{ flex:1, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"10px 12px" }}>
                   <div style={{ fontSize:11, fontWeight:700, color:C.textMuted, marginBottom:6 }}>{d.name}</div>
-                  <div style={{ fontSize:11, color:C.income }}>↑ {fmtEur(d[t("Primici")])}</div>
-                  <div style={{ fontSize:11, color:C.expense }}>↓ {fmtEur(d[t("Troškovi")])}</div>
-                  <div style={{ fontSize:12, fontWeight:700, color:d[t("Saldo")]>=0?C.income:C.expense, marginTop:4 }}>= {fmtEur(d[t("Saldo")])}</div>
+                  <div style={{ fontSize:11, color:C.income }}>↑ {fmt(d[t("Primici")])}</div>
+                  <div style={{ fontSize:11, color:C.expense }}>↓ {fmt(d[t("Troškovi")])}</div>
+                  <div style={{ fontSize:12, fontWeight:700, color:d[t("Saldo")]>=0?C.income:C.expense, marginTop:4 }}>= {fmt(d[t("Saldo")])}</div>
                 </div>
               ))}
             </div>
