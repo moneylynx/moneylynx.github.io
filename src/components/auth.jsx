@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { K, MAX_ATT, LOCK_SEC, WIPE_AT, COUNTRIES, CURRENCIES, TIMEZONES } from '../lib/constants.js';
 import { save, currencySymbol } from '../lib/helpers.js';
 import { hashPinV2, hashPinLegacy, loadKeyFromSession } from '../lib/crypto.js';
-import { Ic } from './ui.jsx';
+import { Ic, LynxLogo } from './ui.jsx';
 
 function LockScreen({ C, sec, onUnlock, onWipe, onResetPin, supaUser, t }) {
   const [pin, setPin]       = useState("");
@@ -310,7 +310,7 @@ function LanguageScreen({ C, onSelect }) {
     <div style={{ width:"100%", minHeight:"100vh", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
       <div style={{ width:"100%", maxWidth:340, textAlign:"center" }}>
         <div style={{ width:72, height:72, borderRadius:22, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", boxShadow:`0 4px 15px ${C.accentGlow}` }}>
-          <Ic n="wallet" s={34} c="#fff"/>
+          <LynxLogo s={34}/>
         </div>
         <h1 style={{ fontSize:28, fontWeight:700, color:C.text, marginBottom:6 }}>Money Lynx</h1>
         <p style={{ fontSize:14, color:C.textMuted, marginBottom:32 }}>Odaberite jezik / Choose language</p>
@@ -398,7 +398,7 @@ function OnboardingScreen({ C, prefs, updPrefs, user, updUser, lists, updLists, 
         {dots}
         <div className="fi" style={{ textAlign:"center", marginBottom:24 }}>
           <div style={{ width:64, height:64, borderRadius:20, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:`0 4px 15px ${C.accentGlow}` }}>
-            <Ic n="wallet" s={30} c="#fff"/>
+            <LynxLogo s={30}/>
           </div>
           <h2 style={{ fontSize:24, fontWeight:700, color:C.text }}>{t("Dobrodošli!")}</h2>
           <p style={{ fontSize:14, color:C.textMuted, marginTop:6 }}>{t("Ajmo brzo podesiti vašu aplikaciju.")}</p>

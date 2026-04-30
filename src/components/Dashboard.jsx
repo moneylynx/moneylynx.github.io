@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell } from 'recharts';
 import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, DEF_LISTS, T, CHART_COLORS, BACKUP_SNOOZE_MS } from '../lib/constants.js';
 import { fmtEur, monthOf, curYear, curMonthIdx, needsBackupReminder } from '../lib/helpers.js';
-import { Ic } from './ui.jsx';
+import { Ic, LynxLogo } from './ui.jsx';
 
 function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD }) {
   const fmt = fmtProp || fmtEur;
@@ -136,7 +136,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
             <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
-              <Ic n="wallet" s={22} c={C.accent}/> {t("Money Lynx")} <span style={{fontSize:14, color:C.textMuted, fontWeight:500, verticalAlign:"middle", position:"relative", top:2}}>· {year}.</span>
+              <LynxLogo s={22}/> {t("Money Lynx")} <span style={{fontSize:14, color:C.textMuted, fontWeight:500, verticalAlign:"middle", position:"relative", top:2}}>· {year}.</span>
             </h1>
             {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
