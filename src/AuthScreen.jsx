@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { signIn, signUp, signInGoogle } from '../lib/supabase.js';
-import { Ic } from './ui.jsx';
+import { Ic, LynxLogo } from './ui.jsx';
 
 export default function AuthScreen({ C, t, lang, onLangChange, onSuccess }) {
   const [mode, setMode]       = useState('login'); // 'login' | 'register'
@@ -94,7 +94,7 @@ export default function AuthScreen({ C, t, lang, onLangChange, onSuccess }) {
         {/* Header */}
         <div style={{ textAlign:'center', marginBottom:32 }}>
           <div style={{ width:64, height:64, borderRadius:20, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px', boxShadow:`0 4px 15px ${C.accentGlow}` }}>
-            <Ic n="wallet" s={30} c="#fff"/>
+            <LynxLogo s={30}/>
           </div>
           <h1 style={{ fontSize:24, fontWeight:700, color:C.text }}>Money Lynx</h1>
           <p style={{ fontSize:13, color:C.textMuted, marginTop:4 }}>

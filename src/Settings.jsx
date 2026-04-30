@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { K, DEF_LISTS, T, MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, MAX_ATT, BACKUP_SNOOZE_MS, CURRENCIES, TIMEZONES } from '../lib/constants.js';
 import { fmtEur, fDate, load, save, curYear, buildCSV, buildSummary, nativeSaveAndShare, isCapacitor } from '../lib/helpers.js';
 import { hashPinV2, hashPinLegacy } from '../lib/crypto.js';
-import { Ic, StickyHeader } from './ui.jsx';
+import { Ic, LynxLogo, StickyHeader } from './ui.jsx';
 import { SetupPin } from './auth.jsx';
 
 function ListEditor({ C, title, items, onBack, t }) {
@@ -933,7 +933,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
 
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-            <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="wallet" s={20} c="#fff"/></div>
+            <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><LynxLogo s={20}/></div>
             <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Money Lynx")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} .4</div></div>
             {onAbout && (
               <button onClick={onAbout}
@@ -944,7 +944,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           </div>
           <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:11 }}>
             <p style={{ fontSize:13, fontWeight:600, color:C.accent }}>moneylynx.net</p>
-            <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>E-mail: info@moneylynx.net</p>
+            <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>E-mail: <a href="mailto:info@moneylynx.net" style={{ color:C.accent, textDecoration:"none" }}>info@moneylynx.net</a></p>
             <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>© {cy} Money Lynx · {t("Sva prava pridržana.")}</p>
             <p style={{ fontSize:11, color:C.textMuted, marginTop:2 }}>{t("Osobna upotreba · Nije za komercijalnu distribuciju.")}</p>
           </div>
@@ -1470,7 +1470,7 @@ Hvala što koristiš Money Lynx!`
           <>
             <div style={{ background:`linear-gradient(135deg,${C.accent}18,${C.accent}08)`, border:`1px solid ${C.accent}30`, borderRadius:14, padding:"14px 16px", marginBottom:18, display:"flex", alignItems:"center", gap:12 }}>
               <div style={{ width:44, height:44, borderRadius:14, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                <Ic n="wallet" s={22} c="#fff"/>
+                <LynxLogo s={22}/>
               </div>
               <div>
                 <div style={{ fontSize:17, fontWeight:700, color:C.text }}>Money Lynx</div>
@@ -1666,7 +1666,7 @@ function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, list
 
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-            <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><Ic n="wallet" s={20} c="#fff"/></div>
+            <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><LynxLogo s={20}/></div>
             <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Money Lynx")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} .4</div></div>
             <button onClick={()=>setSubPg("about")}
               style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
@@ -1675,7 +1675,7 @@ function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, list
           </div>
           <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:11 }}>
             <p style={{ fontSize:13, fontWeight:600, color:C.accent }}>moneylynx.net</p>
-            <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>E-mail: info@moneylynx.net</p>
+            <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>E-mail: <a href="mailto:info@moneylynx.net" style={{ color:C.accent, textDecoration:"none" }}>info@moneylynx.net</a></p>
             <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>© {cy} Money Lynx · {t("Sva prava pridržana.")}</p>
             <p style={{ fontSize:11, color:C.textMuted, marginTop:2 }}>{t("Osobna upotreba · Nije za komercijalnu distribuciju.")}</p>
           </div>
