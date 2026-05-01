@@ -27,11 +27,11 @@ export const Dashboard = () => {
               </div>
               {/* Vodoravni graf prikazan kao progresivna linija[cite: 2] */}
               <div className="progress-container">
-                <div
-                  className="progress-bar"
-                  style={{
-                    width: `${cat.percentage}%`,
-                    backgroundColor: cat.color
+                <div 
+                  className="progress-bar" 
+                  style={{ 
+                    width: `${cat.percentage}%`, 
+                    backgroundColor: cat.color 
                   }}
                 ></div>
               </div>
