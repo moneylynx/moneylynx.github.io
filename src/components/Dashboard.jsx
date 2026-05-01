@@ -1,8 +1,7 @@
-
 import React from 'react';
 import './Dashboard.css';
 
-// Mock data based on the app's logic
+// Podaci prilagođeni za vizualni prikaz potrošnje
 const topCategories = [
   { name: 'Hrana', amount: 450, percentage: 65, color: '#FF6B6B', icon: '🍔' },
   { name: 'Stanovanje', amount: 800, percentage: 85, color: '#4D96FF', icon: '🏠' },
@@ -10,7 +9,7 @@ const topCategories = [
   { name: 'Zabava', amount: 90, percentage: 15, color: '#FFD93D', icon: '🎬' },
 ];
 
-const Dashboard = () => {
+export const Dashboard = () => {
   return (
     <div className="dashboard-container">
       <div className="card top-categories-card">
@@ -20,17 +19,19 @@ const Dashboard = () => {
             <div key={index} className="category-item">
               <div className="category-info">
                 <div className="category-label">
+                  {/* Ikona s primijenjenim sivim filterom kroz CSS */}
                   <span className="category-icon-gray">{cat.icon}</span>
                   <span className="category-name">{cat.name}</span>
                 </div>
                 <span className="category-amount">{cat.amount} €</span>
               </div>
+              {/* Vodoravni graf prikazan kao progresivna linija[cite: 2] */}
               <div className="progress-container">
-                <div 
-                  className="progress-bar" 
-                  style={{ 
-                    width: `${cat.percentage}%`, 
-                    backgroundColor: cat.color 
+                <div
+                  className="progress-bar"
+                  style={{
+                    width: `${cat.percentage}%`,
+                    backgroundColor: cat.color
                   }}
                 ></div>
               </div>
@@ -41,5 +42,3 @@ const Dashboard = () => {
     </div>
   );
 };
-
-export default Dashboard;
