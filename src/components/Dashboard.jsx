@@ -136,7 +136,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
             <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
-              <LynxLogo s={22}/> {t("Money Lynx")} <span style={{fontSize:14, color:C.textMuted, fontWeight:500, verticalAlign:"middle", position:"relative", top:2}}>· {year}.</span>
+              <LynxLogo s={22} color={C.accent}/> {t("Money Lynx")} <span style={{fontSize:14, color:C.textMuted, fontWeight:500, verticalAlign:"middle", position:"relative", top:2}}>· {year}.</span>
             </h1>
             {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
