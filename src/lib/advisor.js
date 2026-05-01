@@ -49,6 +49,7 @@ const monthName = (i) => MONTHS[i];
  * @returns {object} forecast
  */
 export function computeForecast(txs, lists, nowTs = Date.now()) {
+  const recInc = lists.recurring_income || [];
   const now   = new Date(nowTs);
   const cy    = now.getFullYear();
   const cm    = now.getMonth();        // 0-based
@@ -103,26 +104,35 @@ export function computeForecast(txs, lists, nowTs = Date.now()) {
   const dailyDisc = discMonths > 0 ? discTotal / discMonths : 0;
   const discForecast = dailyDisc * daysLeft;
 
-  // C) Income so far this month
+  // C) Income so far this month (received)
   const incomeSoFar = cmTxs
     .filter(x => x.type === 'Primitak' && x.status === 'Plaćeno')
     .reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
 
+  // C2) Upcoming recurring income not yet received this month
+  const recIncPaidIds = new Set(cmTxs.filter(x => x.recurringIncomeId).map(x => x.recurringIncomeId));
+  const recurringIncomeLeft = recInc
+    .filter(r => !recIncPaidIds.has(r.id))
+    .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+
   // D) Totals
   const projectedSpend   = paidSoFar + pendingKnown + recurringLeft + discForecast;
-  const projectedBalance = incomeSoFar - projectedSpend;
+  const projectedIncome  = incomeSoFar + recurringIncomeLeft;
+  const projectedBalance = projectedIncome - projectedSpend;
   const knownCommitted   = paidSoFar + pendingKnown + recurringLeft;
 
   return {
     paidSoFar,
     pendingKnown,
     recurringLeft,
+    recurringIncomeLeft,
     discForecast,
     dailyDisc,
     daysLeft,
     daysInMonth,
     today,
     incomeSoFar,
+    projectedIncome,
     projectedSpend,
     projectedBalance,
     knownCommitted,

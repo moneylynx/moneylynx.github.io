@@ -131,3 +131,52 @@ export const buildSummary = (txs, year, user, t) => {
     "", `${t("Generirano:")} ${fDate(new Date().toISOString().split("T")[0])}`,
   ].filter(l=>l!==null).join("\n");
 };
+
+// ─── Safe number helpers ──────────────────────────────────────────────────────
+// Guard against NaN/null/undefined in transaction amounts.
+// Use these in all reduce operations to prevent a single bad record from
+// crashing Charts, advisor, or any other calculation screen.
+
+/** Safely parse a numeric value — returns 0 for anything non-numeric. */
+export const safeNum = (v) => {
+  const n = parseFloat(v);
+  return isFinite(n) ? n : 0;
+};
+
+/** Sum an array of transactions by extracting a numeric field. */
+export const safeSum = (arr, fn) =>
+  (arr || []).reduce((s, x) => { try { return s + safeNum(fn(x)); } catch { return s; } }, 0);
+
+// ─── Split-transaction analytics helper ──────────────────────────────────────
+// A "split" transaction has tx.splits = [{id, amount, category, description}].
+// For analytics (charts, forecasts, category totals) we expand each split
+// into a virtual transaction so amounts flow to their correct categories.
+// Regular transactions (tx.splits falsy) are returned unchanged.
+
+/**
+ * Expand split transactions into virtual per-category records.
+ * Safe to call on any array — non-split txs pass through unchanged.
+ * @param {Array} txs
+ * @returns {Array} expanded txs ready for reduce operations
+ */
+export function expandSplits(txs) {
+  const out = [];
+  for (const tx of txs || []) {
+    if (!tx.splits || !tx.splits.length) {
+      out.push(tx);
+    } else {
+      for (const split of tx.splits) {
+        out.push({
+          ...tx,
+          id:          `${tx.id}_split_${split.id}`,
+          amount:      safeNum(split.amount),
+          category:    split.category || tx.category,
+          description: split.description || tx.description,
+          _splitParent: tx.id,
+        });
+      }
+    }
+  }
+  return out;
+}
+

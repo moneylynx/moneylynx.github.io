@@ -12,8 +12,9 @@ export const DEF_LISTS = {
   locations:  ["Zagreb","Knežija","Kajini","Šimunčevec","Online","Ostalo"],
   payments:   ["Gotovina","Kartica (debitna)","Kreditna kartica","Bankovni prijenos","Online plaćanje"],
   statuses:   ["Plaćeno","Čeka plaćanje","U obradi"],
-  recurring:  [],
-  budgets:    {}, // { "Hrana": 400, "Zabava": 100, ... } — monthly limits per category
+  recurring:        [],  // recurring expenses
+  recurring_income: [],  // recurring income (salary, rent received, honorari…)
+  budgets:          {}, // { "Hrana": 400, "Zabava": 100, ... } — monthly limits per category
 };
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
@@ -26,11 +27,21 @@ export const T = {
     border:"#1A3355", navBg:"#07111E",
   },
   light: {
-    bg:"#FFFFFF", card:"#F8FAFC", cardAlt:"#EFF6FF",
-    accent:"#0EA5E9", accentDk:"#0284C7", accentGlow:"#0EA5E920",
-    income:"#059669", expense:"#DC2626", warning:"#D97706",
-    text:"#0F172A", textMuted:"#64748B", textSub:"#475569",
-    border:"#DBEAFE", navBg:"#FFFFFF",
+    bg:"#EEF4FB",            // layered off-white — cards pop above it
+    card:"#FFFFFF",           // pure white cards have clear contrast vs bg
+    cardAlt:"#E2ECFB",        // distinct input/secondary fill (was too close to card)
+    accent:"#0284C7",         // deeper sky-blue (was #0EA5E9 — washed out on white)
+    accentDk:"#0369A1",
+    accentGlow:"#0284C720",
+    income:"#059669",
+    expense:"#DC2626",
+    warning:"#B45309",        // deeper amber — clearer on white bg
+    text:"#0F172A",
+    textMuted:"#475569",      // darker (was #64748B — too low contrast)
+    textSub:"#334155",        // darker (was #475569)
+    border:"#C2D4ED",         // stronger border (was #DBEAFE — nearly invisible)
+    navBg:"#FFFFFF",
+    shadow:"0 1px 4px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04)",
   },
 };
 
