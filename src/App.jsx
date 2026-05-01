@@ -1,5 +1,4 @@
 import React from 'react';
-import './Dashboard.css';
 
 // Podaci za vizualni prikaz
 const topCategories = [
