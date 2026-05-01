@@ -5,7 +5,7 @@ import { hashPinV2, hashPinLegacy } from '../../lib/crypto.js';
 import { Ic, LynxLogo, LynxLogoWhite, StickyHeader } from '../ui.jsx';
 import { SetupPin } from '../auth.jsx';
 
-function RecurringEditor({ C, items, lists, onBack, t }) {
+function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
   const [arr, setArr]       = useState(items.map((it,i)=>({...it, id:it.id||`r_${i}_${Date.now()}`})));
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null); 
@@ -119,7 +119,7 @@ function RecurringEditor({ C, items, lists, onBack, t }) {
                       <label style={lbl}>{t("Kategorija")}</label>
                       <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{...fld,color:!form.category?C.textMuted:C.text}}>
                         <option value="">{t("- opcija -")}</option>
-                        {lists.categories_expense.map(c=><option key={c} value={c}>{t(c)}</option>)}
+                        {incomeMode ? lists.categories_income : lists.categories_expense.map(c=><option key={c} value={c}>{t(c)}</option>)}
                       </select>
                     </div>
                     <div>
@@ -186,7 +186,7 @@ function RecurringEditor({ C, items, lists, onBack, t }) {
                   <label style={lbl}>{t("Kategorija")}</label>
                   <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{...fld,color:!form.category?C.textMuted:C.text}}>
                     <option value="">{t("- opcija -")}</option>
-                    {lists.categories_expense.map(c=><option key={c} value={c}>{t(c)}</option>)}
+                    {incomeMode ? lists.categories_income : lists.categories_expense.map(c=><option key={c} value={c}>{t(c)}</option>)}
                   </select>
                 </div>
                 <div>
