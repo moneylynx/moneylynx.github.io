@@ -3,6 +3,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, PieChart, 
 import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, CHART_COLORS } from '../lib/constants.js';
 import { fmtEur, fDate, monthOf, curYear } from '../lib/helpers.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
+import { categoryIcon } from '../lib/categoryIcons.js';
+import { computeYoY } from '../lib/advisor.js';
 
 function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expFilter, setExpFilter, t, lang, fmt: fmtProp }) {
   const fmt = fmtProp || fmtEur;
@@ -148,7 +150,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
   const typeLabel = {rata:t("Obrok"), obveza:t("Obveze"), pending:t("Čeka plaćanje"), processing:t("U obradi"), kredit:t("Rate")};
   const typeColor = {rata:C.warning, obveza:C.accent, pending:C.warning, processing:"#FB923C", kredit:"#A78BFA"};
 
-  const tabs=[["expected",t("Očekivano")],["categories",t("Kategorije")],["overview",t("Pregled/Saldo")],["paylocal",t("Plaćanje/Lokacije")],["trend",t("Trend 3g.")]];
+  const tabs=[["expected",t("Očekivano")],["categories",t("Kategorije")],["overview",t("Pregled/Saldo")],["paylocal",t("Plaćanje/Lokacije")],["trend",t("Trend 3g.")],["yoy",t("God/God")]];
   const chartCard = { background:C.card, border:`1px solid ${C.border}`, borderRadius:15, padding:13, overflowX:"auto", marginBottom:10 };
   const chartLbl = (ic,text) => <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:8, display:"flex", alignItems:"center", gap:5 }}><Ic n={ic} s={12} c={C.textMuted}/>{text}</div>;
 
@@ -323,6 +325,83 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
           </>;
         })()}
 
+        {tab==="yoy" && (() => {
+          const cy = curYear();
+          const thisYear = year;
+          const lastYear = year - 1;
+          const yoyData = computeYoY(data, thisYear, lastYear);
+          if (yoyData.length === 0) return <p style={{textAlign:"center",color:C.textMuted,padding:20,fontSize:13}}>{t("Nema podataka za usporedbu")}</p>;
+
+          // Summary totals
+          const totalThis = yoyData.reduce((s, r) => s + r.thisYear, 0);
+          const totalLast = yoyData.reduce((s, r) => s + r.lastYear, 0);
+          const totalDiff = totalThis - totalLast;
+          const totalPct  = totalLast > 0 ? totalDiff / totalLast : 0;
+
+          return <>
+            {/* Overall summary */}
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:"12px 14px", marginBottom:10 }}>
+              <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:10, display:"flex", alignItems:"center", gap:5 }}>
+                <Ic n="bar" s={12} c={C.textMuted}/>{t("Ukupni troškovi")} — {lastYear}. vs {thisYear}.
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                {[
+                  { lb:`${lastYear}.`, val:fmt(totalLast), col:C.textMuted },
+                  { lb:`${thisYear}.`, val:fmt(totalThis), col:totalThis>totalLast?C.expense:C.income },
+                  { lb:t("Razlika"), val:`${totalDiff>=0?"+":""}${Math.round(totalPct*100)}%`, col:totalDiff>=0?C.expense:C.income },
+                ].map(({lb,val,col})=>(
+                  <div key={lb} style={{ background:C.cardAlt, borderRadius:10, padding:"8px 10px", textAlign:"center", border:`1px solid ${C.border}` }}>
+                    <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, textTransform:"uppercase", letterSpacing:.5 }}>{lb}</div>
+                    <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:col }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Per-category breakdown */}
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:14, padding:"12px 14px", marginBottom:10 }}>
+              <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:10, display:"flex", alignItems:"center", gap:5 }}>
+                <Ic n="tag" s={12} c={C.textMuted}/>{t("Po kategorijama")} — {lastYear}. vs {thisYear}.
+              </div>
+              {yoyData.filter(r => r.thisYear > 0 || r.lastYear > 0).map((row, i) => {
+                const maxAmt = Math.max(row.thisYear, row.lastYear, 1);
+                const diffPos = row.diff >= 0;
+                const pctLabel = row.lastYear > 0
+                  ? `${row.diff >= 0 ? "+" : ""}${Math.round(row.pctChange * 100)}%`
+                  : t("Novo");
+                return (
+                  <div key={row.category} style={{ marginBottom: i < yoyData.length - 1 ? 10 : 0, paddingBottom: i < yoyData.length - 1 ? 10 : 0, borderBottom: i < yoyData.length - 1 ? `1px solid ${C.border}40` : "none" }}>
+                    {/* Category header */}
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                        <span style={{ fontSize:14 }}>{categoryIcon(row.category)}</span>
+                        <span style={{ fontSize:12, fontWeight:600, color:C.text }}>{t(row.category)}</span>
+                      </div>
+                      <span style={{ fontSize:11, fontWeight:700, color:diffPos?C.expense:C.income, background:diffPos?`${C.expense}15`:`${C.income}15`, borderRadius:8, padding:"2px 7px" }}>
+                        {pctLabel}
+                      </span>
+                    </div>
+                    {/* Bar comparison */}
+                    <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                      {[
+                        { yr: lastYear, amt: row.lastYear, col: `${C.textMuted}80` },
+                        { yr: thisYear, amt: row.thisYear, col: diffPos ? C.expense : C.income },
+                      ].map(({ yr, amt, col }) => (
+                        <div key={yr} style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <span style={{ fontSize:9, color:C.textMuted, width:30, flexShrink:0, textAlign:"right" }}>{yr}.</span>
+                          <div style={{ flex:1, height:10, background:C.cardAlt, borderRadius:4, overflow:"hidden" }}>
+                            <div style={{ height:"100%", width:`${Math.round((amt/maxAmt)*100)}%`, background:col, borderRadius:4, transition:"width .4s ease", minWidth: amt > 0 ? 3 : 0 }}/>
+                          </div>
+                          <span style={{ fontSize:10, fontWeight:600, fontFamily:"'JetBrains Mono',monospace", color:col, width:64, flexShrink:0, textAlign:"right" }}>{fmt(amt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>;
+        })()}
       </div>
     </div>
   );

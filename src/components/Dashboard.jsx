@@ -4,23 +4,30 @@ import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, DEF_LISTS, T, CHART_COLORS, BACKU
 import { fmtEur, monthOf, curYear, curMonthIdx, needsBackupReminder } from '../lib/helpers.js';
 import { Ic, LynxLogo } from './ui.jsx';
 import { categoryIcon } from '../lib/categoryIcons.js';
+import { useAdvisor } from '../hooks/useAdvisor.js';
 
 function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD }) {
   const fmt = fmtProp || fmtEur;
   const cmIdx = curMonthIdx();
-  const cm  = MONTHS[cmIdx]; 
+  const cm  = MONTHS[cmIdx];
   const cmName = lang==="en" ? MONTHS_EN[cmIdx] : cm;
 
   const yd  = data.filter(x=>new Date(x.date).getFullYear()===year);
   const md  = yd.filter(x=>monthOf(x.date)===cm);
-  
+
   const inc = yd.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0);
   const exp = yd.filter(x=>x.type==="Isplata").reduce((s,x)=>s+(+x.amount||0),0);
   const bal = inc - exp;
-  
+
   const mI  = md.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0);
   const mE  = md.filter(x=>x.type==="Isplata" && x.status==="Plaćeno").reduce((s,x)=>s+(+x.amount||0),0);
-  
+
+  // ─── Active Advisor ──────────────────────────────────────────────────────
+  const { forecast, anomalies, insights } = useAdvisor(data, lists, fmt);
+
+  // Expand/collapse forecast detail
+  const [forecastOpen, setForecastOpen] = useState(false);
+
   const pendingMonth = useMemo(() => {
     const pendingTxs = md.filter(x => x.status === "Čeka plaćanje" || x.status === "U obradi").reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
     const rec = lists.recurring || [];
@@ -29,15 +36,10 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
     return pendingTxs + unpaidRecSum;
   }, [md, lists.recurring]);
 
-  // ─── To-Do widget data ─────────────────────────────────────────────────────
-  // Unified "things to pay this month" list: pending/processing transactions
-  // PLUS recurring obligations that haven't been materialized yet this month.
-  // Sorted by due date so the most urgent shows first.
   const todoItems = useMemo(() => {
     const items = [];
     const today = new Date(); today.setHours(23,59,59,999);
 
-    // 1) Pending/processing transactions for current month AND overdue from past months
     data.filter(x =>
       x.type === "Isplata" &&
       (x.status === "Čeka plaćanje" || x.status === "U obradi") &&
@@ -53,7 +55,6 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
       status: x.status,
     }));
 
-    // 2) Recurring obligations that have NOT produced a transaction yet this month.
     const rec = lists.recurring || [];
     const recTxsIds = new Set(md.filter(x => x.recurringId).map(x => x.recurringId));
     const cy = new Date().getFullYear();
@@ -77,9 +78,6 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
     return items.sort((a, b) => a.date.localeCompare(b.date));
   }, [data, md, lists.recurring]);
 
-  // Handle Pay action from the To-Do widget. Works for both kinds:
-  // - tx: flip status to Plaćeno, stamp today's date
-  // - recurring: create a new transaction with status Plaćeno this month
   const payTodoItem = (item) => {
     if (!setTxs) return;
     const today = new Date().toISOString().split("T")[0];
@@ -87,7 +85,6 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
       setTxs(p => p.map(x => x.id === item.id ? { ...x, status: "Plaćeno", date: today } : x));
       return;
     }
-    // Recurring: instantiate a concrete tx for this month.
     const r = item.recurring;
     setTxs(p => [...p, {
       id: Date.now().toString(),
@@ -131,6 +128,14 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
     { icon:<Ic n="down"  s={13} c={C.expense}/>, label:`${cmName} ${t("plaćeno")}`,  val:fmt(mE), color:C.expense },
   ];
 
+  // Color resolver for insight card accent
+  const insightColor = (color) => ({
+    income:  C.income,
+    expense: C.expense,
+    warning: C.warning,
+    accent:  C.accent,
+  }[color] || C.accent);
+
   return (
     <div className="fi" style={{ width:"100%" }}>
       <div className="hdr" style={{ position:"sticky", top:0, zIndex:50, background:C.bg, paddingBottom:10, paddingLeft:16, paddingRight:16, borderBottom:`1px solid ${C.border}` }}>
@@ -156,9 +161,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
       </div>
 
       <div style={{ padding:"12px 16px 0" }}>
-        {/* Backup reminder — shown when it's been 30+ days since last backup.
-            User can click to jump straight to the Backup screen, or dismiss
-            with the X for 7 days. */}
+        {/* Backup reminder */}
         {needsBackupReminder(prefs) && (
           <div className="su" style={{
             background: `linear-gradient(135deg, ${C.warning}28, ${C.warning}14)`,
@@ -203,6 +206,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           </div>
         )}
 
+        {/* Balance card */}
         <div className="su" style={{ background:`linear-gradient(135deg,${C.accent}22,${bal>=0?C.income:C.expense}18)`, border:`1px solid ${bal>=0?C.income:C.expense}40`, borderRadius:18, padding:"16px 18px 16px 16px", marginBottom:10, position:"relative", overflow:"hidden" }}>
           <div style={{ position:"absolute", top:12, right:18, textAlign:"right" }}>
             <div style={{ fontSize:10, fontWeight:700, color:C.textSub, letterSpacing:.3, marginRight:6 }}>{wd}</div>
@@ -214,6 +218,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           <div style={{ position:"absolute", right:-20, top:-20, width:90, height:90, borderRadius:"50%", background:`${bal>=0?C.income:C.expense}10` }}/>
         </div>
 
+        {/* Month mini cards */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
           {cards.map(({icon,label,val,color},i)=>(
             <div key={label} className="su" style={{ background:C.card, border:`1px solid ${C.border}`, borderLeft:`3px solid ${color}`, borderRadius:14, padding:"10px 12px", animationDelay:`${i*.05}s` }}>
@@ -233,7 +238,67 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           </div>
         ) : (
           <>
-            {/* Top kategorije — kompaktno, dovoljno konteksta bez previše prostora */}
+            {/* ── ACTIVE ADVISOR: Insights + Forecast ───────────────────── */}
+            {insights.length > 0 && (
+              <div style={{ marginBottom:10 }}>
+                {insights.map((ins, i) => {
+                  const col = insightColor(ins.color);
+                  const isForecast = ins.type === 'forecast';
+                  return (
+                    <div key={i} className="su"
+                      onClick={isForecast ? () => setForecastOpen(v => !v) : undefined}
+                      style={{
+                        background: `linear-gradient(135deg, ${col}18, ${col}08)`,
+                        border: `1px solid ${col}40`,
+                        borderLeft: `4px solid ${col}`,
+                        borderRadius: 14,
+                        padding: "10px 12px",
+                        marginBottom: i < insights.length - 1 ? 6 : 0,
+                        cursor: isForecast ? "pointer" : "default",
+                        animationDelay: `${i * .05}s`,
+                      }}>
+                      <div style={{ display:"flex", alignItems:"flex-start", gap:8 }}>
+                        <span style={{ fontSize:16, flexShrink:0, lineHeight:1.3 }}>{ins.icon}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:12, fontWeight:700, color:col, marginBottom:2 }}>
+                            {ins.title}
+                          </div>
+                          <div style={{ fontSize:11, color:C.textMuted, lineHeight:1.4 }}>
+                            {ins.body}
+                          </div>
+                        </div>
+                        {isForecast && (
+                          <Ic n="chevron" s={12} c={C.textMuted} style={{ transform: forecastOpen ? "rotate(90deg)" : "rotate(-90deg)", transition:"transform .2s", flexShrink:0, marginTop:2 }}/>
+                        )}
+                      </div>
+
+                      {/* Forecast detail — expandable */}
+                      {isForecast && forecastOpen && (
+                        <div className="su" style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${col}30` }}>
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+                            {[
+                              { lb: t("Plaćeno"),       val: fmt(forecast.paidSoFar),     col: C.expense },
+                              { lb: t("U čekanju"),     val: fmt(forecast.pendingKnown),  col: C.warning },
+                              { lb: t("Obveze"),        val: fmt(forecast.recurringLeft), col: C.accent  },
+                              { lb: t("Procjena"),      val: fmt(forecast.discForecast),  col: C.textMuted },
+                              { lb: t("Prihodi"),       val: fmt(forecast.incomeSoFar),   col: C.income  },
+                              { lb: `${forecast.daysLeft} ${t("dana")}`, val: `${fmt(forecast.dailyDisc)}/${t("dan")}`, col: C.textMuted },
+                            ].map(({ lb, val, col: c }) => (
+                              <div key={lb} style={{ background:`${C.bg}80`, borderRadius:8, padding:"6px 10px", border:`1px solid ${col}20` }}>
+                                <div style={{ fontSize:9, color:C.textMuted, marginBottom:2, textTransform:"uppercase", letterSpacing:.5 }}>{lb}</div>
+                                <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:c }}>{val}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Top kategorije */}
             {catsMonth.length>0 && (
               <div className="su" style={{ background:C.card, border:`1px solid ${C.accent}40`, borderLeft:`4px solid ${C.accent}`, borderRadius:14, padding:"10px 12px", marginBottom:10 }}>
                 <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:10, display:"flex", alignItems:"center", gap:5 }}>
@@ -254,6 +319,10 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                           <div style={{ width:7, height:7, borderRadius:2, background:CHART_COLORS[i%CHART_COLORS.length], flexShrink:0 }}/>
                           <span style={{ fontSize:13, lineHeight:1 }}>{categoryIcon(c.name)}</span>
                           <span style={{ color:C.textSub, maxWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t(c.name)}</span>
+                          {/* Flag anomaly inline */}
+                          {anomalies.find(a => a.category === c.name) && (
+                            <span style={{ fontSize:9, fontWeight:700, color:C.warning, background:`${C.warning}20`, borderRadius:6, padding:"1px 5px" }}>↑</span>
+                          )}
                         </div>
                         <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:600, fontSize:11 }}>{fmt(c.value)}</span>
                       </div>
@@ -263,7 +332,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               </div>
             )}
 
-            {/* Za platiti ovog mjeseca — uvijek prikazano */}
+            {/* Za platiti */}
             {todoItems.length === 0 ? (
               <div className="su" style={{ background:C.card, border:`1px solid ${C.income}40`, borderLeft:`4px solid ${C.income}`, borderRadius:14, padding:"12px 14px", marginBottom:10, display:"flex", alignItems:"center", gap:10 }}>
                 <div style={{ width:32, height:32, borderRadius:10, background:`${C.income}20`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
@@ -276,7 +345,6 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               </div>
             ) : (
               <div className="su" style={{ background:C.card, border:`1px solid ${C.warning}40`, borderLeft:`4px solid ${C.warning}`, borderRadius:14, marginBottom:10, display:"flex", flexDirection:"column", maxHeight:"calc(100vh - 498px)", minHeight:280, overflow:"hidden" }}>
-                {/* Fiksni header */}
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 12px 8px", flexShrink:0 }}>
                   <div style={{ fontSize:11, fontWeight:600, color:C.warning, display:"flex", alignItems:"center", gap:5 }}>
                     <Ic n="coins" s={12} c={C.warning}/>{t("Za platiti ovog mjeseca")}
@@ -286,7 +354,6 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     {fmt(todoItems.reduce((s,i)=>s+i.amount,0))}
                   </div>
                 </div>
-                {/* Skrolabili srednji dio — sve stavke */}
                 <div style={{ overflowY:"auto", flex:1, padding:"0 12px", display:"flex", flexDirection:"column", gap:6 }}>
                   {todoItems.map(item => (
                     <div key={item.kind+"-"+item.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 9px", background:C.cardAlt, borderRadius:9, border:`1px solid ${C.border}`, flexShrink:0 }}>
@@ -327,7 +394,6 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     </div>
                   ))}
                 </div>
-                {/* Fiksni footer */}
                 <div style={{ padding:"10px 12px", flexShrink:0, borderTop:`1px solid ${C.border}` }}>
                   <button
                     onClick={()=>{ if(setTxFilter) setTxFilter("overdue"); setPage("transactions"); }}
