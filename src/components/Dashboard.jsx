@@ -1,381 +1,45 @@
-import { useState, useMemo } from 'react';
-import { PieChart, Pie, Cell } from 'recharts';
-import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, DEF_LISTS, T, CHART_COLORS, BACKUP_SNOOZE_MS } from '../lib/constants.js';
-import { fmtEur, monthOf, curYear, curMonthIdx, needsBackupReminder, expandSplits } from '../lib/helpers.js';
-import { Ic, LynxLogo } from './ui.jsx';
-import { categoryIcon } from '../lib/categoryIcons.js';
-import { useAdvisor } from '../hooks/useAdvisor.js';
 
-function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD }) {
-  const fmt = fmtProp || fmtEur;
-  const cmIdx = curMonthIdx();
-  const cm     = MONTHS[cmIdx];
-  const cmName = lang === "en" ? MONTHS_EN[cmIdx] : cm;
+import React from 'react';
+import './Dashboard.css';
 
-  const yd = data.filter(x => new Date(x.date).getFullYear() === year);
-  const md = yd.filter(x => monthOf(x.date) === cm);
+// Mock data based on the app's logic
+const topCategories = [
+  { name: 'Hrana', amount: 450, percentage: 65, color: '#FF6B6B', icon: '🍔' },
+  { name: 'Stanovanje', amount: 800, percentage: 85, color: '#4D96FF', icon: '🏠' },
+  { name: 'Transport', amount: 120, percentage: 25, color: '#6BCB77', icon: '🚗' },
+  { name: 'Zabava', amount: 90, percentage: 15, color: '#FFD93D', icon: '🎬' },
+];
 
-  const inc = yd.filter(x => x.type === "Primitak").reduce((s,x) => s + (+x.amount||0), 0);
-  const exp = yd.filter(x => x.type === "Isplata").reduce((s,x) => s + (+x.amount||0), 0);
-  const bal = inc - exp;
-
-  const mI = md.filter(x => x.type === "Primitak").reduce((s,x) => s + (+x.amount||0), 0);
-  const mE = md.filter(x => x.type === "Isplata" && x.status === "Plaćeno").reduce((s,x) => s + (+x.amount||0), 0);
-
-  const { forecast, anomalies, insights } = useAdvisor(data, lists, fmt);
-  const [forecastOpen, setForecastOpen] = useState(false);
-
-  // ── To-Do items ────────────────────────────────────────────────────────────
-  const todoItems = useMemo(() => {
-    const items = [];
-    const today = new Date(); today.setHours(23,59,59,999);
-    data.filter(x =>
-      x.type === "Isplata" &&
-      (x.status === "Čeka plaćanje" || x.status === "U obradi") &&
-      new Date(x.date) <= today
-    ).forEach(x => items.push({ kind:"tx", id:x.id, date:x.date, description:x.description, category:x.category, location:x.location, amount:parseFloat(x.amount)||0, status:x.status }));
-
-    const rec = lists.recurring || [];
-    const recTxsIds = new Set(md.filter(x => x.recurringId).map(x => x.recurringId));
-    const cy = new Date().getFullYear(), cmi = new Date().getMonth();
-    rec.forEach(r => {
-      if (recTxsIds.has(r.id)) return;
-      const day = Math.max(1, Math.min(28, parseInt(r.dueDay)||1));
-      items.push({ kind:"recurring", id:r.id, date:new Date(cy,cmi,day).toISOString().split("T")[0], description:r.description, category:r.category, location:r.location, amount:parseFloat(r.amount)||0, recurring:r });
-    });
-    // ── Upcoming recurring income ────────────────────────────────────────
-    const recInc = lists.recurring_income || [];
-    const recIncPaidIds = new Set(md.filter(x => x.recurringIncomeId).map(x => x.recurringIncomeId));
-    recInc.forEach(r => {
-      if (recIncPaidIds.has(r.id)) return;
-      const day = Math.max(1, Math.min(28, parseInt(r.dueDay)||1));
-      items.push({ kind:"recurring_income", id:r.id, date:new Date(cy,cmi,day).toISOString().split("T")[0], description:r.description, category:r.category, amount:parseFloat(r.amount)||0, recurring:r });
-    });
-
-    return items.sort((a,b) => a.date.localeCompare(b.date));
-  }, [data, md, lists.recurring, lists.recurring_income]);
-
-  const payTodoItem = (item) => {
-    if (!setTxs) return;
-    try { navigator.vibrate?.(40); } catch {}
-    const today = new Date().toISOString().split("T")[0];
-    if (item.kind === "tx") { setTxs(p => p.map(x => x.id === item.id ? {...x, status:"Plaćeno", date:today} : x)); return; }
-    const r = item.recurring;
-    if (item.kind === "recurring_income") {
-      setTxs(p => [...p, { id:Date.now().toString(), type:"Primitak", date:today, description:r.description, amount:r.amount, category:r.category||"Plaća", location:"Ostalo", payment:r.payment||"Bankovni prijenos", status:"Plaćeno", notes:r.notes||"", recurringIncomeId:r.id, installments:0 }]);
-      return;
-    }
-    setTxs(p => [...p, { id:Date.now().toString(), type:"Isplata", date:today, description:r.description, amount:r.amount, category:r.category, location:r.location, payment:r.payment, status:"Plaćeno", notes:r.notes||"", recurringId:r.id, installments:0 }]);
-  };
-
-  const catsMonth = useMemo(() => {
-    const m = {};
-    expandSplits(md.filter(x => x.type === "Isplata")).forEach(x => { m[x.category]=(m[x.category]||0)+(parseFloat(x.amount)||0); });
-    return Object.entries(m).map(([name,value]) => ({name,value})).sort((a,b) => b.value-a.value);
-  }, [md]);
-
-  const now = new Date();
-  const wd  = now.toLocaleDateString(lang==="en"?"en-US":"hr-HR",{weekday:"short"}).replace(".","").toUpperCase();
-  const dd  = String(now.getDate()).padStart(2,"0");
-  const mm  = String(now.getMonth()+1).padStart(2,"0");
-  const yy  = now.getFullYear();
-  const W   = Math.min(window.innerWidth??480,480)-64;
-  const dn  = [user.firstName, user.lastName].filter(Boolean).join(" ");
-
-  const insightColor = (color) => ({ income:C.income, expense:C.expense, warning:C.warning, accent:C.accent }[color] || C.accent);
-
-  // Forecast projection line — shown inside balance card
-  const forecastBal = forecast.hasHistory && forecast.daysLeft > 0 ? forecast.projectedBalance : null;
-  const forecastColor = forecastBal === null ? null : forecastBal >= 0 ? C.income : C.expense;
-
-  // Positive month comparison vs last year (for mini-cards)
-  const lastYrME = useMemo(() => {
-    const ly = year - 1;
-    return data.filter(x => new Date(x.date).getFullYear()===ly && monthOf(x.date)===cm && x.type==="Isplata" && x.status==="Plaćeno").reduce((s,x)=>s+(+x.amount||0),0);
-  }, [data, year, cm]);
-  const monthImprovement = lastYrME > 0 && mE > 0 ? (lastYrME - mE) / lastYrME : null;
-
-  // Empty state onboarding steps
-  const onboardingSteps = useMemo(() => {
-    const hasTx   = data.length > 0;
-    const hasRec  = (lists.recurring||[]).length > 0;
-    const hasBudg = lists.budgets && Object.keys(lists.budgets).some(k => lists.budgets[k] > 0);
-    return [
-      { done:hasTx,  icon:"💳", title:t("Dodaj prvu transakciju"), body:t("Zabileži prihod ili trošak — aplikacija počinje učiti tvoje navike."), action:()=>setPage("add"), cta:t("Dodaj sada →") },
-      { done:hasRec, icon:"🔄", title:t("Dodaj redovnu obvezu"), body:t("Najam, pretplate, kredit — jednom dodaj, aplikacija te svaki mjesec podsjeća."), action:()=>{setPage("settings");setSubPg&&setSubPg("recurring");}, cta:t("Postavi obveze →") },
-      { done:hasBudg,icon:"🎯", title:t("Postavi budžet kategorije"), body:t("Odredi limit za npr. Hranu ili Zabavu — aplikacija upozori kad se priblizavaš."), action:()=>{setPage("settings");setSubPg&&setSubPg("budgets");}, cta:t("Postavi budžet →") },
-    ];
-  }, [data, lists]);
-
+const Dashboard = () => {
   return (
-    <div className="fi" style={{ width:"100%" }}>
-      {/* ── Sticky header ──────────────────────────────────────────────── */}
-      <div className="hdr" style={{ position:"sticky", top:0, zIndex:50, background:C.bg, paddingBottom:10, paddingLeft:16, paddingRight:16, borderBottom:`1px solid ${C.border}` }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <div>
-            <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
-              <LynxLogo s={22} color={C.accent}/> {t("Money Lynx")} <span style={{fontSize:14,color:C.textMuted,fontWeight:500,verticalAlign:"middle",position:"relative",top:2}}>· {year}.</span>
-            </h1>
-            {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
-          </div>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            {syncing && <span title={t("Sinkronizacija…")} style={{ width:8,height:8,borderRadius:"50%",background:C.warning,display:"inline-block",animation:"pulse 1s infinite" }}/>}
-            {!syncing && supaUser && <span title={supaUser.email} style={{ width:8,height:8,borderRadius:"50%",background:C.income,display:"inline-block" }}/>}
-            <button onClick={onQuickAdd} style={{ background:`${C.warning}18`,border:`1px solid ${C.warning}50`,borderRadius:12,padding:"6px 10px",fontSize:12,fontWeight:700,color:C.warning,display:"flex",alignItems:"center",gap:5,cursor:"pointer",boxShadow:`0 2px 10px ${C.warning}20` }}>
-              <Ic n="zap" s={14} c={C.warning}/> {t("Brzi unos")}
-            </button>
-          </div>
+    <div className="dashboard-container">
+      <div className="card top-categories-card">
+        <h3>Top kategorije</h3>
+        <div className="categories-list">
+          {topCategories.map((cat, index) => (
+            <div key={index} className="category-item">
+              <div className="category-info">
+                <div className="category-label">
+                  <span className="category-icon-gray">{cat.icon}</span>
+                  <span className="category-name">{cat.name}</span>
+                </div>
+                <span className="category-amount">{cat.amount} €</span>
+              </div>
+              <div className="progress-container">
+                <div 
+                  className="progress-bar" 
+                  style={{ 
+                    width: `${cat.percentage}%`, 
+                    backgroundColor: cat.color 
+                  }}
+                ></div>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
-
-      <div style={{ padding:"12px 16px 0" }}>
-        {/* Backup reminder */}
-        {needsBackupReminder(prefs) && (
-          <div className="su" style={{ background:`linear-gradient(135deg,${C.warning}28,${C.warning}14)`, border:`1px solid ${C.warning}60`, borderRadius:14, padding:"12px 14px", marginBottom:10, display:"flex", alignItems:"center", gap:10 }}>
-            <div onClick={()=>{setPage("settings");setSubPg&&setSubPg("general");}} style={{ flex:1,display:"flex",alignItems:"center",gap:10,cursor:"pointer" }}>
-              <div style={{ width:36,height:36,borderRadius:10,background:`${C.warning}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}><Ic n="dl" s={18} c={C.warning}/></div>
-              <div style={{ flex:1,minWidth:0 }}>
-                <div style={{ fontSize:13,fontWeight:700,color:C.text,marginBottom:2 }}>{t("Davno nisi napravio backup")}</div>
-                <div style={{ fontSize:11,color:C.textMuted,lineHeight:1.35 }}>{t("Klikni ovdje da sačuvaš kopiju podataka.")}</div>
-              </div>
-              <Ic n="chevron" s={14} c={C.warning} style={{ transform:"rotate(-90deg)",flexShrink:0 }}/>
-            </div>
-            <button onClick={e=>{e.stopPropagation();updPrefs({backupSnoozedUntil:Date.now()+BACKUP_SNOOZE_MS});}} title={t("Podsjeti me za 7 dana")} style={{ background:"transparent",border:"none",padding:4,cursor:"pointer",color:C.textMuted,flexShrink:0 }}>
-              <Ic n="x" s={14} c={C.textMuted}/>
-            </button>
-          </div>
-        )}
-
-        {/* ── 1. HERO BALANCE CARD — with inline forecast projection ──── */}
-        <div className="su" onClick={() => forecast.hasHistory && setForecastOpen(v => !v)}
-          style={{ background:`linear-gradient(135deg,${C.accent}22,${bal>=0?C.income:C.expense}18)`, border:`1px solid ${bal>=0?C.income:C.expense}40`, borderRadius:18, padding:"16px 18px 18px 16px", marginBottom:10, position:"relative", overflow:"hidden", cursor: forecast.hasHistory ? "pointer" : "default" }}>
-          <div style={{ position:"absolute", top:12, right:18, textAlign:"right" }}>
-            <div style={{ fontSize:10,fontWeight:700,color:C.textSub,letterSpacing:.3,marginRight:6 }}>{wd}</div>
-            <div style={{ fontSize:13,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.textSub,marginRight:-6 }}>{dd}.{mm}.</div>
-            <div style={{ fontSize:10,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.textMuted,marginTop:1,marginRight:-6 }}>{yy}.</div>
-          </div>
-          <div style={{ fontSize:11,color:C.textSub,marginBottom:4,textAlign:"left" }}>{t("Stanje")} {year}.</div>
-          <div style={{ fontSize:28,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:bal>=0?C.income:C.expense,textAlign:"left",paddingRight:65 }}>{fmt(bal)}</div>
-
-          {/* Inline forecast row */}
-          {forecastBal !== null && (
-            <div style={{ marginTop:8, paddingTop:8, borderTop:`1px solid ${bal>=0?C.income:C.expense}25`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <span style={{ fontSize:11, color:C.textMuted, display:"flex", alignItems:"center", gap:4 }}>
-                <span style={{ fontSize:12 }}>📊</span> {t("Projekcija kraj mj.")}
-              </span>
-              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                <span style={{ fontSize:13, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:forecastColor }}>
-                  {forecastBal >= 0 ? "+" : ""}{fmt(forecastBal)}
-                </span>
-                <Ic n="chevron" s={11} c={C.textMuted} style={{ transform: forecastOpen ? "rotate(90deg)" : "rotate(-90deg)", transition:"transform .2s" }}/>
-              </div>
-            </div>
-          )}
-
-          {/* Expandable forecast detail */}
-          {forecastOpen && forecast.hasHistory && (
-            <div className="su" style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${forecastColor}30` }}>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6 }}>
-                {[
-                  { lb:t("Plaćeno"),  val:fmt(forecast.paidSoFar),    col:C.expense },
-                  { lb:t("Obveze"),   val:fmt(forecast.recurringLeft), col:C.accent  },
-                  { lb:t("Procjena"),  val:fmt(forecast.discForecast), col:C.textMuted },
-                  { lb:t("Prihodi"),  val:fmt(forecast.incomeSoFar),   col:C.income  },
-                  { lb:t("U čekanju"),val:fmt(forecast.pendingKnown),  col:C.warning },
-                  { lb:`${forecast.daysLeft} ${t("dana")}`, val:`${fmt(forecast.dailyDisc)}/${t("dan")}`, col:C.textMuted },
-                ].map(({lb,val,col:c}) => (
-                  <div key={lb} style={{ background:`${C.bg}80`, borderRadius:8, padding:"6px 8px", border:`1px solid ${c}20` }}>
-                    <div style={{ fontSize:9,color:C.textMuted,marginBottom:2,textTransform:"uppercase",letterSpacing:.4 }}>{lb}</div>
-                    <div style={{ fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:c }}>{val}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div style={{ position:"absolute",right:-20,top:-20,width:90,height:90,borderRadius:"50%",background:`${bal>=0?C.income:C.expense}10` }}/>
-        </div>
-
-        {/* ── 2. MINI CARDS — month summary with YoY improvement ──────── */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
-          <div className="su" style={{ background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.income}`,borderRadius:14,padding:"10px 12px" }}>
-            <div style={{ fontSize:10,color:C.textMuted,marginBottom:3,display:"flex",alignItems:"center",gap:4 }}><Ic n="up" s={13} c={C.income}/>{cmName} {t("primici")}</div>
-            <div style={{ fontSize:14,fontWeight:700,color:C.income,fontFamily:"'JetBrains Mono',monospace" }}>{fmt(mI)}</div>
-          </div>
-          <div className="su" style={{ background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.expense}`,borderRadius:14,padding:"10px 12px" }}>
-            <div style={{ fontSize:10,color:C.textMuted,marginBottom:3,display:"flex",alignItems:"center",gap:4 }}><Ic n="down" s={13} c={C.expense}/>{cmName} {t("plaćeno")}</div>
-            <div style={{ display:"flex",alignItems:"baseline",gap:6 }}>
-              <div style={{ fontSize:14,fontWeight:700,color:C.expense,fontFamily:"'JetBrains Mono',monospace" }}>{fmt(mE)}</div>
-              {/* YoY improvement badge */}
-              {monthImprovement !== null && monthImprovement >= 0.05 && (
-                <span style={{ fontSize:10,fontWeight:700,color:C.income,background:`${C.income}18`,borderRadius:8,padding:"1px 5px",display:"flex",alignItems:"center",gap:2 }}>
-                  ↓{Math.round(monthImprovement*100)}%
-                </span>
-              )}
-              {monthImprovement !== null && monthImprovement < -0.05 && (
-                <span style={{ fontSize:10,fontWeight:700,color:C.expense,background:`${C.expense}18`,borderRadius:8,padding:"1px 5px",display:"flex",alignItems:"center",gap:2 }}>
-                  ↑{Math.round(Math.abs(monthImprovement)*100)}%
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {yd.length === 0 ? (
-          /* ── EMPTY STATE — onboarding guide ─────────────────────────── */
-          <div className="su" style={{ marginTop:8 }}>
-            <div style={{ textAlign:"center", marginBottom:20 }}>
-              <div style={{ width:60,height:60,borderRadius:20,background:`linear-gradient(135deg,${C.accent},${C.accentDk})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",boxShadow:`0 4px 15px ${C.accentGlow}` }}>
-                <Ic n="plus" s={28} c="#fff"/>
-              </div>
-              <h3 style={{ fontSize:17,fontWeight:700,color:C.text,marginBottom:6 }}>{t("Dobrodošao u Money Lynx!")}</h3>
-              <p style={{ fontSize:13,color:C.textMuted,lineHeight:1.5 }}>{t("Prati financije u 3 koraka:")}</p>
-            </div>
-
-            {onboardingSteps.map((step, i) => (
-              <div key={i} onClick={!step.done ? step.action : undefined}
-                style={{ display:"flex",alignItems:"flex-start",gap:12,padding:"12px 14px",background:step.done?`${C.income}08`:C.cardAlt,border:`1px solid ${step.done?C.income+"40":C.border}`,borderRadius:14,marginBottom:8,cursor:step.done?"default":"pointer",transition:"all .2s" }}>
-                <div style={{ width:36,height:36,borderRadius:11,background:step.done?`${C.income}20`:`${C.accent}15`,border:`1px solid ${step.done?C.income:C.accent}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18 }}>
-                  {step.done ? "✅" : step.icon}
-                </div>
-                <div style={{ flex:1,minWidth:0 }}>
-                  <div style={{ fontSize:13,fontWeight:700,color:step.done?C.income:C.text,marginBottom:3,display:"flex",alignItems:"center",gap:6 }}>
-                    {step.title}
-                    {step.done && <span style={{ fontSize:10,fontWeight:700,color:C.income }}>✓</span>}
-                  </div>
-                  <div style={{ fontSize:11,color:C.textMuted,lineHeight:1.4 }}>{step.body}</div>
-                </div>
-                {!step.done && (
-                  <span style={{ fontSize:11,fontWeight:700,color:C.accent,flexShrink:0,whiteSpace:"nowrap",alignSelf:"center" }}>{step.cta}</span>
-                )}
-              </div>
-            ))}
-
-            <div style={{ textAlign:"center",marginTop:8,padding:"10px 0" }}>
-              <button onClick={()=>setPage("add")} style={{ background:`linear-gradient(135deg,${C.accent},${C.accentDk})`,border:"none",borderRadius:14,padding:"12px 28px",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 15px ${C.accentGlow}` }}>
-                <Ic n="plus" s={16} c="#fff" style={{ marginRight:6,verticalAlign:"middle" }}/>{t("Dodaj prvu transakciju")}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* ── 3. ZA PLATITI — moved up, compact, 4 items max ─────── */}
-            {todoItems.length === 0 ? (
-              <div className="su" style={{ background:C.card,border:`1px solid ${C.income}40`,borderLeft:`4px solid ${C.income}`,borderRadius:14,padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:10 }}>
-                <div style={{ width:30,height:30,borderRadius:9,background:`${C.income}20`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                  <Ic n="check" s={15} c={C.income}/>
-                </div>
-                <div>
-                  <div style={{ fontSize:12,fontWeight:700,color:C.income }}>{t("Sve obveze podmirene!")}</div>
-                  <div style={{ fontSize:10,color:C.textMuted,marginTop:1 }}>{cmName} {year}.</div>
-                </div>
-              </div>
-            ) : (
-              <div className="su" style={{ background:C.card,border:`1px solid ${C.warning}40`,borderLeft:`4px solid ${C.warning}`,borderRadius:14,marginBottom:10,overflow:"hidden" }}>
-                <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px 7px",borderBottom:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:11,fontWeight:600,color:C.warning,display:"flex",alignItems:"center",gap:5 }}>
-                    <Ic n="coins" s={12} c={C.warning}/>{t("Za platiti")}
-                    <span style={{ background:`${C.warning}25`,borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:C.warning }}>{todoItems.length}</span>
-                  </div>
-                  <div style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.warning }}>{fmt(todoItems.reduce((s,i)=>s+i.amount,0))}</div>
-                </div>
-                {/* Show max 3 items — keeps widget above fold on small phones */}
-                <div style={{ padding:"6px 10px",display:"flex",flexDirection:"column",gap:5 }}>
-                  {todoItems.slice(0,3).map(item => (
-                    <div key={item.kind+"-"+item.id} style={{ display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:C.cardAlt,borderRadius:9,border:`1px solid ${C.border}` }}>
-                      <div style={{ width:26,height:26,borderRadius:7,background:item.kind==="recurring_income"?`${C.income}15`:item.kind==="recurring"?`${C.accent}15`:`${C.warning}15`,border:`1px solid ${item.kind==="recurring_income"?C.income:item.kind==="recurring"?C.accent:C.warning}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13 }}>
-                        {item.kind==="recurring_income" ? "💵" : categoryIcon(item.category)}
-                      </div>
-                      <div style={{ flex:1,minWidth:0 }}>
-                        <div style={{ fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{item.description || t(item.category)}</div>
-                        <div style={{ fontSize:10,color:C.textMuted,display:"flex",alignItems:"center",gap:3,marginTop:1 }}>
-                          <Ic n="cal" s={9} c={C.textMuted}/>{new Date(item.date).getDate()}.{new Date(item.date).getMonth()+1}.
-                          {item.kind==="recurring" && <span style={{ color:C.accent,fontWeight:600 }}>· {t("Redovna obveza")}</span>}
-                          {item.kind==="recurring_income" && <span style={{ color:C.income,fontWeight:600 }}>· {t("Redovni primitak")}</span>}
-                        </div>
-                      </div>
-                      <div style={{ fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.text,flexShrink:0 }}>{fmt(item.amount)}</div>
-                      <button onClick={()=>payTodoItem(item)} style={{ padding:"4px 8px",background:C.income,border:"none",borderRadius:6,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0 }}>
-                        <Ic n="check" s={10} c="#fff"/>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {/* Footer — always visible */}
-                <div style={{ padding:"6px 12px 8px",borderTop:`1px solid ${C.border}` }}>
-                  <button onClick={()=>{if(setTxFilter)setTxFilter("overdue");setPage("transactions");}}
-                    style={{ width:"100%",padding:"5px",background:"transparent",border:"none",color:C.accent,fontSize:11,fontWeight:600,cursor:"pointer" }}>
-                    {todoItems.length > 3 ? `${t("Prikaži sve")} (${todoItems.length})` : t("Otvori transakcije →")}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ── 4. ADVISOR INSIGHTS — anomalies + positive ──────────── */}
-            {insights.length > 0 && (
-              <div style={{ marginBottom:10 }}>
-                {insights.map((ins, i) => {
-                  const col = insightColor(ins.color);
-                  return (
-                    <div key={i} className="su"
-                      style={{ background:`linear-gradient(135deg,${col}18,${col}08)`, border:`1px solid ${col}40`, borderLeft:`4px solid ${col}`, borderRadius:14, padding:"9px 12px", marginBottom:i<insights.length-1?6:0, animationDelay:`${i*.05}s` }}>
-                      <div style={{ display:"flex",alignItems:"flex-start",gap:8 }}>
-                        <span style={{ fontSize:15,flexShrink:0,lineHeight:1.3 }}>{ins.icon}</span>
-                        <div style={{ flex:1,minWidth:0 }}>
-                          <div style={{ fontSize:12,fontWeight:700,color:col,marginBottom:1 }}>{ins.title}</div>
-                          <div style={{ fontSize:11,color:C.textMuted,lineHeight:1.4 }}>{ins.body}</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ── 5. TOP KATEGORIJE — compact, no pie on small screens ── */}
-            {catsMonth.length > 0 && (
-              <div className="su" style={{ background:C.card,border:`1px solid ${C.accent}40`,borderLeft:`4px solid ${C.accent}`,borderRadius:14,padding:"9px 12px",marginBottom:10 }}>
-                <div style={{ fontSize:11,fontWeight:600,color:C.textMuted,marginBottom:8,display:"flex",alignItems:"center",gap:5 }}>
-                  <Ic n="tag" s={12} c={C.textMuted}/>{t("Top kategorije")} · {cmName}
-                </div>
-                <div style={{ display:"flex",flexDirection:"column",gap:0 }}>
-                  {catsMonth.slice(0,5).map((c,i)=>{
-                    const maxVal = catsMonth[0].value;
-                    return (
-                      <div key={c.name} style={{ display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:i<Math.min(catsMonth.length-1,4)?`1px solid ${C.border}30`:"none" }}>
-                        <span style={{ fontSize:14,flexShrink:0,lineHeight:1 }}>{categoryIcon(c.name)}</span>
-                        <div style={{ flex:1,minWidth:0 }}>
-                          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2 }}>
-                            <span style={{ fontSize:11,color:C.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110 }}>{t(c.name)}</span>
-                            <div style={{ display:"flex",alignItems:"center",gap:5,flexShrink:0 }}>
-                              {anomalies.find(a=>a.category===c.name) && (
-                                <span style={{ fontSize:9,fontWeight:700,color:C.warning,background:`${C.warning}20`,borderRadius:6,padding:"1px 5px" }}>↑</span>
-                              )}
-                              <span style={{ fontFamily:"'JetBrains Mono',monospace",fontWeight:600,fontSize:11 }}>{fmt(c.value)}</span>
-                            </div>
-                          </div>
-                          {/* Mini progress bar */}
-                          <div style={{ height:3,background:C.cardAlt,borderRadius:2,overflow:"hidden" }}>
-                            <div style={{ height:"100%",width:`${Math.round((c.value/maxVal)*100)}%`,background:CHART_COLORS[i%CHART_COLORS.length],borderRadius:2,transition:"width .4s ease" }}/>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {catsMonth.length > 5 && (
-                  <button onClick={()=>{setPage("charts");}} style={{ marginTop:6,width:"100%",padding:"4px",background:"transparent",border:"none",color:C.textMuted,fontSize:10,cursor:"pointer" }}>
-                    + {catsMonth.length - 5} {t("više")} · {t("Otvori statistiku →")}
-                  </button>
-                )}
-              </div>
-            )}
-          </>
-        )}
       </div>
     </div>
   );
-}
-
+};
 
 export default Dashboard;
