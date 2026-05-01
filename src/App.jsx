@@ -13,7 +13,7 @@ import { supabase, signOut, onAuthChange } from "./lib/supabase.js";
 import { uploadAll, downloadAll } from "./lib/sync.js";
 
 // ─── Components ───────────────────────────────────────────────────────────────
-import { Ic, LynxLogo, LynxLogoWhite, QuickAddModal, ActionHubModal } from "./components/ui.jsx";
+import { Ic, LynxLogo, QuickAddModal, ActionHubModal } from "./components/ui.jsx";
 import { LockScreen, SetupPin, OnboardingScreen } from "./components/auth.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
@@ -574,7 +574,7 @@ export default function App() {
       <style>{gs}</style>
       <div style={{ textAlign:"center" }}>
         <div style={{ width:56, height:56, borderRadius:16, background:`linear-gradient(135deg,${C.accent},${C.accentDk||C.accent})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", animation:"pulse 1.5s ease-in-out infinite" }}>
-          <LynxLogoWhite s={26}/>
+          <LynxLogo s={26}/>
         </div>
         <span style={{ color:C.textMuted, fontSize:13 }}>Money Lynx</span>
       </div>
