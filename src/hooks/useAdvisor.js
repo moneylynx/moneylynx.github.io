@@ -2,24 +2,29 @@ import { useMemo } from 'react';
 import { computeForecast, detectAnomalies, computeYoY, generateInsights } from '../lib/advisor.js';
 
 // ─── useAdvisor ───────────────────────────────────────────────────────────────
-// Memoised wrapper around the advisor engine. Recomputes only when txs or
-// lists change (which happens at most once per transaction add/edit).
-//
-// Returns:
-//   forecast   — { paidSoFar, pendingKnown, recurringLeft, discForecast,
-//                  daysLeft, projectedSpend, projectedBalance, incomeSoFar,
-//                  hasHistory, dailyDisc, monthName }
-//   anomalies  — [{ category, currentSpend, avgSpend, pctAbove, severity }]
-//   insights   — [{ type, severity, icon, color, title, body }]
-//   yoy        — (thisYear, lastYear) → computed on demand in Charts
+// Memoised wrapper around the advisor engine.
+// Also computes _lastYearSameMonthSpend and attaches it to forecast so
+// generateInsights can produce positive-reinforcement cards.
 // ─────────────────────────────────────────────────────────────────────────────
 export function useAdvisor(txs, lists, fmt) {
-  const forecast = useMemo(
-    () => computeForecast(txs, lists),
-    // Re-run whenever txs or recurring list changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [txs.length, JSON.stringify(lists.recurring)]
-  );
+  const forecast = useMemo(() => {
+    const base = computeForecast(txs, lists);
+
+    // Attach same-month last-year paid spend for positive reinforcement.
+    const now = new Date();
+    const lastYr = now.getFullYear() - 1;
+    const cm     = now.getMonth();
+    const lastYrSpend = txs
+      .filter(x => {
+        const d = new Date(x.date);
+        return d.getFullYear() === lastYr && d.getMonth() === cm &&
+               x.type === 'Isplata' && x.status === 'Plaćeno';
+      })
+      .reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
+
+    return { ...base, _lastYearSameMonthSpend: lastYrSpend };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txs.length, JSON.stringify(lists.recurring)]);
 
   const anomalies = useMemo(
     () => detectAnomalies(txs),
