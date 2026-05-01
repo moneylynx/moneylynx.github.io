@@ -33,4 +33,6 @@ const AboutScreen = () => {
   );
 };
 
-export default AboutScreen;
+export const AboutScreen = () => {
+  // ... ostatak koda ...
+};
