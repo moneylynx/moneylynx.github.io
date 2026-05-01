@@ -1,7 +1,6 @@
-
 import React from 'react';
 
-const AboutScreen = () => {
+export const AboutScreen = () => {
   return (
     <div className="about-container">
       <div className="about-header">
@@ -9,13 +8,11 @@ const AboutScreen = () => {
         <h2>MoneyLynx</h2>
         <p className="version-tag">Verzija 1.0</p>
       </div>
-      
       <div className="about-content">
         <p>
-          MoneyLynx je vaša privatna platforma za upravljanje osobnim financijama. 
+          MoneyLynx je vaša privatna platforma za upravljanje osobnim financijama.
           Dizajnirana s naglaskom na sigurnost, enkripciju i korisničko iskustvo.
         </p>
-        
         <div className="info-section">
           <h4>Status sustava</h4>
           <ul>
@@ -25,14 +22,9 @@ const AboutScreen = () => {
           </ul>
         </div>
       </div>
-      
       <div className="footer-credits">
         <p>© 2024 MoneyLynx. Sva prava pridržana.</p>
       </div>
     </div>
   );
-};
-
-export const AboutScreen = () => {
-  // ... ostatak koda ...
 };
