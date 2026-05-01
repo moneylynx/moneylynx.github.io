@@ -1,7 +1,7 @@
 import React from 'react';
 import './Dashboard.css';
 
-// Podaci za vizualni prikaz
+// Podaci za vizualni prikaz (Top kategorije)
 const topCategories = [
   { name: 'Hrana', amount: 450, percentage: 65, color: '#FF6B6B', icon: '🍔' },
   { name: 'Stanovanje', amount: 800, percentage: 85, color: '#4D96FF', icon: '🏠' },
@@ -19,13 +19,11 @@ const Dashboard = () => {
             <div key={index} className="category-item">
               <div className="category-info">
                 <div className="category-label">
-                  {/* Sive ikone prema dogovoru */}
                   <span className="category-icon-gray">{cat.icon}</span>
                   <span className="category-name">{cat.name}</span>
                 </div>
                 <span className="category-amount">{cat.amount} €</span>
               </div>
-              {/* Vodoravni graf (linija potrošnje) */}
               <div className="progress-container">
                 <div 
                   className="progress-bar" 
@@ -43,5 +41,5 @@ const Dashboard = () => {
   );
 };
 
-// Vraćamo na default export kako bi odgovaralo uvozu u App.jsx
+// VAŽNO: Koristimo 'export default' jer tvoj App.jsx tako uvozi komponentu
 export default Dashboard;
