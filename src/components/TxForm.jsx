@@ -36,7 +36,6 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
   // ─── Smart defaults ─────────────────────────────────────────────────────────
   // Only active for new entries (not edit/draft). Predicts category/location/
   // payment from description, plus offers recent-combo chips.
-  const isNewEntry = !tx && !draft;
   const { suggestField, recentCombos, predictions, AUTO_THRESHOLD } =
     useSmartDefaults(isNewEntry ? (txs || []) : [], form);
 
@@ -125,8 +124,27 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
   useEffect(()=>{ if (isGotov && inst>1) upd({ installments:0 }); },[form.payment]);
   useEffect(()=>{ if (inst>1 && isGotov) upd({ payment: lists.payments.find(p=>p!=="Gotovina") ?? lists.payments[0] }); },[form.installments]);
 
+  // Progressive disclosure — secondary fields hidden until expanded
+  const hasSecondaryData = !!(tx?.notes || tx?.location || draft?.notes);
+  const isNewEntry = !tx && !draft;
+  const [showAdvanced, setShowAdvanced] = useState(!isNewEntry || hasSecondaryData);
+
+  // Split transactions — expense entries only
+  const canSplit  = isNewEntry && form.type === "Isplata";
+  const [splitMode, setSplitMode] = useState(false);
+  const [splits, setSplits] = useState([{id:"s1",amount:"",category:"",description:""},{id:"s2",amount:"",category:"",description:""}]);
+  const splitsTotal    = splits.reduce((sum,sp)=>sum+(parseFloat(sp.amount)||0), 0);
+  const splitRemainder = Math.round(((parseFloat(form.amount)||0)-splitsTotal)*100)/100;
+  const updSplit = (id,patch) => setSplits(p=>p.map(sp=>sp.id===id?{...sp,...patch}:sp));
+  const addSplit = () => setSplits(p=>[...p,{id:`s${Date.now()}`,amount:"",category:"",description:""}]);
+  const delSplit = (id) => setSplits(p=>p.length>2?p.filter(sp=>sp.id!==id):p);
+
   const fld = { width:"100%", height:46, padding:"0 12px", background:C.cardAlt, border:`1.5px solid ${C.border}`, borderRadius:12, color:C.text, fontSize:14 };
-  const lbl = { fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:5, display:"flex", alignItems:"center", gap:5, letterSpacing:.3, textTransform:"uppercase" };
+
+  // Typography hierarchy: primary labels are more prominent than secondary
+  const lblPrimary = { fontSize:12, fontWeight:700, color:C.text, marginBottom:6, display:"flex", alignItems:"center", gap:5, letterSpacing:.1 };
+  const lbl        = { fontSize:11, fontWeight:600, color:C.textMuted, marginBottom:5, display:"flex", alignItems:"center", gap:5, letterSpacing:.2, textTransform:"uppercase" };
+  const lblAdv     = { fontSize:10, fontWeight:600, color:C.textMuted, marginBottom:5, display:"flex", alignItems:"center", gap:4, letterSpacing:.3, textTransform:"uppercase", opacity:.8 };
 
   // Style accent for auto-filled fields — subtle green tint to show "we guessed this".
   const autoFilledStyle = (key) => autoFilledFields.has(key) ? {
@@ -172,6 +190,14 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
     }
 
     if (inst <= 1 && !finalForm.status){ setErr({ msg: t("Odaberite status"), field:"status" }); return; }
+    if (splitMode && canSplit) {
+      const valid = splits.filter(sp => parseFloat(sp.amount)>0 && sp.category);
+      if (valid.length < 2) { setErr({ msg: t("Unesite barem 2 stavke za podjelu"), field:"split" }); return; }
+      const splitTotal = valid.reduce((s,sp)=>s+(parseFloat(sp.amount)||0),0);
+      if (Math.abs(splitTotal-amount)>0.01) { setErr({ msg: `${t("Zbroj stavki")} ${fmtEur(splitTotal)} ≠ ${fmtEur(amount)}`, field:"split" }); return; }
+      onSubmit({ ...finalForm, amount, installments:inst, splits:valid.map(sp=>({...sp,amount:parseFloat(sp.amount)||0})), category:"(split)" });
+      return;
+    }
     onSubmit({ ...finalForm, amount, installments: inst });
   };
 
@@ -234,7 +260,7 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
               <input type="date" value={form.date} onChange={e=>upd({date:e.target.value})} style={fld}/>
             </div>
             <div>
-              <label style={lbl}><Ic n="coins" s={11} c={C.textMuted}/>{t("Iznos (€)")}</label>
+              <label style={lblPrimary}><Ic n="coins" s={13} c={C.accent}/><span>{t("Iznos (€)")}</span></label>
               <input type="number" inputMode="decimal" step="0.01" min="0" placeholder="0,00" value={form.amount}
                 onChange={e=>{ upd({amount:e.target.value}); clearErr(); }}
                 style={{...fld, fontFamily:"'JetBrains Mono',monospace", fontWeight:600, borderColor:bd("amount")}}/>
@@ -242,7 +268,7 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
           </div>
 
           <div>
-            <label style={lbl}><Ic n="edit" s={11} c={C.textMuted}/>{t("Opis")}</label>
+            <label style={lblPrimary}><Ic n="edit" s={13} c={C.accent}/><span>{t("Opis")}</span></label>
             <input type="text" placeholder="" value={form.description}
               onChange={e=>{
                 upd({description:e.target.value});
@@ -256,37 +282,94 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
               }} style={{...fld, borderColor:bd("description")}}/>
           </div>
 
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-            <div>
-              <label style={lbl}>
-                <span style={{ fontSize:13 }}>{form.category ? categoryIcon(form.category) : '🏷️'}</span>
-                {t("Kategorija")}
-                {autoFilledFields.has('category') && <span style={{ marginLeft:'auto', fontSize:9, color:C.income, fontWeight:700 }}>{t("auto")}</span>}
-              </label>
-              <select value={form.category} onChange={e=>{
-                upd({category:e.target.value});
-                // Manual change — remove auto marker for this field.
-                setAutoFilledFields(prev => { const s = new Set(prev); s.delete('category'); return s; });
-                clearErr();
-              }} style={{...fld, color:!form.category?C.textMuted:C.text, borderColor:bd("category"), ...autoFilledStyle('category')}}>
-                <option value="" disabled>{t("- odabrati -")}</option>
-                {cats.map(c=><option key={c} value={c}>{categoryIcon(c)}  {t(c)}</option>)}
-              </select>
+          <div>
+            <label style={lbl}>
+              <span style={{ fontSize:13 }}>{form.category ? categoryIcon(form.category) : '🏷️'}</span>
+              {t("Kategorija")}
+              {autoFilledFields.has('category') && <span style={{ marginLeft:'auto', fontSize:9, color:C.income, fontWeight:700 }}>{t("auto")}</span>}
+            </label>
+            <select value={form.category} onChange={e=>{
+              upd({category:e.target.value});
+              setAutoFilledFields(prev => { const s = new Set(prev); s.delete('category'); return s; });
+              clearErr();
+            }} style={{...fld, color:!form.category?C.textMuted:C.text, borderColor:bd("category"), ...autoFilledStyle('category')}}>
+              <option value="" disabled>{t("- odabrati -")}</option>
+              {cats.map(c=><option key={c} value={c}>{categoryIcon(c)}  {t(c)}</option>)}
+            </select>
+          </div>
+
+          {canSplit && parseFloat(form.amount)>0 && !isRecurring && inst<=1 && (
+            <button type="button" onClick={()=>setSplitMode(v=>!v)}
+              style={{ background:splitMode?`${C.warning}15`:"transparent", border:`1.5px solid ${splitMode?C.warning:C.border}`, padding:"6px 12px", borderRadius:20, cursor:"pointer", display:"flex", alignItems:"center", gap:6, color:splitMode?C.warning:C.textMuted, fontSize:12, fontWeight:600, alignSelf:"flex-start", transition:"all .2s" }}>
+              🔀 {splitMode ? t("Ukloni podjelu") : t("Podijeli po kategorijama")}
+            </button>
+          )}
+          {splitMode && canSplit && (
+            <div className="su" style={{ background:C.cardAlt, border:`1.5px solid ${C.warning}50`, borderRadius:14, padding:"11px 12px 8px" }}>
+              <div style={{ fontSize:11, fontWeight:700, color:C.warning, marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span>🔀 {t("Podjela iznosa")}</span>
+                <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:splitRemainder===0?C.income:C.expense }}>
+                  {splitRemainder===0?`✓ ${fmtEur(parseFloat(form.amount)||0)}`:splitRemainder>0?`−${fmtEur(splitRemainder)}`:(`+${fmtEur(Math.abs(splitRemainder))} prekoračeno`)}
+                </span>
+              </div>
+              {splits.map(sp => (
+                <div key={sp.id} style={{ display:"grid", gridTemplateColumns:"80px 1fr 28px", gap:5, marginBottom:7, alignItems:"end" }}>
+                  <div>
+                    <label style={lblAdv}>{t("Iznos €")}</label>
+                    <input type="number" inputMode="decimal" placeholder="0,00" value={sp.amount} onChange={e=>updSplit(sp.id,{amount:e.target.value})} style={{...fld, height:38, fontFamily:"'JetBrains Mono',monospace", fontWeight:700, fontSize:13}}/>
+                  </div>
+                  <div>
+                    <label style={lblAdv}>{sp.category?categoryIcon(sp.category):"🏷️"} {t("Kategorija")}</label>
+                    <select value={sp.category} onChange={e=>updSplit(sp.id,{category:e.target.value})} style={{...fld, height:38, color:!sp.category?C.textMuted:C.text}}>
+                      <option value="" disabled>{t("- odabrati -")}</option>
+                      {cats.map(c=><option key={c} value={c}>{categoryIcon(c)} {t(c)}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={()=>delSplit(sp.id)} disabled={splits.length<=2} style={{ height:38, background:"transparent", border:`1px solid ${C.border}`, borderRadius:8, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", opacity:splits.length<=2?0.3:1 }}>
+                    <Ic n="x" s={11} c={C.textMuted}/>
+                  </button>
+                </div>
+              ))}
+              <div style={{ display:"flex", gap:6, marginTop:4 }}>
+                <button onClick={addSplit} style={{ flex:1, padding:"6px 10px", background:"transparent", border:`1px dashed ${C.border}`, borderRadius:9, color:C.textMuted, fontSize:11, cursor:"pointer" }}>+ {t("Dodaj stavku")}</button>
+                {splitRemainder>0.005 && (
+                  <button onClick={()=>updSplit(splits[splits.length-1].id,{amount:String(Math.round((parseFloat(splits[splits.length-1].amount||0)+splitRemainder)*100)/100)})}
+                    style={{ padding:"6px 10px", background:`${C.income}15`, border:`1px solid ${C.income}40`, borderRadius:9, color:C.income, fontSize:11, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
+                    ↓ {fmtEur(splitRemainder)}
+                  </button>
+                )}
+              </div>
             </div>
-            <div>
-              <label style={lbl}>
-                <Ic n="pin" s={11} c={C.textMuted}/>{t("Lokacija")}
-                {autoFilledFields.has('location') && <span style={{ marginLeft:'auto', fontSize:9, color:C.income, fontWeight:700 }}>{t("auto")}</span>}
-              </label>
-              <select value={form.location} onChange={e=>{
-                upd({location:e.target.value});
-                setAutoFilledFields(prev => { const s = new Set(prev); s.delete('location'); return s; });
-                clearErr();
-              }} style={{...fld, color:!form.location?C.textMuted:C.text, borderColor:bd("location"), ...autoFilledStyle('location')}}>
-                <option value="" disabled>{t("- odabrati -")}</option>
-                {lists.locations.map(l=><option key={l} value={l}>{t(l)}</option>)}
-              </select>
-            </div>
+          )}
+
+          {/* ── "Više opcija" toggle ─────────────────────────────────── */}
+          <button type="button" onClick={() => setShowAdvanced(v => !v)}
+            style={{ background:"transparent", border:"none", padding:"2px 0", cursor:"pointer", display:"flex", alignItems:"center", gap:6, color:C.textMuted, fontSize:12, fontWeight:600, alignSelf:"flex-start" }}>
+            <Ic n={showAdvanced ? "chevron" : "chevron"} s={11} c={C.textMuted}
+              style={{ transform: showAdvanced ? "rotate(90deg)" : "rotate(-90deg)", transition:"transform .2s" }}/>
+            {showAdvanced ? t("Sakrij opcije") : t("Više opcija")}
+            {/* Show hint badges when advanced fields have values */}
+            {!showAdvanced && (form.location || form.notes || inst > 1 || isRecurring) && (
+              <span style={{ background:C.accent, borderRadius:10, padding:"1px 6px", fontSize:9, fontWeight:700, color:"#fff" }}>
+                {[form.location && form.location !== "Ostalo", form.notes, inst > 1, isRecurring].filter(Boolean).length}
+              </span>
+            )}
+          </button>
+
+          {showAdvanced && (<>
+          <div>
+            <label style={lblAdv}>
+              <Ic n="pin" s={10} c={C.textMuted}/>{t("Lokacija")}
+              {autoFilledFields.has('location') && <span style={{ marginLeft:'auto', fontSize:9, color:C.income, fontWeight:700 }}>{t("auto")}</span>}
+            </label>
+            <select value={form.location} onChange={e=>{
+              upd({location:e.target.value});
+              setAutoFilledFields(prev => { const s = new Set(prev); s.delete('location'); return s; });
+              clearErr();
+            }} style={{...fld, color:!form.location?C.textMuted:C.text, borderColor:bd("location"), ...autoFilledStyle('location')}}>
+              <option value="" disabled>{t("- odabrati -")}</option>
+              {lists.locations.map(l=><option key={l} value={l}>{t(l)}</option>)}
+            </select>
           </div>
 
           {form.type==="Isplata" && !tx && (
@@ -419,6 +502,7 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
             <textarea placeholder={t("Opcionalno…")} value={form.notes||""} onChange={e=>upd({notes:e.target.value})}
               rows={2} style={{...fld, height:"auto", padding:"10px 12px", resize:"vertical"}}/>
           </div>
+          </>)}
         </div>
 
         {err.msg && (
