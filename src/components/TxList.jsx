@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { fmtEur, fDate } from '../lib/helpers.js';
+import { categoryIcon } from '../lib/categoryIcons.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
 
-function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, t, fmt: fmtProp }) {
+function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, onUnpay, t, fmt: fmtProp }) {
   const fmt = fmtProp || fmtEur;
   const [q, setQ]          = useState("");
   const [delCfm,setDelCfm] = useState(null);
@@ -13,17 +14,15 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
   // Default to overdue on mount
   useEffect(() => { setFilter("overdue"); }, []);
 
-  // Color map for filter → left border color
   const filterColor = {
-    all:        null, // use type-based color
+    all:        null,
     expense:    C.income,
     pending:    C.warning,
     processing: "#FB923C",
     income:     C.income,
-    overdue:    C.expense, // keep as-is
+    overdue:    C.expense,
   };
 
-  // Detect potential duplicates — same amount, date, description
   const dupIds = useMemo(() => {
     const seen = {};
     const dups = new Set();
@@ -41,7 +40,6 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
     if (filter==="income")   f = f.filter(x=>x.type==="Primitak");
     if (filter==="pending")  f = f.filter(x=>x.status==="Čeka plaćanje");
     if (filter==="processing") f = f.filter(x=>x.status==="U obradi");
-    // "overdue" = pending/processing with date <= today (current + past months, unpaid)
     if (filter==="overdue") {
       const today = new Date(); today.setHours(23,59,59,999);
       f = data.filter(x =>
@@ -66,12 +64,37 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
     return f.sort((a,b)=>new Date(b.date)-new Date(a.date));
   },[data,filter,q,year]);
 
-  // Reset to page 1 when filter or search changes.
   useEffect(() => { setPage(1); }, [filter, q]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
   const pageRows   = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // ─── Long-press: revert "Plaćeno" → "Čeka plaćanje" ───────────────────────
+  // Holding 600ms on a paid expense triggers onUnpay. Touch moves cancel it.
+  const longPressTimer = useRef(null);
+  const longPressTriggered = useRef(false);
+  const [longPressFeedback, setLongPressFeedback] = useState(null);
+
+  const startLongPress = (tx) => {
+    if (!onUnpay || tx.status !== "Plaćeno" || tx.type !== "Isplata") return;
+    longPressTriggered.current = false;
+    setLongPressFeedback(tx.id);
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true;
+      onUnpay(tx.id);
+      setLongPressFeedback(null);
+      // Haptic feedback if available.
+      if (navigator.vibrate) try { navigator.vibrate(40); } catch {}
+    }, 600);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    setLongPressFeedback(null);
+  };
 
   return (
     <div className="fi" style={{ width:"100%" }}>
@@ -104,6 +127,12 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
             {t("Prikazuje neplaćene stavke s rokom do danas (tekući + prošli mjeseci)")}
           </div>
         )}
+        {filter==="expense" && onUnpay && rows.length > 0 && (
+          <div style={{ fontSize:10, color:C.textMuted, marginBottom:8, padding:"4px 2px", display:"flex", alignItems:"center", gap:5, fontStyle:"italic" }}>
+            <Ic n="info" s={10} c={C.textMuted}/>
+            {t("Savjet: drži duže na ikoni kategorije za vraćanje u Čeka plaćanje")}
+          </div>
+        )}
         {rows.length===0
           ? <div style={{ textAlign:"center", padding:50, color:C.textMuted }}>
               <Ic n="list" s={44} c={C.border} style={{ marginBottom:12, opacity:.3 }}/>
@@ -111,15 +140,44 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
               <p style={{ fontSize:12, marginTop:4 }}>{q ? t("Pokušajte s drugim pojmom za pretragu.") : filter !== "all" ? t("Nema stavki za odabrani filter.") : t("Pritisnite + za dodavanje.")}</p>
             </div>
           : pageRows.map((tx,i)=>{
-            // Left border color: filter-based (except overdue keeps type-based), fallback to type
             const leftColor = filter === "overdue"
               ? (tx.installmentGroup ? C.warning : tx.type==="Primitak" ? C.income : C.expense)
               : filter === "all"
                 ? (tx.installmentGroup ? C.warning : tx.type==="Primitak" ? C.income : C.expense)
                 : (filterColor[filter] || (tx.type==="Primitak" ? C.income : C.expense));
+
+            const isLongPressActive = longPressFeedback === tx.id;
+            const canUnpay = onUnpay && tx.status === "Plaćeno" && tx.type === "Isplata";
+
             return (
             <div key={tx.id} className="su" style={{ background:C.card, border:`1px solid ${C.border}`, borderLeft:`3px solid ${leftColor}`, borderRadius:14, padding:13, marginBottom:8, animationDelay:`${i*.02}s` }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"stretch" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"stretch", gap:10 }}>
+
+                {/* Category icon — leftmost element. Long-press to revert paid status. */}
+                <div
+                  onMouseDown={()=>canUnpay && startLongPress(tx)}
+                  onMouseUp={cancelLongPress}
+                  onMouseLeave={cancelLongPress}
+                  onTouchStart={()=>canUnpay && startLongPress(tx)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchCancel={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  title={canUnpay ? t("Drži duže za vraćanje u Čeka plaćanje") : ""}
+                  style={{
+                    width:38, height:38,
+                    flexShrink:0,
+                    borderRadius:11,
+                    background: isLongPressActive ? `${C.warning}30` : `${leftColor}15`,
+                    border: `1px solid ${isLongPressActive ? C.warning : leftColor}30`,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:20,
+                    transition:"all .2s",
+                    cursor: canUnpay ? "pointer" : "default",
+                    userSelect:"none",
+                  }}>
+                  {tx.type === "Primitak" ? "💵" : categoryIcon(tx.category)}
+                </div>
+
                 <div style={{ flex:1, minWidth:0, textAlign:"left" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                     <span style={{ fontWeight:600, fontSize:14, color:C.text }}>{tx.description}</span>
@@ -133,8 +191,8 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
                   <div style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>{fDate(tx.date)} · {t(tx.category)} · {t(tx.location)}</div>
                   <div style={{ fontSize:11, color:C.textMuted, marginTop:2 }}>{t(tx.payment)} · <span style={{ color:tx.status==="Plaćeno"?C.income:tx.status==="U obradi"?"#FB923C":C.warning }}>{t(tx.status)}</span></div>
                 </div>
-                
-                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", flexShrink:0, marginLeft:10 }}>
+
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", flexShrink:0 }}>
                   <div style={{ fontSize:15, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:tx.type==="Primitak"?C.income:C.expense }}>{tx.type==="Primitak"?"+":"-"}{fmt(+tx.amount)}</div>
                   <div style={{ display:"flex", gap:5, marginTop:"auto", justifyContent:"flex-end" }}>
                     {(tx.status==="Čeka plaćanje" || tx.status==="U obradi") && <button title={t("Plati")} onClick={()=>onPay(tx.id)} style={{ background:`${C.income}18`, border:`1px solid ${C.income}40`, borderRadius:8, padding:"5px 8px", cursor:"pointer" }}><Ic n="check" s={13} c={C.income}/></button>}

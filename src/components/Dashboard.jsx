@@ -3,6 +3,7 @@ import { PieChart, Pie, Cell } from 'recharts';
 import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, DEF_LISTS, T, CHART_COLORS, BACKUP_SNOOZE_MS } from '../lib/constants.js';
 import { fmtEur, monthOf, curYear, curMonthIdx, needsBackupReminder } from '../lib/helpers.js';
 import { Ic, LynxLogo } from './ui.jsx';
+import { categoryIcon } from '../lib/categoryIcons.js';
 
 function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD }) {
   const fmt = fmtProp || fmtEur;
@@ -251,7 +252,8 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                       <div key={c.name} style={{ display:"flex", justifyContent:"space-between", padding:"4px 0", borderBottom: i<catsMonth.length-1?`1px solid ${C.border}40`:"none", fontSize:11 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                           <div style={{ width:7, height:7, borderRadius:2, background:CHART_COLORS[i%CHART_COLORS.length], flexShrink:0 }}/>
-                          <span style={{ color:C.textSub, maxWidth:80, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t(c.name)}</span>
+                          <span style={{ fontSize:13, lineHeight:1 }}>{categoryIcon(c.name)}</span>
+                          <span style={{ color:C.textSub, maxWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t(c.name)}</span>
                         </div>
                         <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:600, fontSize:11 }}>{fmt(c.value)}</span>
                       </div>
@@ -290,10 +292,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     <div key={item.kind+"-"+item.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 9px", background:C.cardAlt, borderRadius:9, border:`1px solid ${C.border}`, flexShrink:0 }}>
                       <div style={{
                         width:28, height:28, borderRadius:8,
-                        background: item.kind==="recurring" ? `${C.accent}20` : `${C.warning}20`,
+                        background: item.kind==="recurring" ? `${C.accent}15` : `${C.warning}15`,
+                        border: `1px solid ${item.kind==="recurring" ? C.accent : C.warning}30`,
                         display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
+                        fontSize:14,
                       }}>
-                        <Ic n={item.kind==="recurring"?"repeat":"coins"} s={12} c={item.kind==="recurring"?C.accent:C.warning}/>
+                        {categoryIcon(item.category)}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize:12, fontWeight:600, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
