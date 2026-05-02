@@ -22,6 +22,9 @@ function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, list
     if (subPg === "recurring") {
       return <RecurringEditor C={C} items={lists.recurring||[]} lists={lists} t={t} onBack={arr=>{ setLists(l=>({...l,recurring:arr})); setSubPg(null); }}/>;
     }
+    if (subPg === "recurring_income") {
+      return <RecurringEditor C={C} items={lists.recurring_income||[]} lists={lists} t={t} incomeMode={true} onBack={arr=>{ setLists(l=>({...l,recurring_income:arr})); setSubPg(null); }}/>;
+    }
     if (subPg === "about") {
       return <AboutScreen C={C} onBack={()=>setSubPg(null)} t={t} lang={lang}/>;
     }
@@ -103,6 +106,7 @@ function Settings({ C, txs, setTxs, drafts, prefs, updPrefs, user, updUser, list
         <div style={{ marginTop:14, marginBottom:6 }}>
           <SL text={t("Redovne obveze")} icon="repeat"/>
           <Row icon="repeat" label={t("Upravljaj obvezama")} sub={`${(lists.recurring||[]).length} ${t("definiranih obveza")}`} onClick={()=>setSubPg("recurring")}/>
+          <Row icon="up" label={t("Redovni primici")} sub={`${(lists.recurring_income||[]).length} ${t("definiranih")} (${t("plaća, stanarina...")})`} onClick={()=>setSubPg("recurring_income")}/>
         </div>
 
         <div style={{ marginTop:14, marginBottom:6 }}>
