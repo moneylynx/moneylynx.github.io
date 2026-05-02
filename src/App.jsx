@@ -9,6 +9,7 @@ import {
   cacheKeyToSession, loadKeyFromSession, clearSessionKey,
 } from './lib/crypto.js';
 import { supabase, signOut } from './lib/supabase.js';
+import { updateBadge, registerPeriodicSync, parseShortcutAction, computeOverdueCount } from './lib/pwaBadge.js';
 import { uploadAll } from './lib/sync.js';
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -24,12 +25,16 @@ import { Ic, LynxLogoWhite, QuickAddModal, ActionHubModal } from './components/u
 import { LockScreen, SetupPin, OnboardingScreen }           from './components/auth.jsx';
 import AuthScreen    from './components/AuthScreen.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';
 import Dashboard     from './components/Dashboard.jsx';
 import TxForm        from './components/TxForm.jsx';
 import TxList        from './components/TxList.jsx';
 import Charts        from './components/Charts.jsx';
 import Settings      from './components/Settings.jsx';
 import { RecurringScreen } from './components/Settings.jsx';
+
+// Haptic feedback helper — silent if browser doesn't support vibrate
+const haptic = (ms = 40) => { try { navigator.vibrate?.(ms); } catch {} };
 
 export default function App() {
   const _sec    = load(K.sec, {});
@@ -125,6 +130,29 @@ export default function App() {
     else if (!sec.pinHash) { save(K.usr, user); }
   }, [user]);
   useEffect(() => { save(K.sec, sec); }, [sec]);
+
+  // ── PWA badge + shortcut setup ───────────────────────────────────────────────
+  useEffect(() => {
+    registerPeriodicSync();
+    const shortcut = parseShortcutAction();
+    if (shortcut) {
+      setPage(shortcut.page);
+      if (shortcut.filter) setTxFilter(shortcut.filter);
+    }
+    // Listen for SW badge count requests
+    const handler = (e) => {
+      if (e.data?.type === 'REQUEST_BADGE_COUNT') {
+        updateBadge(computeOverdueCount(txs, lists));
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handler);
+    return () => navigator.serviceWorker?.removeEventListener('message', handler);
+  }, []);
+
+  // Update badge whenever txs or lists change
+  useEffect(() => {
+    updateBadge(computeOverdueCount(txs, lists));
+  }, [txs, lists]);
 
   // ── One-time setup effects ─────────────────────────────────────────────────
   useEffect(() => {
@@ -350,7 +378,7 @@ export default function App() {
       {page === 'dashboard'    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} setTxFilter={setTxFilter} onQuickAdd={() => setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg} syncing={syncing} supaUser={supaUser}/>}
       {page === 'add'          && <TxForm {...shared} txs={txs} draft={draftEdit} setLists={setLists} onSubmit={tx => { addTx(tx); if (draftEdit) { setDrafts(p => p.filter(d => d.id !== draftEdit.id)); setDraftEdit(null); } }} onCancel={() => { setPage('dashboard'); setDraftEdit(null); }} onGoRecurring={() => setPage('recurring')}/>}
       {page === 'edit'         && <TxForm {...shared} txs={txs} tx={txs.find(x => x.id === editId)} setLists={setLists} onSubmit={handleUpdTx} onCancel={() => { setEditId(null); setPage('transactions'); }}/>}
-      {page === 'transactions' && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id => { setEditId(id); setPage('edit'); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id => setTxs(p => p.map(x => x.id === id ? { ...x, status: 'Plaćeno', date: new Date().toISOString().split('T')[0] } : x))} onUnpay={id => {
+      {page === 'transactions' && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id => { setEditId(id); setPage('edit'); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id => { haptic(40); setTxs(p => p.map(x => x.id === id ? { ...x, status: 'Plaćeno', date: new Date().toISOString().split('T')[0] } : x)); }} onUnpay={id => {
         const tx = txs.find(x => x.id === id);
         if (!tx) return;
         const previousStatus = tx.status;
@@ -360,9 +388,9 @@ export default function App() {
           setTxs(p => p.map(x => x.id === id ? { ...x, status: previousStatus, date: previousDate } : x));
         });
       }}/>}
-      {page === 'charts'       && <Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/>}
+      {page === 'charts'       && <ChunkErrorBoundary C={C} label={t('Statistika')} t={t}><Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/></ChunkErrorBoundary>}
       {page === 'recurring'    && <RecurringScreen {...shared} data={txs} setTxs={setTxs} onBack={() => setPage('dashboard')}/>}
-      {page === 'settings'     && <Settings {...shared} txs={txs} setTxs={setTxs} drafts={drafts} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode} onChangePinCrypto={handleChangePinCrypto} onRemovePinCrypto={handleRemovePinCrypto} supaUser={supaUser} onSignOut={async () => { await signOut(); setSupaUser(null); }} onSyncToCloud={supaUser ? async (t, l, u) => { await uploadAll(supaUser.id, { txs: t || txs, lists: l || lists, user: u || user }); } : null}/>}
+      {page === 'settings'     && <ChunkErrorBoundary C={C} label={t('Postavke')} t={t}><Settings {...shared} txs={txs} setTxs={setTxs} drafts={drafts} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode} onChangePinCrypto={handleChangePinCrypto} onRemovePinCrypto={handleRemovePinCrypto} supaUser={supaUser} onSignOut={async () => { await signOut(); setSupaUser(null); }} onSyncToCloud={supaUser ? async (t, l, u) => { await uploadAll(supaUser.id, { txs: t || txs, lists: l || lists, user: u || user }); } : null}/></ChunkErrorBoundary>}
 
       {showQuickAdd  && <QuickAddModal  C={C} t={t} onClose={() => setShowQuickAdd(false)} onSave={d => { setDrafts(p => [{ id: Date.now().toString(), amount: d.amount, description: d.desc, date: new Date().toISOString() }, ...p]); setShowQuickAdd(false); }}/>}
       {showActionHub && <ActionHubModal C={C} t={t} drafts={drafts} onClose={() => setShowActionHub(false)} onNew={() => { setPage('add'); setDraftEdit(null); setShowActionHub(false); }} onSelect={d => { setDraftEdit(d); setPage('add'); setShowActionHub(false); }} onDel={delDraft}/>}
