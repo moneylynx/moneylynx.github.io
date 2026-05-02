@@ -350,7 +350,16 @@ export default function App() {
       {page === 'dashboard'    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} setTxFilter={setTxFilter} onQuickAdd={() => setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg} syncing={syncing} supaUser={supaUser}/>}
       {page === 'add'          && <TxForm {...shared} txs={txs} draft={draftEdit} setLists={setLists} onSubmit={tx => { addTx(tx); if (draftEdit) { setDrafts(p => p.filter(d => d.id !== draftEdit.id)); setDraftEdit(null); } }} onCancel={() => { setPage('dashboard'); setDraftEdit(null); }} onGoRecurring={() => setPage('recurring')}/>}
       {page === 'edit'         && <TxForm {...shared} txs={txs} tx={txs.find(x => x.id === editId)} setLists={setLists} onSubmit={handleUpdTx} onCancel={() => { setEditId(null); setPage('transactions'); }}/>}
-      {page === 'transactions' && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id => { setEditId(id); setPage('edit'); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id => setTxs(p => p.map(x => x.id === id ? { ...x, status: 'Plaćeno', date: new Date().toISOString().split('T')[0] } : x))}/>}
+      {page === 'transactions' && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id => { setEditId(id); setPage('edit'); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id => setTxs(p => p.map(x => x.id === id ? { ...x, status: 'Plaćeno', date: new Date().toISOString().split('T')[0] } : x))} onUnpay={id => {
+        const tx = txs.find(x => x.id === id);
+        if (!tx) return;
+        const previousStatus = tx.status;
+        const previousDate = tx.date;
+        setTxs(p => p.map(x => x.id === id ? { ...x, status: 'Čeka plaćanje' } : x));
+        startUndo(t('Status vraćen u Čeka plaćanje'), () => {
+          setTxs(p => p.map(x => x.id === id ? { ...x, status: previousStatus, date: previousDate } : x));
+        });
+      }}/>}
       {page === 'charts'       && <Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/>}
       {page === 'recurring'    && <RecurringScreen {...shared} data={txs} setTxs={setTxs} onBack={() => setPage('dashboard')}/>}
       {page === 'settings'     && <Settings {...shared} txs={txs} setTxs={setTxs} drafts={drafts} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode} onChangePinCrypto={handleChangePinCrypto} onRemovePinCrypto={handleRemovePinCrypto} supaUser={supaUser} onSignOut={async () => { await signOut(); setSupaUser(null); }} onSyncToCloud={supaUser ? async (t, l, u) => { await uploadAll(supaUser.id, { txs: t || txs, lists: l || lists, user: u || user }); } : null}/>}
