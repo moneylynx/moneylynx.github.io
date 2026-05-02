@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell } from 'recharts';
 import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, DEF_LISTS, T, CHART_COLORS, BACKUP_SNOOZE_MS } from '../lib/constants.js';
-import { fmtEur, monthOf, curYear, curMonthIdx, needsBackupReminder } from '../lib/helpers.js';
+import { fmtEur, monthOf, curYear, curMonthIdx, needsBackupReminder, expandSplits } from '../lib/helpers.js';
 import { Ic, LynxLogo } from './ui.jsx';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { useAdvisor } from '../hooks/useAdvisor.js';
@@ -43,20 +43,34 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
       const day = Math.max(1, Math.min(28, parseInt(r.dueDay)||1));
       items.push({ kind:"recurring", id:r.id, date:new Date(cy,cmi,day).toISOString().split("T")[0], description:r.description, category:r.category, location:r.location, amount:parseFloat(r.amount)||0, recurring:r });
     });
+    // ── Upcoming recurring income ────────────────────────────────────────
+    const recInc = lists.recurring_income || [];
+    const recIncPaidIds = new Set(md.filter(x => x.recurringIncomeId).map(x => x.recurringIncomeId));
+    recInc.forEach(r => {
+      if (recIncPaidIds.has(r.id)) return;
+      const day = Math.max(1, Math.min(28, parseInt(r.dueDay)||1));
+      items.push({ kind:"recurring_income", id:r.id, date:new Date(cy,cmi,day).toISOString().split("T")[0], description:r.description, category:r.category, amount:parseFloat(r.amount)||0, recurring:r });
+    });
+
     return items.sort((a,b) => a.date.localeCompare(b.date));
-  }, [data, md, lists.recurring]);
+  }, [data, md, lists.recurring, lists.recurring_income]);
 
   const payTodoItem = (item) => {
     if (!setTxs) return;
+    try { navigator.vibrate?.(40); } catch {}
     const today = new Date().toISOString().split("T")[0];
     if (item.kind === "tx") { setTxs(p => p.map(x => x.id === item.id ? {...x, status:"Plaćeno", date:today} : x)); return; }
     const r = item.recurring;
+    if (item.kind === "recurring_income") {
+      setTxs(p => [...p, { id:Date.now().toString(), type:"Primitak", date:today, description:r.description, amount:r.amount, category:r.category||"Plaća", location:"Ostalo", payment:r.payment||"Bankovni prijenos", status:"Plaćeno", notes:r.notes||"", recurringIncomeId:r.id, installments:0 }]);
+      return;
+    }
     setTxs(p => [...p, { id:Date.now().toString(), type:"Isplata", date:today, description:r.description, amount:r.amount, category:r.category, location:r.location, payment:r.payment, status:"Plaćeno", notes:r.notes||"", recurringId:r.id, installments:0 }]);
   };
 
   const catsMonth = useMemo(() => {
     const m = {};
-    md.filter(x => x.type === "Isplata").forEach(x => { m[x.category]=(m[x.category]||0)+(+x.amount||0); });
+    expandSplits(md.filter(x => x.type === "Isplata")).forEach(x => { m[x.category]=(m[x.category]||0)+(parseFloat(x.amount)||0); });
     return Object.entries(m).map(([name,value]) => ({name,value})).sort((a,b) => b.value-a.value);
   }, [md]);
 
@@ -269,14 +283,15 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                 <div style={{ padding:"6px 10px",display:"flex",flexDirection:"column",gap:5 }}>
                   {todoItems.slice(0,3).map(item => (
                     <div key={item.kind+"-"+item.id} style={{ display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:C.cardAlt,borderRadius:9,border:`1px solid ${C.border}` }}>
-                      <div style={{ width:26,height:26,borderRadius:7,background:item.kind==="recurring"?`${C.accent}15`:`${C.warning}15`,border:`1px solid ${item.kind==="recurring"?C.accent:C.warning}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13 }}>
-                        {categoryIcon(item.category)}
+                      <div style={{ width:26,height:26,borderRadius:7,background:item.kind==="recurring_income"?`${C.income}15`:item.kind==="recurring"?`${C.accent}15`:`${C.warning}15`,border:`1px solid ${item.kind==="recurring_income"?C.income:item.kind==="recurring"?C.accent:C.warning}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13 }}>
+                        {item.kind==="recurring_income" ? "💵" : categoryIcon(item.category)}
                       </div>
                       <div style={{ flex:1,minWidth:0 }}>
                         <div style={{ fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{item.description || t(item.category)}</div>
                         <div style={{ fontSize:10,color:C.textMuted,display:"flex",alignItems:"center",gap:3,marginTop:1 }}>
                           <Ic n="cal" s={9} c={C.textMuted}/>{new Date(item.date).getDate()}.{new Date(item.date).getMonth()+1}.
-                          {item.kind==="recurring" && <span style={{ color:C.accent,fontWeight:600 }}>· {t("Redovno")}</span>}
+                          {item.kind==="recurring" && <span style={{ color:C.accent,fontWeight:600 }}>· {t("Redovna obveza")}</span>}
+                          {item.kind==="recurring_income" && <span style={{ color:C.income,fontWeight:600 }}>· {t("Redovni primitak")}</span>}
                         </div>
                       </div>
                       <div style={{ fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.text,flexShrink:0 }}>{fmt(item.amount)}</div>

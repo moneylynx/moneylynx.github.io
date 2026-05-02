@@ -371,6 +371,7 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
                   <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span style={{ fontWeight: 600, fontSize: 14, color: C.text }}>{tx.description}</span>
+                      {tx.splits?.length > 0 && <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:10, background:`${C.accent}20`, color:C.accent }}>🔀 {tx.splits.length}</span>}
                       {tx.installmentGroup && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10, background: `${C.warning}20`, color: C.warning }}>{tx.installmentNum}/{tx.installmentTotal}</span>}
                       {dupIds.has(tx.id) && (
                         <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10, background: `${C.expense}20`, color: C.expense, display: "flex", alignItems: "center", gap: 3 }}>
@@ -389,7 +390,7 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
                       </div>
                       <div style={{ display: "flex", gap: 5, marginTop: "auto", justifyContent: "flex-end" }}>
                         {(tx.status === "Čeka plaćanje" || tx.status === "U obradi") && (
-                          <button title={t("Plati")} onClick={() => onPay(tx.id)} style={{ background: `${C.income}18`, border: `1px solid ${C.income}40`, borderRadius: 8, padding: "5px 8px", cursor: "pointer" }}>
+                          <button title={t("Plati")} onClick={() => { try{navigator.vibrate?.(40)}catch{}; onPay(tx.id); }} style={{ background: `${C.income}18`, border: `1px solid ${C.income}40`, borderRadius: 8, padding: "5px 8px", cursor: "pointer" }}>
                             <Ic n="check" s={13} c={C.income}/>
                           </button>
                         )}
@@ -427,6 +428,18 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
                   </div>
                 )}
                 {tx.notes && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 7, fontStyle: "italic", borderTop: `1px solid ${C.border}`, paddingTop: 7, textAlign: "left" }}>💬 {tx.notes}</div>}
+              {tx.splits?.length > 0 && (
+                <div style={{ marginTop: 7, paddingTop: 7, borderTop: `1px solid ${C.border}40` }}>
+                  {tx.splits.map((sp, si) => (
+                    <div key={sp.id || si} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: C.textMuted, padding: "2px 0" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span>{categoryIcon(sp.category)}</span>{t(sp.category)}{sp.description ? ` · ${sp.description}` : ""}
+                      </span>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 600 }}>{fmt(sp.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               </div>
             );
           })
