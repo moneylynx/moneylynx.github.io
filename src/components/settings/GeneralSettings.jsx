@@ -4,6 +4,7 @@ import { fmtEur, fDate, load, save, curYear, buildCSV, buildSummary, nativeSaveA
 import { hashPinV2, hashPinLegacy } from '../../lib/crypto.js';
 import { Ic, LynxLogo, LynxLogoWhite, StickyHeader } from '../ui.jsx';
 import { SetupPin } from '../auth.jsx';
+import { saveToGoogleDrive, loadFromGoogleDrive, isDriveConfigured, revokeGoogleToken } from '../../lib/googleDriveBackup.js';
 
 function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, t, lang }) {
   const [pinChg,  setPinChg]  = useState(false);
@@ -17,6 +18,11 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   // note/chat app and save it elsewhere.
   const [exportFallback, setExportFallback] = useState(null); // { filename, content }
   const [exportYear, setExportYear]         = useState("all"); // "all" or specific year
+
+  // ── Google Drive backup state ──────────────────────────────────────────────
+  const [driveStatus,  setDriveStatus]  = useState(null); // null | 'saving' | 'saved' | 'error' | 'loading'
+  const [driveMsg,     setDriveMsg]     = useState("");
+  const [driveLastAt,  setDriveLastAt]  = useState(() => load(K.prf, {}).driveLastBackup || null);
 
   const hasProfileData = user.firstName || user.lastName || user.phone || user.email;
   const [isEditingProfile, setIsEditingProfile] = useState(!hasProfileData);
@@ -58,6 +64,50 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
 
   // Complete backup — serializes all app data except PIN hash (safety).
   // Instead of trying to silently pick the "right" save path (which fails
+  // ── Google Drive handlers ──────────────────────────────────────────────────
+  const buildBackupPayload = () => {
+    const yr = exportYear === "all" ? null : parseInt(exportYear);
+    const filtTxs = yr ? txs.filter(x => new Date(x.date).getFullYear() === yr) : txs;
+    return {
+      __moja_lova_backup: true, version: 2,
+      exportedAt: new Date().toISOString(), exportYear: yr || "all",
+      data: { txs: filtTxs, lists, user, prefs: { ...prefs, lastBackupAt: Date.now() } },
+    };
+  };
+
+  const driveBackup = async () => {
+    setDriveStatus("saving"); setDriveMsg("");
+    try {
+      const payload = buildBackupPayload();
+      const result  = await saveToGoogleDrive(payload);
+      const now = Date.now();
+      updPrefs({ lastBackupAt: now, driveLastBackup: result.updatedAt });
+      setDriveLastAt(result.updatedAt);
+      setDriveStatus("saved");
+      setDriveMsg(t("Backup spremljen na Google Drive."));
+    } catch (e) {
+      setDriveStatus("error");
+      setDriveMsg(e.message || t("Greška pri spajanju s Google Driveom."));
+    }
+  };
+
+  const driveRestore = async () => {
+    setDriveStatus("loading"); setDriveMsg("");
+    try {
+      const payload = await loadFromGoogleDrive();
+      if (!payload) { setDriveStatus("error"); setDriveMsg(t("Nema backupa na Google Driveu.")); return; }
+      const data = payload.__moja_lova_backup ? payload.data : payload;
+      if (!data || !data.txs) { setDriveStatus("error"); setDriveMsg(t("Datoteka nije valjan backup.")); return; }
+      if (data.txs)   setTxs(data.txs);
+      if (data.lists) setLists(data.lists);
+      if (data.user)  updUser(data.user);
+      updPrefs({ ...data.prefs, onboarded: true, lastBackupAt: Date.now() });
+      setDriveStatus("saved"); setDriveMsg(t("Podaci vraćeni s Google Drivea."));
+    } catch (e) {
+      setDriveStatus("error"); setDriveMsg(e.message || t("Greška pri čitanju s Google Drivea."));
+    }
+  };
+
   // unpredictably in WebView/APK environments), we ALWAYS show the backup
   // content in a modal with three clear action buttons: Copy, Share, Download.
   // Whatever fails, the user always has a working option.
@@ -375,6 +425,56 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             <input type="file" accept="*/*" onChange={fullImport} style={{ display:"none" }}/>
           </label>
         </div>
+
+        {/* ── Google Drive backup section ──────────────────────────────── */}
+        {isDriveConfigured() && (
+          <div style={{ marginTop: 14, marginBottom: 6 }}>
+            <SL text="Google Drive" icon="repeat"/>
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 13, padding: "12px 14px", marginBottom: 7 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: "#4285F420", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 20 }}>
+                  ☁️
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Google Drive Backup</div>
+                  <div style={{ fontSize: 11, color: C.textMuted }}>
+                    {driveLastAt
+                      ? `${t("Zadnji backup")}: ${new Date(driveLastAt).toLocaleString("hr-HR")}`
+                      : t("Automatski sigurni backup u tvoj Drive")}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <button onClick={driveBackup} disabled={driveStatus === "saving"}
+                  style={{ padding: "10px 12px", background: `linear-gradient(135deg,#4285F420,#4285F408)`, border: "1px solid #4285F440", borderRadius: 10, cursor: driveStatus === "saving" ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                  {driveStatus === "saving"
+                    ? <><span style={{ width: 14, height: 14, borderRadius: "50%", border: `2px solid #4285F4`, borderTopColor: "transparent", animation: "spin 1s linear infinite", display: "inline-block" }}/><span style={{ fontSize: 12, fontWeight: 600, color: "#4285F4" }}>{t("Sprema…")}</span></>
+                    : <><Ic n="dl" s={14} c="#4285F4"/><span style={{ fontSize: 12, fontWeight: 600, color: "#4285F4" }}>{t("Spremi na Drive")}</span></>
+                  }
+                </button>
+                <button onClick={driveRestore} disabled={driveStatus === "loading"}
+                  style={{ padding: "10px 12px", background: `${C.cardAlt}`, border: `1px solid ${C.border}`, borderRadius: 10, cursor: driveStatus === "loading" ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                  {driveStatus === "loading"
+                    ? <><span style={{ width: 14, height: 14, borderRadius: "50%", border: `2px solid ${C.accent}`, borderTopColor: "transparent", animation: "spin 1s linear infinite", display: "inline-block" }}/><span style={{ fontSize: 12, fontWeight: 600, color: C.accent }}>{t("Učitava…")}</span></>
+                    : <><Ic n="ul" s={14} c={C.accent}/><span style={{ fontSize: 12, fontWeight: 600, color: C.accent }}>{t("Vrati s Drivea")}</span></>
+                  }
+                </button>
+              </div>
+
+              {driveMsg && (
+                <div style={{ marginTop: 10, padding: "8px 12px", background: driveStatus === "error" ? `${C.expense}15` : `${C.income}15`, border: `1px solid ${driveStatus === "error" ? C.expense : C.income}40`, borderRadius: 8, fontSize: 12, color: driveStatus === "error" ? C.expense : C.income, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Ic n={driveStatus === "error" ? "alert" : "check"} s={13} c={driveStatus === "error" ? C.expense : C.income}/>
+                  {driveMsg}
+                </div>
+              )}
+
+              <div style={{ marginTop: 10, padding: "8px 10px", background: C.cardAlt, borderRadius: 8, fontSize: 10, color: C.textMuted, lineHeight: 1.5 }}>
+                ℹ️ {t("Backup se sprema u tvoj privatni prostor na Google Driveu (appdata folder). Aplikacija ne može pristupiti tvojim ostalim Drive datotekama.")}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Account section */}
         {supaUser && (
