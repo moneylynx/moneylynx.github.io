@@ -1,11 +1,10 @@
 import { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, PieChart, Pie, Cell, AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, CHART_COLORS } from '../lib/constants.js';
-import { fmtEur, fDate, monthOf, curYear, expandSplits, safeNum } from '../lib/helpers.js';
+import { fmtEur, fDate, monthOf, curYear } from '../lib/helpers.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { computeYoY } from '../lib/advisor.js';
-// Note: computeYoY internally uses the passed txs — we pass expandSplits(data) below
 
 function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expFilter, setExpFilter, t, lang, fmt: fmtProp }) {
   const fmt = fmtProp || fmtEur;
@@ -26,8 +25,8 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
     const mLabel = (lang==="en" ? MSHORT_EN : MSHORT)[i];
     return{
       name:mLabel,
-      inc:  mt.filter(x=>x.type==="Primitak").reduce((s,x)=>s+safeNum(x.amount),0),
-      exp:  expandSplits(mt.filter(x=>x.type==="Isplata"&&x.status==="Plaćeno")).reduce((s,x)=>s+safeNum(x.amount),0),
+      inc:  mt.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0),
+      exp:  mt.filter(x=>x.type==="Isplata"&&x.status==="Plaćeno").reduce((s,x)=>s+(+x.amount||0),0),
       ceka: mt.filter(x=>x.status==="Čeka plaćanje").reduce((s,x)=>s+(+x.amount||0),0),
       obr:  mt.filter(x=>x.status==="U obradi").reduce((s,x)=>s+(+x.amount||0),0),
       rec:  recAmt,
@@ -45,7 +44,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
     });
   },[yd,year,lang]);
 
-  const catD  = useMemo(()=>{ const m={}; try { expandSplits(fd.filter(x=>x.type==="Isplata")).forEach(x=>{ m[x.category]=(m[x.category]||0)+safeNum(x.amount); }); } catch {} return Object.entries(m).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value); },[fd]);
+  const catD  = useMemo(()=>{ const m={}; fd.filter(x=>x.type==="Isplata").forEach(x=>{ m[x.category]=(m[x.category]||0)+(+x.amount||0); }); return Object.entries(m).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value); },[fd]);
   const payD  = useMemo(()=>{ const m={}; fd.forEach(x=>{ m[x.payment]=(m[x.payment]||0)+(+x.amount||0); }); return Object.entries(m).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value); },[fd]);
   const locD  = useMemo(()=>{ const m={}; fd.forEach(x=>{ m[x.location]=(m[x.location]||0)+(+x.amount||0); }); return Object.entries(m).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value); },[fd]);
 
@@ -330,7 +329,7 @@ function Charts({ C, data, year, lists, tab, setTab, selMonth, setSelMonth, expF
           const cy = curYear();
           const thisYear = year;
           const lastYear = year - 1;
-          const yoyData = computeYoY(expandSplits(data), thisYear, lastYear);
+          const yoyData = computeYoY(data, thisYear, lastYear);
           if (yoyData.length === 0) return <p style={{textAlign:"center",color:C.textMuted,padding:20,fontSize:13}}>{t("Nema podataka za usporedbu")}</p>;
 
           // Summary totals
