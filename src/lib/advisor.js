@@ -131,26 +131,28 @@ export function computeForecast(txs, lists, nowTs = Date.now()) {
   };
 }
 
-// ─── 2. ANOMALY DETECTION ────────────────────────────────────────────────────
-
-/**
- * Flags categories where current-month spend is significantly above the
- * 3-month rolling average.
- *
- * Thresholds:
- *   • ≥ 40% above rolling average
- *   • absolute current spend ≥ 15 € (avoids flagging €2 → €3 noise)
- *   • ≥ 2 months of prior history with non-zero spend in that category
- *
- * @returns {Array} anomalies — sorted by severity (worst first)
- *   Each: { category, currentSpend, avgSpend, pctAbove, severity }
- */
+// ─── 2. ANOMALY DETECTION (seasonal-aware) ──────────────────────────────────
+//
+// Primary strategy: compare current month against the SAME month in the prior
+// 1–2 years. This prevents December shopping or summer holidays from being
+// flagged as anomalies every year just because they spike above a 3-month
+// rolling average.
+//
+// Fallback strategy: if no same-month prior-year data exists (app is too new),
+// fall back to a 3-month rolling average — same as before.
+//
+// Thresholds:
+//   • ≥ 40% above baseline
+//   • absolute current spend ≥ 15 € (avoids €2 → €3 noise)
+//   • at least 1 comparable data point required
+//
+// @returns {Array} anomalies sorted by severity (worst first)
 export function detectAnomalies(txs, nowTs = Date.now()) {
-  const now  = new Date(nowTs);
-  const cy   = now.getFullYear();
-  const cm   = now.getMonth();
+  const now = new Date(nowTs);
+  const cy  = now.getFullYear();
+  const cm  = now.getMonth();
 
-  // Current month spend per category
+  // Current-month spend per category (expenses only)
   const cmTxs  = txs.filter(x => yrOf(x.date) === cy && miOf(x.date) === cm && x.type === 'Isplata');
   const cmCats = {};
   for (const tx of cmTxs) {
@@ -163,31 +165,53 @@ export function detectAnomalies(txs, nowTs = Date.now()) {
   for (const [cat, currentSpend] of Object.entries(cmCats)) {
     if (currentSpend < 15) continue;
 
-    // Collect prior months' spend for this category
-    const priorAmounts = [];
-    for (let offset = 1; offset <= 3; offset++) {
-      let mo = cm - offset;
-      let yr = cy;
-      if (mo < 0) { mo += 12; yr -= 1; }
-      const mSpend = txs
-        .filter(x => yrOf(x.date) === yr && miOf(x.date) === mo && x.type === 'Isplata' && (x.category || 'Ostalo') === cat)
+    // ── Primary: same month in prior years (seasonal baseline) ─────────────
+    const seasonalAmounts = [];
+    for (let yOffset = 1; yOffset <= 2; yOffset++) {
+      const priorYr = cy - yOffset;
+      const amt = txs
+        .filter(x => yrOf(x.date) === priorYr && miOf(x.date) === cm &&
+                     x.type === 'Isplata' && (x.category || 'Ostalo') === cat)
         .reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
-      if (mSpend > 0) priorAmounts.push(mSpend);
+      if (amt > 0) seasonalAmounts.push(amt);
     }
 
-    if (priorAmounts.length < 2) continue; // not enough history
+    // ── Fallback: 3-month rolling average if no seasonal data ──────────────
+    let baseline = null;
+    let baselineLabel = 'seasonal';
 
-    const avgSpend = priorAmounts.reduce((a, b) => a + b, 0) / priorAmounts.length;
-    const pctAbove = (currentSpend - avgSpend) / avgSpend;
+    if (seasonalAmounts.length >= 1) {
+      baseline = seasonalAmounts.reduce((a, b) => a + b, 0) / seasonalAmounts.length;
+      baselineLabel = 'seasonal';
+    } else {
+      // Rolling fallback — same logic as before
+      const rollingAmounts = [];
+      for (let offset = 1; offset <= 3; offset++) {
+        let mo = cm - offset;
+        let yr = cy;
+        if (mo < 0) { mo += 12; yr -= 1; }
+        const amt = txs
+          .filter(x => yrOf(x.date) === yr && miOf(x.date) === mo &&
+                       x.type === 'Isplata' && (x.category || 'Ostalo') === cat)
+          .reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
+        if (amt > 0) rollingAmounts.push(amt);
+      }
+      if (rollingAmounts.length < 2) continue; // not enough history either way
+      baseline = rollingAmounts.reduce((a, b) => a + b, 0) / rollingAmounts.length;
+      baselineLabel = 'rolling';
+    }
 
-    if (pctAbove < 0.4) continue; // less than 40% above average
+    if (!baseline || baseline <= 0) continue;
+
+    const pctAbove = (currentSpend - baseline) / baseline;
+    if (pctAbove < 0.4) continue;
 
     anomalies.push({
       category:     cat,
       currentSpend,
-      avgSpend,
+      avgSpend:     baseline,
       pctAbove,
-      // severity 0–1: how far above threshold (0.4) they are, capped at 1
+      baselineLabel,
       severity: Math.min(1, (pctAbove - 0.4) / 1.6),
     });
   }
@@ -277,8 +301,36 @@ export function generateInsights(forecast, anomalies, fmt = (n) => `${n.toFixed(
     });
   }
 
+  // ─── Positive reinforcement ────────────────────────────────────────────────
+  // Compare current-month spending vs same month last year. If ≥10% lower,
+  // celebrate it. This is computed from forecast data which has the current
+  // month spend in paidSoFar.
+  if (forecast.paidSoFar > 20) {
+    const now   = new Date();
+    const cy    = now.getFullYear();
+    const cm    = now.getMonth();
+    // avgSpend from anomalies for all categories combined, or we derive from
+    // the anomaly list. Simpler: the caller passes txs via useAdvisor so we
+    // can't access it here directly. Instead we embed a txs parameter below.
+    // Signal is passed via forecast._lastYearSameMonthSpend (set by useAdvisor).
+    const lastYrSpend = forecast._lastYearSameMonthSpend;
+    if (lastYrSpend > 20) {
+      const improvement = (lastYrSpend - forecast.paidSoFar) / lastYrSpend;
+      if (improvement >= 0.10) {
+        insights.push({
+          type:     'positive',
+          severity: -0.1, // negative = always sorts last, below healthy
+          icon:     '🎉',
+          color:    'income',
+          title:    `Odličan ${now.toLocaleDateString('hr-HR', { month: 'long' })}!`,
+          body:     `Potrošio si ${Math.round(improvement * 100)}% manje nego prošle godine u ovom mjesecu (${fmt(lastYrSpend)} → ${fmt(forecast.paidSoFar)}).`,
+        });
+      }
+    }
+  }
+
   // ─── Healthy state ─────────────────────────────────────────────────────────
-  if (insights.length === 0 && forecast.paidSoFar > 0) {
+  if (insights.filter(i => i.type !== 'positive').length === 0 && forecast.paidSoFar > 0) {
     insights.push({
       type:     'healthy',
       severity: 0,
