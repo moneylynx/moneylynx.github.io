@@ -256,37 +256,50 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
               }} style={{...fld, borderColor:bd("description")}}/>
           </div>
 
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-            <div>
-              <label style={lbl}>
-                <span style={{ fontSize:13 }}>{form.category ? categoryIcon(form.category) : '🏷️'}</span>
-                {t("Kategorija")}
-                {autoFilledFields.has('category') && <span style={{ marginLeft:'auto', fontSize:9, color:C.income, fontWeight:700 }}>{t("auto")}</span>}
-              </label>
-              <select value={form.category} onChange={e=>{
-                upd({category:e.target.value});
-                // Manual change — remove auto marker for this field.
-                setAutoFilledFields(prev => { const s = new Set(prev); s.delete('category'); return s; });
-                clearErr();
-              }} style={{...fld, color:!form.category?C.textMuted:C.text, borderColor:bd("category"), ...autoFilledStyle('category')}}>
-                <option value="" disabled>{t("- odabrati -")}</option>
-                {cats.map(c=><option key={c} value={c}>{categoryIcon(c)}  {t(c)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={lbl}>
-                <Ic n="pin" s={11} c={C.textMuted}/>{t("Lokacija")}
-                {autoFilledFields.has('location') && <span style={{ marginLeft:'auto', fontSize:9, color:C.income, fontWeight:700 }}>{t("auto")}</span>}
-              </label>
-              <select value={form.location} onChange={e=>{
-                upd({location:e.target.value});
-                setAutoFilledFields(prev => { const s = new Set(prev); s.delete('location'); return s; });
-                clearErr();
-              }} style={{...fld, color:!form.location?C.textMuted:C.text, borderColor:bd("location"), ...autoFilledStyle('location')}}>
-                <option value="" disabled>{t("- odabrati -")}</option>
-                {lists.locations.map(l=><option key={l} value={l}>{t(l)}</option>)}
-              </select>
-            </div>
+          <div>
+            <label style={lbl}>
+              <span style={{ fontSize:13 }}>{form.category ? categoryIcon(form.category) : '🏷️'}</span>
+              {t("Kategorija")}
+              {autoFilledFields.has('category') && <span style={{ marginLeft:'auto', fontSize:9, color:C.income, fontWeight:700 }}>{t("auto")}</span>}
+            </label>
+            <select value={form.category} onChange={e=>{
+              upd({category:e.target.value});
+              setAutoFilledFields(prev => { const s = new Set(prev); s.delete('category'); return s; });
+              clearErr();
+            }} style={{...fld, color:!form.category?C.textMuted:C.text, borderColor:bd("category"), ...autoFilledStyle('category')}}>
+              <option value="" disabled>{t("- odabrati -")}</option>
+              {cats.map(c=><option key={c} value={c}>{categoryIcon(c)}  {t(c)}</option>)}
+            </select>
+          </div>
+
+          {/* ── "Više opcija" toggle ─────────────────────────────────── */}
+          <button type="button" onClick={() => setShowAdvanced(v => !v)}
+            style={{ background:"transparent", border:"none", padding:"2px 0", cursor:"pointer", display:"flex", alignItems:"center", gap:6, color:C.textMuted, fontSize:12, fontWeight:600, alignSelf:"flex-start" }}>
+            <Ic n={showAdvanced ? "chevron" : "chevron"} s={11} c={C.textMuted}
+              style={{ transform: showAdvanced ? "rotate(90deg)" : "rotate(-90deg)", transition:"transform .2s" }}/>
+            {showAdvanced ? t("Sakrij opcije") : t("Više opcija")}
+            {/* Show hint badges when advanced fields have values */}
+            {!showAdvanced && (form.location || form.notes || inst > 1 || isRecurring) && (
+              <span style={{ background:C.accent, borderRadius:10, padding:"1px 6px", fontSize:9, fontWeight:700, color:"#fff" }}>
+                {[form.location && form.location !== "Ostalo", form.notes, inst > 1, isRecurring].filter(Boolean).length}
+              </span>
+            )}
+          </button>
+
+          {showAdvanced && (<>
+          <div>
+            <label style={lbl}>
+              <Ic n="pin" s={11} c={C.textMuted}/>{t("Lokacija")}
+              {autoFilledFields.has('location') && <span style={{ marginLeft:'auto', fontSize:9, color:C.income, fontWeight:700 }}>{t("auto")}</span>}
+            </label>
+            <select value={form.location} onChange={e=>{
+              upd({location:e.target.value});
+              setAutoFilledFields(prev => { const s = new Set(prev); s.delete('location'); return s; });
+              clearErr();
+            }} style={{...fld, color:!form.location?C.textMuted:C.text, borderColor:bd("location"), ...autoFilledStyle('location')}}>
+              <option value="" disabled>{t("- odabrati -")}</option>
+              {lists.locations.map(l=><option key={l} value={l}>{t(l)}</option>)}
+            </select>
           </div>
 
           {form.type==="Isplata" && !tx && (
@@ -419,6 +432,7 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
             <textarea placeholder={t("Opcionalno…")} value={form.notes||""} onChange={e=>upd({notes:e.target.value})}
               rows={2} style={{...fld, height:"auto", padding:"10px 12px", resize:"vertical"}}/>
           </div>
+          </>)}
         </div>
 
         {err.msg && (
