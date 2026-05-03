@@ -205,17 +205,72 @@ export default function App() {
   const updS = (p) => setSec(v  => ({ ...v, ...p }));
 
   // ── Theme ─────────────────────────────────────────────────────────────────
-  const theme = useMemo(() => {
-    if (prefs.theme === 'auto') return window.matchMedia?.('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
-    return prefs.theme;
-  }, [prefs.theme]);
+  // Track the OS-level dark preference live. A `useMemo` would only re-evaluate
+  // on prop changes; we need a real subscription so that 'auto' mode reflects
+  // the user toggling their phone's theme while the app is open.
+  const [systemDark, setSystemDark] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : false
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => setSystemDark(e.matches);
+    // Modern browsers + legacy Safari (<14) fallback
+    if (mq.addEventListener) mq.addEventListener('change', handler);
+    else if (mq.addListener) mq.addListener(handler);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler);
+      else if (mq.removeListener) mq.removeListener(handler);
+    };
+  }, []);
+
+  // Resolve final theme. An explicit user choice (light or dark) ALWAYS wins
+  // over OS preference, ambient light, battery-saver, etc. — only 'auto'
+  // defers to the system. Anything else falls back to 'light'.
+  const theme = prefs.theme === 'dark'  ? 'dark'
+              : prefs.theme === 'light' ? 'light'
+              : (systemDark ? 'dark' : 'light');
   const C = T[theme] ?? T.dark;
+
+  // Sync external browser-level theming hints with the chosen theme so
+  // status bar / PWA chrome / browser UA stylesheet all match. Without this,
+  // some Android Chromes will auto-darken a light page that would otherwise
+  // be locked light.
+  useEffect(() => {
+    // <meta name="theme-color"> — controls Android Chrome status bar tint
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', C.bg);
+
+    // iOS PWA status bar
+    const sbar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (sbar) sbar.setAttribute('content', theme === 'dark' ? 'black-translucent' : 'default');
+
+    // Drop the pre-render style injected by index.html — the React-managed
+    // styles below take over from this point.
+    const pre = document.getElementById('ml-theme-pre');
+    if (pre) pre.remove();
+  }, [theme, C.bg]);
 
   const gs = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-    html,body,#root{width:100%;min-height:100vh;background:${C.bg};}
-    input,select,textarea{font-family:inherit;}
+    /* color-scheme is the strongest signal to the browser about which theme
+       this page actually uses. Setting it explicitly disables:
+        – Chrome on Android "Auto-dark for web contents" (force-darken)
+        – Firefox "Override page colours" auto-inversion
+        – ambient-light / reading-mode tone shifts
+       This is what guarantees that the user's choice is respected — no OS
+       layer can darken light or further-darken dark. */
+    :root{color-scheme:${theme};}
+    html,body,#root{width:100%;min-height:100vh;background:${C.bg};color:${C.text};}
+    input,select,textarea{font-family:inherit;color-scheme:${theme};}
     input:focus,select:focus,textarea:focus{outline:none;border-color:${C.accent}!important;}
     ::-webkit-scrollbar{width:3px;} ::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px;}
     @keyframes su{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
