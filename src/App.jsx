@@ -95,6 +95,11 @@ export default function App() {
   const [subPg,     setSubPg]     = useState(null);
   const [showQuickAdd,  setShowQuickAdd]  = useState(false);
   const [showActionHub, setShowActionHub] = useState(false);
+  // Origin tracking for the Transactions screen — when the user opens
+  // Transactions from a non-tab entry point (e.g. Dashboard → "Prikaži sve"),
+  // we remember the origin page so a back button can take them back. When
+  // they reach Transactions via the bottom nav, this stays null = no back btn.
+  const [txListReturnTo, setTxListReturnTo] = useState(null);
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [txFilter,      setTxFilter]      = useState('pending');
@@ -173,7 +178,7 @@ export default function App() {
 
   // Route back to dashboard when app is backgrounded.
   useEffect(() => {
-    const fn = () => { if (document.hidden) setPage('dashboard'); };
+    const fn = () => { if (document.hidden) { setPage('dashboard'); setTxListReturnTo(null); } };
     document.addEventListener('visibilitychange', fn);
     return () => document.removeEventListener('visibilitychange', fn);
   }, []);
@@ -375,10 +380,10 @@ export default function App() {
         </div>
       )}
 
-      {page === 'dashboard'    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} setTxFilter={setTxFilter} onQuickAdd={() => setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg} syncing={syncing} supaUser={supaUser}/>}
+      {page === 'dashboard'    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} setTxFilter={setTxFilter} onQuickAdd={() => setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg} syncing={syncing} supaUser={supaUser} onGoToTransactions={(filter) => { if (filter) setTxFilter(filter); setTxListReturnTo('dashboard'); setPage('transactions'); }}/>}
       {page === 'add'          && <TxForm {...shared} txs={txs} draft={draftEdit} setLists={setLists} onSubmit={tx => { addTx(tx); if (draftEdit) { setDrafts(p => p.filter(d => d.id !== draftEdit.id)); setDraftEdit(null); } }} onCancel={() => { setPage('dashboard'); setDraftEdit(null); }} onGoRecurring={() => setPage('recurring')}/>}
       {page === 'edit'         && <TxForm {...shared} txs={txs} tx={txs.find(x => x.id === editId)} setLists={setLists} onSubmit={handleUpdTx} onCancel={() => { setEditId(null); setPage('transactions'); }}/>}
-      {page === 'transactions' && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id => { setEditId(id); setPage('edit'); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id => { haptic(40); setTxs(p => p.map(x => x.id === id ? { ...x, status: 'Plaćeno', date: new Date().toISOString().split('T')[0] } : x)); }} onUnpay={id => {
+      {page === 'transactions' && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onBack={txListReturnTo ? () => { const dest = txListReturnTo; setTxListReturnTo(null); setPage(dest); } : null} onEdit={id => { setEditId(id); setPage('edit'); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id => { haptic(40); setTxs(p => p.map(x => x.id === id ? { ...x, status: 'Plaćeno', date: new Date().toISOString().split('T')[0] } : x)); }} onUnpay={id => {
         const tx = txs.find(x => x.id === id);
         if (!tx) return;
         const previousStatus = tx.status;
@@ -411,7 +416,7 @@ export default function App() {
         {[['dashboard','home','Početna'],['transactions','list','Transakcije'],['add','plus',''],['charts','bar','Statistika'],['settings','gear','Postavke']].map(([id, ic, lb]) => (
           <button key={id} onClick={() => {
             if (id === 'add') { if (drafts.length > 0) { setShowActionHub(true); } else { setDraftEdit(null); setPage('add'); setSubPg(null); } }
-            else { setPage(id); setSubPg(null); }
+            else { setPage(id); setSubPg(null); setTxListReturnTo(null); }
           }} style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '4px 10px', borderRadius: 10 }}>
             {id === 'add'
               ? <div style={{ width: 46, height: 46, borderRadius: 16, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: -24, boxShadow: `0 4px 18px ${C.accentGlow}` }}><Ic n="plus" s={24} c="#fff"/></div>
