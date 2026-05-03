@@ -6,7 +6,7 @@ import { Ic, LynxLogo } from './ui.jsx';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { useAdvisor } from '../hooks/useAdvisor.js';
 
-function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD }) {
+function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD, onGoToTransactions }) {
   const fmt = fmtProp || fmtEur;
   const cmIdx = curMonthIdx();
   const cm     = MONTHS[cmIdx];
@@ -279,33 +279,48 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                   </div>
                   <div style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.warning }}>{fmt(todoItems.reduce((s,i)=>s+i.amount,0))}</div>
                 </div>
-                {/* Show max 3 items — keeps widget above fold on small phones */}
-                <div style={{ padding:"6px 10px",display:"flex",flexDirection:"column",gap:5 }}>
-                  {todoItems.slice(0,3).map(item => (
-                    <div key={item.kind+"-"+item.id} style={{ display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:C.cardAlt,borderRadius:9,border:`1px solid ${C.border}` }}>
-                      <div style={{ width:26,height:26,borderRadius:7,background:item.kind==="recurring_income"?`${C.income}15`:item.kind==="recurring"?`${C.accent}15`:`${C.warning}15`,border:`1px solid ${item.kind==="recurring_income"?C.income:item.kind==="recurring"?C.accent:C.warning}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13 }}>
-                        {item.kind==="recurring_income" ? "💵" : categoryIcon(item.category)}
-                      </div>
-                      <div style={{ flex:1,minWidth:0 }}>
-                        <div style={{ fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{item.description || t(item.category)}</div>
-                        <div style={{ fontSize:10,color:C.textMuted,display:"flex",alignItems:"center",gap:3,marginTop:1 }}>
-                          <Ic n="cal" s={9} c={C.textMuted}/>{new Date(item.date).getDate()}.{new Date(item.date).getMonth()+1}.
-                          {item.kind==="recurring" && <span style={{ color:C.accent,fontWeight:600 }}>· {t("Redovna obveza")}</span>}
-                          {item.kind==="recurring_income" && <span style={{ color:C.income,fontWeight:600 }}>· {t("Redovni primitak")}</span>}
+                {/* Scrollable list — fits ~3.5 items, scrolls if more. Subtle bottom fade hints at more content below. */}
+                <div style={{ position:"relative" }}>
+                  <div style={{
+                    padding:"6px 10px",
+                    display:"flex",
+                    flexDirection:"column",
+                    gap:5,
+                    maxHeight: 168,
+                    overflowY: todoItems.length > 3 ? "auto" : "visible",
+                    overscrollBehavior: "contain",
+                    WebkitOverflowScrolling: "touch",
+                  }}>
+                    {todoItems.map(item => (
+                      <div key={item.kind+"-"+item.id} style={{ display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:C.cardAlt,borderRadius:9,border:`1px solid ${C.border}`,flexShrink:0 }}>
+                        <div style={{ width:26,height:26,borderRadius:7,background:item.kind==="recurring_income"?`${C.income}15`:item.kind==="recurring"?`${C.accent}15`:`${C.warning}15`,border:`1px solid ${item.kind==="recurring_income"?C.income:item.kind==="recurring"?C.accent:C.warning}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13 }}>
+                          {item.kind==="recurring_income" ? "💵" : categoryIcon(item.category)}
                         </div>
+                        <div style={{ flex:1,minWidth:0 }}>
+                          <div style={{ fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{item.description || t(item.category)}</div>
+                          <div style={{ fontSize:10,color:C.textMuted,display:"flex",alignItems:"center",gap:3,marginTop:1 }}>
+                            <Ic n="cal" s={9} c={C.textMuted}/>{new Date(item.date).getDate()}.{new Date(item.date).getMonth()+1}.
+                            {item.kind==="recurring" && <span style={{ color:C.accent,fontWeight:600 }}>· {t("Redovna obveza")}</span>}
+                            {item.kind==="recurring_income" && <span style={{ color:C.income,fontWeight:600 }}>· {t("Redovni primitak")}</span>}
+                          </div>
+                        </div>
+                        <div style={{ fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.text,flexShrink:0 }}>{fmt(item.amount)}</div>
+                        <button onClick={()=>payTodoItem(item)} style={{ padding:"4px 8px",background:C.income,border:"none",borderRadius:6,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0 }}>
+                          <Ic n="check" s={10} c="#fff"/>
+                        </button>
                       </div>
-                      <div style={{ fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.text,flexShrink:0 }}>{fmt(item.amount)}</div>
-                      <button onClick={()=>payTodoItem(item)} style={{ padding:"4px 8px",background:C.income,border:"none",borderRadius:6,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0 }}>
-                        <Ic n="check" s={10} c="#fff"/>
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  {/* Bottom fade hint — only when scroll is active */}
+                  {todoItems.length > 3 && (
+                    <div style={{ position:"absolute", left:0, right:0, bottom:0, height:14, pointerEvents:"none", background:`linear-gradient(180deg, transparent 0%, ${C.card} 95%)` }}/>
+                  )}
                 </div>
                 {/* Footer — always visible */}
                 <div style={{ padding:"6px 12px 8px",borderTop:`1px solid ${C.border}` }}>
-                  <button onClick={()=>{if(setTxFilter)setTxFilter("overdue");setPage("transactions");}}
+                  <button onClick={()=>{ if (onGoToTransactions) onGoToTransactions("overdue"); else { if(setTxFilter)setTxFilter("overdue"); setPage("transactions"); } }}
                     style={{ width:"100%",padding:"5px",background:"transparent",border:"none",color:C.accent,fontSize:11,fontWeight:600,cursor:"pointer" }}>
-                    {todoItems.length > 3 ? `${t("Prikaži sve")} (${todoItems.length})` : t("Otvori transakcije →")}
+                    {todoItems.length > 3 ? `${t("Prikaži sve")} (${todoItems.length}) →` : `${t("Otvori transakcije")} →`}
                   </button>
                 </div>
               </div>
