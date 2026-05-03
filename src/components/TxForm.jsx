@@ -33,6 +33,13 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
   const [recDueDay,   setRecDueDay]   = useState(new Date().getDate());
   const [recMonths,   setRecMonths]   = useState("");
 
+  // ─── Mode flags (declared early — used by smart defaults below) ─────────────
+  // NOTE: must be declared BEFORE useSmartDefaults() and any useEffect that
+  // references isNewEntry, otherwise the bundler hoists those calls into a
+  // temporal-dead-zone and throws "Cannot access … before initialization".
+  const hasSecondaryData = !!(tx?.notes || tx?.location || draft?.notes);
+  const isNewEntry = !tx && !draft;
+
   // ─── Smart defaults ─────────────────────────────────────────────────────────
   // Only active for new entries (not edit/draft). Predicts category/location/
   // payment from description, plus offers recent-combo chips.
@@ -125,8 +132,8 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
   useEffect(()=>{ if (inst>1 && isGotov) upd({ payment: lists.payments.find(p=>p!=="Gotovina") ?? lists.payments[0] }); },[form.installments]);
 
   // Progressive disclosure — secondary fields hidden until expanded
-  const hasSecondaryData = !!(tx?.notes || tx?.location || draft?.notes);
-  const isNewEntry = !tx && !draft;
+  // NOTE: isNewEntry & hasSecondaryData are declared earlier in this component
+  // (before the smart-defaults hook) — do NOT redeclare here.
   const [showAdvanced, setShowAdvanced] = useState(!isNewEntry || hasSecondaryData);
 
   // Split transactions — expense entries only

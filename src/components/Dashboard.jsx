@@ -332,44 +332,70 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               </div>
             )}
 
-            {/* ── 5. TOP KATEGORIJE — compact, no pie on small screens ── */}
-            {catsMonth.length > 0 && (
-              <div className="su" style={{ background:C.card,border:`1px solid ${C.accent}40`,borderLeft:`4px solid ${C.accent}`,borderRadius:14,padding:"9px 12px",marginBottom:10 }}>
-                <div style={{ fontSize:11,fontWeight:600,color:C.textMuted,marginBottom:8,display:"flex",alignItems:"center",gap:5 }}>
-                  <Ic n="tag" s={12} c={C.textMuted}/>{t("Top kategorije")} · {cmName}
-                </div>
-                <div style={{ display:"flex",flexDirection:"column",gap:0 }}>
-                  {catsMonth.slice(0,5).map((c,i)=>{
-                    const maxVal = catsMonth[0].value;
-                    return (
-                      <div key={c.name} style={{ display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:i<Math.min(catsMonth.length-1,4)?`1px solid ${C.border}30`:"none" }}>
-                        <span style={{ fontSize:14,flexShrink:0,lineHeight:1 }}>{categoryIcon(c.name)}</span>
-                        <div style={{ flex:1,minWidth:0 }}>
-                          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2 }}>
-                            <span style={{ fontSize:11,color:C.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110 }}>{t(c.name)}</span>
-                            <div style={{ display:"flex",alignItems:"center",gap:5,flexShrink:0 }}>
-                              {anomalies.find(a=>a.category===c.name) && (
-                                <span style={{ fontSize:9,fontWeight:700,color:C.warning,background:`${C.warning}20`,borderRadius:6,padding:"1px 5px" }}>↑</span>
-                              )}
-                              <span style={{ fontFamily:"'JetBrains Mono',monospace",fontWeight:600,fontSize:11 }}>{fmt(c.value)}</span>
+            {/* ── 5. TOP KATEGORIJE — horizontal bar chart, mobile-optimized ── */}
+            {catsMonth.length > 0 && (() => {
+              const topN     = catsMonth.slice(0, 5);
+              const maxVal   = topN[0].value;
+              const totalAll = catsMonth.reduce((s,c)=>s+c.value, 0);
+              const totalTop = topN.reduce((s,c)=>s+c.value, 0);
+              return (
+                <div className="su" style={{ background:C.card,border:`1px solid ${C.accent}40`,borderLeft:`4px solid ${C.accent}`,borderRadius:14,padding:"10px 12px 8px",marginBottom:10 }}>
+                  {/* Header row: title + total */}
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9,paddingBottom:7,borderBottom:`1px solid ${C.border}40` }}>
+                    <div style={{ fontSize:11,fontWeight:600,color:C.textMuted,display:"flex",alignItems:"center",gap:5 }}>
+                      <Ic n="tag" s={12} c={C.textMuted}/>{t("Top kategorije")} · {cmName}
+                    </div>
+                    <div style={{ fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.text }}>
+                      {fmt(totalTop)}
+                    </div>
+                  </div>
+
+                  {/* Bar rows */}
+                  <div style={{ display:"flex",flexDirection:"column",gap:7 }}>
+                    {topN.map((c, i) => {
+                      const pctMax   = Math.max(2, Math.round((c.value / maxVal) * 100));
+                      const pctTotal = totalAll > 0 ? Math.round((c.value / totalAll) * 100) : 0;
+                      const color    = CHART_COLORS[i % CHART_COLORS.length];
+                      const isHot    = !!anomalies.find(a => a.category === c.name);
+                      return (
+                        <div key={c.name} style={{ display:"flex",alignItems:"center",gap:8 }}>
+                          <span style={{ fontSize:14,flexShrink:0,lineHeight:1,width:18,textAlign:"center" }}>{categoryIcon(c.name)}</span>
+                          <div style={{ flex:1,minWidth:0 }}>
+                            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3,gap:6 }}>
+                              <span style={{ fontSize:11,fontWeight:500,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0 }}>{t(c.name)}</span>
+                              <div style={{ display:"flex",alignItems:"center",gap:5,flexShrink:0 }}>
+                                {isHot && (
+                                  <span title={t("Iznad prosjeka")} style={{ fontSize:9,fontWeight:700,color:C.warning,background:`${C.warning}20`,borderRadius:6,padding:"1px 5px",lineHeight:1.3 }}>↑</span>
+                                )}
+                                <span style={{ fontSize:10,color:C.textMuted,fontFamily:"'JetBrains Mono',monospace",fontWeight:500 }}>{pctTotal}%</span>
+                                <span style={{ fontFamily:"'JetBrains Mono',monospace",fontWeight:700,fontSize:11,color:C.text,minWidth:48,textAlign:"right" }}>{fmt(c.value)}</span>
+                              </div>
+                            </div>
+                            {/* Bar */}
+                            <div style={{ height:7,background:`${C.cardAlt}`,borderRadius:4,overflow:"hidden",boxShadow:`inset 0 1px 1px rgba(0,0,0,.08)` }}>
+                              <div style={{
+                                height:"100%",
+                                width:`${pctMax}%`,
+                                background:`linear-gradient(90deg, ${color}AA 0%, ${color} 60%, ${color} 100%)`,
+                                borderRadius:4,
+                                transition:"width .55s cubic-bezier(.2,.8,.2,1)",
+                                boxShadow:`0 1px 2px ${color}40`
+                              }}/>
                             </div>
                           </div>
-                          {/* Mini progress bar */}
-                          <div style={{ height:3,background:C.cardAlt,borderRadius:2,overflow:"hidden" }}>
-                            <div style={{ height:"100%",width:`${Math.round((c.value/maxVal)*100)}%`,background:CHART_COLORS[i%CHART_COLORS.length],borderRadius:2,transition:"width .4s ease" }}/>
-                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+
+                  {catsMonth.length > 5 && (
+                    <button onClick={()=>{setPage("charts");}} style={{ marginTop:8,width:"100%",padding:"5px 0 2px",background:"transparent",border:"none",borderTop:`1px solid ${C.border}30`,color:C.accent,fontSize:11,fontWeight:600,cursor:"pointer" }}>
+                      + {catsMonth.length - 5} {t("više")} · {t("Otvori statistiku →")}
+                    </button>
+                  )}
                 </div>
-                {catsMonth.length > 5 && (
-                  <button onClick={()=>{setPage("charts");}} style={{ marginTop:6,width:"100%",padding:"4px",background:"transparent",border:"none",color:C.textMuted,fontSize:10,cursor:"pointer" }}>
-                    + {catsMonth.length - 5} {t("više")} · {t("Otvori statistiku →")}
-                  </button>
-                )}
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
       </div>
