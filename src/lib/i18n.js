@@ -30,6 +30,8 @@ export const EN_DICT = {
   "Ovdje će se pojaviti redovne obveze i obroci čiji datum pada u tekući mjesec.": "Recurring obligations and installments for the current month will appear here.",
   "dospijeva": "due", "u mj.": "of mo.", "Obrok": "Installment", "obroka ukupno": "total installments", "Vrati": "Undo", "Plati": "Pay",
   "Redovne obveze": "Recurring Tasks", "Uredi redovnu obvezu": "Edit Recurring", "Npr. Kredit": "E.g. Loan", "Iznos €": "Amount €",
+  "Redovni primici": "Recurring Income", "Uredi redovni primitak": "Edit Recurring Income",
+  "Novi redovni primitak": "New Recurring Income", "Dodaj redovni primitak": "Add Recurring Income",
   "- opcija -": "- option -", "DAN DOSPJECA": "DUE DATE", "Dan (npr. 15)": "Day (e.g. 15)", "Broj obroka": "Num of Inst.",
   "0 = neograničeno": "0 = unlimited", "Do datuma": "Until Date", "Spremi": "Save", "Nova redovna obveza": "New Recurring",
   "Dodaj redovnu obvezu": "Add Recurring Obligation", "Spremi i vrati se": "Save & Return", "(blokiran)": "(locked)",
