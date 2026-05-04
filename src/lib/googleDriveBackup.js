@@ -1,5 +1,5 @@
 // ─── Google Drive Backup ─────────────────────────────────────────────────────
-// Saves / loads Money Lynx backup JSON to the user's Google Drive using the
+// Saves / loads Moja Lova backup JSON to the user's Google Drive using the
 // Google Identity Services (GIS) library and the Drive REST API.
 //
 // SETUP REQUIRED:

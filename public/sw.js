@@ -1,4 +1,4 @@
-// Money Lynx Service Worker v1.0
+// Moja Lova Service Worker v1.0
 // Handles: cache-first strategy, background badge updates, SKIP_WAITING
 
 const CACHE_NAME = "moneylynx-v1.0";
