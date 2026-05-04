@@ -3,7 +3,7 @@ import { fmtEur, fDate } from '../lib/helpers.js';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
 
-function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, onUnpay, t, fmt: fmtProp }) {
+function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, onUnpay, onBack, t, fmt: fmtProp }) {
   const fmt = fmtProp || fmtEur;
 
   // ── Search & filter state ──────────────────────────────────────────────────
@@ -153,10 +153,18 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
     <div className="fi" style={{ width: "100%" }}>
       <StickyHeader C={C} icon="list" title={`${t("Transakcije")} · ${year}.`}
         right={
-          <button onClick={toggleBulkMode}
-            style={{ background: bulkMode ? `${C.accent}20` : C.cardAlt, border: `1px solid ${bulkMode ? C.accent : C.border}`, borderRadius: 10, padding: "6px 11px", fontSize: 12, fontWeight: 700, color: bulkMode ? C.accent : C.textMuted, cursor: "pointer" }}>
-            {bulkMode ? t("Zatvori") : t("Odaberi")}
-          </button>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            {onBack && !bulkMode && (
+              <button onClick={onBack} title={t("Natrag")}
+                style={{ background: C.cardAlt, border: `1px solid ${C.border}`, color: C.textMuted, padding: "8px 14px", borderRadius: 10, fontSize: 13, cursor: "pointer" }}>
+                {t("Natrag")}
+              </button>
+            )}
+            <button onClick={toggleBulkMode}
+              style={{ background: bulkMode ? `${C.accent}20` : C.cardAlt, border: `1px solid ${bulkMode ? C.accent : C.border}`, borderRadius: 10, padding: "6px 11px", fontSize: 12, fontWeight: 700, color: bulkMode ? C.accent : C.textMuted, cursor: "pointer" }}>
+              {bulkMode ? t("Zatvori") : t("Odaberi")}
+            </button>
+          </div>
         }
       />
 

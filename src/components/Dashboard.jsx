@@ -6,11 +6,13 @@ import { Ic, LynxLogo } from './ui.jsx';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { useAdvisor } from '../hooks/useAdvisor.js';
 
-function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD }) {
+function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD, onGoToTransactions }) {
   const fmt = fmtProp || fmtEur;
   const cmIdx = curMonthIdx();
   const cm     = MONTHS[cmIdx];
   const cmName = lang === "en" ? MONTHS_EN[cmIdx] : cm;
+  const MONTHS_GEN_HR = ["siječnja","veljače","ožujka","travnja","svibnja","lipnja","srpnja","kolovoza","rujna","listopada","studenoga","prosinca"];
+  const projectionMonthLabel = lang === "en" ? `Projection at the end of ${cmName}` : `Projekcija na kraju ${MONTHS_GEN_HR[cmIdx]}`;
 
   const yd = data.filter(x => new Date(x.date).getFullYear() === year);
   const md = yd.filter(x => monthOf(x.date) === cm);
@@ -80,9 +82,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   const mm  = String(now.getMonth()+1).padStart(2,"0");
   const yy  = now.getFullYear();
   const W   = Math.min(window.innerWidth??480,480)-64;
+  const VH  = typeof window !== "undefined" ? Math.min(window.innerHeight || 720, 900) : 720;
+  const todoMaxHeight = Math.max(116, Math.min(238, Math.round(VH * 0.24)));
   const dn  = [user.firstName, user.lastName].filter(Boolean).join(" ");
 
   const insightColor = (color) => ({ income:C.income, expense:C.expense, warning:C.warning, accent:C.accent }[color] || C.accent);
+  const visibleInsights = insights.filter(ins => ins.type !== "forecast");
 
   // Forecast projection line — shown inside balance card
   const forecastBal = forecast.hasHistory && forecast.daysLeft > 0 ? forecast.projectedBalance : null;
@@ -114,7 +119,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
             <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
-              <LynxLogo s={22} color={C.accent}/> {t("Money Lynx")} <span style={{fontSize:14,color:C.textMuted,fontWeight:500,verticalAlign:"middle",position:"relative",top:2}}>· {year}.</span>
+              <LynxLogo s={22} color={C.accent}/> {t("Moja Lova")} <span style={{fontSize:14,color:C.textMuted,fontWeight:500,verticalAlign:"middle",position:"relative",top:2}}>· {year}.</span>
             </h1>
             {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
@@ -161,7 +166,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           {forecastBal !== null && (
             <div style={{ marginTop:8, paddingTop:8, borderTop:`1px solid ${bal>=0?C.income:C.expense}25`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <span style={{ fontSize:11, color:C.textMuted, display:"flex", alignItems:"center", gap:4 }}>
-                <span style={{ fontSize:12 }}>📊</span> {t("Projekcija kraj mj.")}
+                <span style={{ fontSize:12 }}>📊</span> {projectionMonthLabel}
               </span>
               <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                 <span style={{ fontSize:13, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:forecastColor }}>
@@ -228,7 +233,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               <div style={{ width:60,height:60,borderRadius:20,background:`linear-gradient(135deg,${C.accent},${C.accentDk})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",boxShadow:`0 4px 15px ${C.accentGlow}` }}>
                 <Ic n="plus" s={28} c="#fff"/>
               </div>
-              <h3 style={{ fontSize:17,fontWeight:700,color:C.text,marginBottom:6 }}>{t("Dobrodošao u Money Lynx!")}</h3>
+              <h3 style={{ fontSize:17,fontWeight:700,color:C.text,marginBottom:6 }}>{t("Dobrodošao u Moja Lova!")}</h3>
               <p style={{ fontSize:13,color:C.textMuted,lineHeight:1.5 }}>{t("Prati financije u 3 koraka:")}</p>
             </div>
 
@@ -279,46 +284,61 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                   </div>
                   <div style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.warning }}>{fmt(todoItems.reduce((s,i)=>s+i.amount,0))}</div>
                 </div>
-                {/* Show max 3 items — keeps widget above fold on small phones */}
-                <div style={{ padding:"6px 10px",display:"flex",flexDirection:"column",gap:5 }}>
-                  {todoItems.slice(0,3).map(item => (
-                    <div key={item.kind+"-"+item.id} style={{ display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:C.cardAlt,borderRadius:9,border:`1px solid ${C.border}` }}>
-                      <div style={{ width:26,height:26,borderRadius:7,background:item.kind==="recurring_income"?`${C.income}15`:item.kind==="recurring"?`${C.accent}15`:`${C.warning}15`,border:`1px solid ${item.kind==="recurring_income"?C.income:item.kind==="recurring"?C.accent:C.warning}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13 }}>
-                        {item.kind==="recurring_income" ? "💵" : categoryIcon(item.category)}
-                      </div>
-                      <div style={{ flex:1,minWidth:0 }}>
-                        <div style={{ fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{item.description || t(item.category)}</div>
-                        <div style={{ fontSize:10,color:C.textMuted,display:"flex",alignItems:"center",gap:3,marginTop:1 }}>
-                          <Ic n="cal" s={9} c={C.textMuted}/>{new Date(item.date).getDate()}.{new Date(item.date).getMonth()+1}.
-                          {item.kind==="recurring" && <span style={{ color:C.accent,fontWeight:600 }}>· {t("Redovna obveza")}</span>}
-                          {item.kind==="recurring_income" && <span style={{ color:C.income,fontWeight:600 }}>· {t("Redovni primitak")}</span>}
+                {/* Scrollable list — fits ~3.5 items, scrolls if more. Subtle bottom fade hints at more content below. */}
+                <div style={{ position:"relative" }}>
+                  <div style={{
+                    padding:"6px 10px",
+                    display:"flex",
+                    flexDirection:"column",
+                    gap:5,
+                    maxHeight: todoMaxHeight,
+                    overflowY: todoItems.length > Math.max(3, Math.floor(todoMaxHeight / 44)) ? "auto" : "visible",
+                    overscrollBehavior: "contain",
+                    WebkitOverflowScrolling: "touch",
+                  }}>
+                    {todoItems.map(item => (
+                      <div key={item.kind+"-"+item.id} style={{ display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:C.cardAlt,borderRadius:9,border:`1px solid ${C.border}`,flexShrink:0 }}>
+                        <div style={{ width:26,height:26,borderRadius:7,background:item.kind==="recurring_income"?`${C.income}15`:item.kind==="recurring"?`${C.accent}15`:`${C.warning}15`,border:`1px solid ${item.kind==="recurring_income"?C.income:item.kind==="recurring"?C.accent:C.warning}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13 }}>
+                          {item.kind==="recurring_income" ? "💵" : categoryIcon(item.category)}
                         </div>
+                        <div style={{ flex:1,minWidth:0 }}>
+                          <div style={{ fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{item.description || t(item.category)}</div>
+                          <div style={{ fontSize:10,color:C.textMuted,display:"flex",alignItems:"center",gap:3,marginTop:1 }}>
+                            <Ic n="cal" s={9} c={C.textMuted}/>{new Date(item.date).getDate()}.{new Date(item.date).getMonth()+1}.
+                            {item.kind==="recurring" && <span style={{ color:C.accent,fontWeight:600 }}>· {t("Redovna obveza")}</span>}
+                            {item.kind==="recurring_income" && <span style={{ color:C.income,fontWeight:600 }}>· {t("Redovni primitak")}</span>}
+                          </div>
+                        </div>
+                        <div style={{ fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.text,flexShrink:0 }}>{fmt(item.amount)}</div>
+                        <button onClick={()=>payTodoItem(item)} style={{ padding:"4px 8px",background:C.income,border:"none",borderRadius:6,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0 }}>
+                          <Ic n="check" s={10} c="#fff"/>
+                        </button>
                       </div>
-                      <div style={{ fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.text,flexShrink:0 }}>{fmt(item.amount)}</div>
-                      <button onClick={()=>payTodoItem(item)} style={{ padding:"4px 8px",background:C.income,border:"none",borderRadius:6,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0 }}>
-                        <Ic n="check" s={10} c="#fff"/>
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  {/* Bottom fade hint — only when scroll is active */}
+                  {todoItems.length > Math.max(3, Math.floor(todoMaxHeight / 44)) && (
+                    <div style={{ position:"absolute", left:0, right:0, bottom:0, height:14, pointerEvents:"none", background:`linear-gradient(180deg, transparent 0%, ${C.card} 95%)` }}/>
+                  )}
                 </div>
                 {/* Footer — always visible */}
                 <div style={{ padding:"6px 12px 8px",borderTop:`1px solid ${C.border}` }}>
-                  <button onClick={()=>{if(setTxFilter)setTxFilter("overdue");setPage("transactions");}}
+                  <button onClick={()=>{ if (onGoToTransactions) onGoToTransactions("overdue"); else { if(setTxFilter)setTxFilter("overdue"); setPage("transactions"); } }}
                     style={{ width:"100%",padding:"5px",background:"transparent",border:"none",color:C.accent,fontSize:11,fontWeight:600,cursor:"pointer" }}>
-                    {todoItems.length > 3 ? `${t("Prikaži sve")} (${todoItems.length})` : t("Otvori transakcije →")}
+                    {todoItems.length > 3 ? `${t("Prikaži sve")} (${todoItems.length}) →` : `${t("Otvori transakcije")} →`}
                   </button>
                 </div>
               </div>
             )}
 
             {/* ── 4. ADVISOR INSIGHTS — anomalies + positive ──────────── */}
-            {insights.length > 0 && (
+            {visibleInsights.length > 0 && (
               <div style={{ marginBottom:10 }}>
-                {insights.map((ins, i) => {
+                {visibleInsights.map((ins, i) => {
                   const col = insightColor(ins.color);
                   return (
                     <div key={i} className="su"
-                      style={{ background:`linear-gradient(135deg,${col}18,${col}08)`, border:`1px solid ${col}40`, borderLeft:`4px solid ${col}`, borderRadius:14, padding:"9px 12px", marginBottom:i<insights.length-1?6:0, animationDelay:`${i*.05}s` }}>
+                      style={{ background:`linear-gradient(135deg,${col}18,${col}08)`, border:`1px solid ${col}40`, borderLeft:`4px solid ${col}`, borderRadius:14, padding:"9px 12px", marginBottom:i<visibleInsights.length-1?6:0, animationDelay:`${i*.05}s` }}>
                       <div style={{ display:"flex",alignItems:"flex-start",gap:8 }}>
                         <span style={{ fontSize:15,flexShrink:0,lineHeight:1.3 }}>{ins.icon}</span>
                         <div style={{ flex:1,minWidth:0 }}>
@@ -332,44 +352,70 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               </div>
             )}
 
-            {/* ── 5. TOP KATEGORIJE — compact, no pie on small screens ── */}
-            {catsMonth.length > 0 && (
-              <div className="su" style={{ background:C.card,border:`1px solid ${C.accent}40`,borderLeft:`4px solid ${C.accent}`,borderRadius:14,padding:"9px 12px",marginBottom:10 }}>
-                <div style={{ fontSize:11,fontWeight:600,color:C.textMuted,marginBottom:8,display:"flex",alignItems:"center",gap:5 }}>
-                  <Ic n="tag" s={12} c={C.textMuted}/>{t("Top kategorije")} · {cmName}
-                </div>
-                <div style={{ display:"flex",flexDirection:"column",gap:0 }}>
-                  {catsMonth.slice(0,5).map((c,i)=>{
-                    const maxVal = catsMonth[0].value;
-                    return (
-                      <div key={c.name} style={{ display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:i<Math.min(catsMonth.length-1,4)?`1px solid ${C.border}30`:"none" }}>
-                        <span style={{ fontSize:14,flexShrink:0,lineHeight:1 }}>{categoryIcon(c.name)}</span>
-                        <div style={{ flex:1,minWidth:0 }}>
-                          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2 }}>
-                            <span style={{ fontSize:11,color:C.textSub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110 }}>{t(c.name)}</span>
-                            <div style={{ display:"flex",alignItems:"center",gap:5,flexShrink:0 }}>
-                              {anomalies.find(a=>a.category===c.name) && (
-                                <span style={{ fontSize:9,fontWeight:700,color:C.warning,background:`${C.warning}20`,borderRadius:6,padding:"1px 5px" }}>↑</span>
-                              )}
-                              <span style={{ fontFamily:"'JetBrains Mono',monospace",fontWeight:600,fontSize:11 }}>{fmt(c.value)}</span>
+            {/* ── 5. TOP KATEGORIJE — horizontal bar chart, mobile-optimized ── */}
+            {catsMonth.length > 0 && (() => {
+              const topN     = catsMonth.slice(0, 4);
+              const maxVal   = topN[0].value;
+              const totalAll = catsMonth.reduce((s,c)=>s+c.value, 0);
+              const totalTop = topN.reduce((s,c)=>s+c.value, 0);
+              return (
+                <div className="su" style={{ background:C.card,border:`1px solid ${C.accent}40`,borderLeft:`4px solid ${C.accent}`,borderRadius:14,padding:"10px 12px 8px",marginBottom:10 }}>
+                  {/* Header row: title + total */}
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9,paddingBottom:7,borderBottom:`1px solid ${C.border}40` }}>
+                    <div style={{ fontSize:11,fontWeight:600,color:C.textMuted,display:"flex",alignItems:"center",gap:5 }}>
+                      <Ic n="tag" s={12} c={C.textMuted}/>{t("Top kategorije")} · {cmName}
+                    </div>
+                    <div style={{ fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.text }}>
+                      {fmt(totalTop)}
+                    </div>
+                  </div>
+
+                  {/* Bar rows */}
+                  <div style={{ display:"flex",flexDirection:"column",gap:7 }}>
+                    {topN.map((c, i) => {
+                      const pctMax   = Math.max(2, Math.round((c.value / maxVal) * 100));
+                      const pctTotal = totalAll > 0 ? Math.round((c.value / totalAll) * 100) : 0;
+                      const color    = CHART_COLORS[i % CHART_COLORS.length];
+                      const isHot    = !!anomalies.find(a => a.category === c.name);
+                      return (
+                        <div key={c.name} style={{ display:"flex",alignItems:"center",gap:8 }}>
+                          <span style={{ fontSize:14,flexShrink:0,lineHeight:1,width:18,textAlign:"center" }}>{categoryIcon(c.name)}</span>
+                          <div style={{ flex:1,minWidth:0 }}>
+                            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3,gap:6 }}>
+                              <span style={{ fontSize:11,fontWeight:500,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,minWidth:0 }}>{t(c.name)}</span>
+                              <div style={{ display:"flex",alignItems:"center",gap:5,flexShrink:0 }}>
+                                {isHot && (
+                                  <span title={t("Iznad prosjeka")} style={{ fontSize:9,fontWeight:700,color:C.warning,background:`${C.warning}20`,borderRadius:6,padding:"1px 5px",lineHeight:1.3 }}>↑</span>
+                                )}
+                                <span style={{ fontSize:10,color:C.textMuted,fontFamily:"'JetBrains Mono',monospace",fontWeight:500 }}>{pctTotal}%</span>
+                                <span style={{ fontFamily:"'JetBrains Mono',monospace",fontWeight:700,fontSize:11,color:C.text,minWidth:48,textAlign:"right" }}>{fmt(c.value)}</span>
+                              </div>
+                            </div>
+                            {/* Bar */}
+                            <div style={{ height:7,background:`${C.cardAlt}`,borderRadius:4,overflow:"hidden",boxShadow:`inset 0 1px 1px rgba(0,0,0,.08)` }}>
+                              <div style={{
+                                height:"100%",
+                                width:`${pctMax}%`,
+                                background:`linear-gradient(90deg, ${color}AA 0%, ${color} 60%, ${color} 100%)`,
+                                borderRadius:4,
+                                transition:"width .55s cubic-bezier(.2,.8,.2,1)",
+                                boxShadow:`0 1px 2px ${color}40`
+                              }}/>
                             </div>
                           </div>
-                          {/* Mini progress bar */}
-                          <div style={{ height:3,background:C.cardAlt,borderRadius:2,overflow:"hidden" }}>
-                            <div style={{ height:"100%",width:`${Math.round((c.value/maxVal)*100)}%`,background:CHART_COLORS[i%CHART_COLORS.length],borderRadius:2,transition:"width .4s ease" }}/>
-                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+
+                  {catsMonth.length > 4 && (
+                    <button onClick={()=>{setPage("charts");}} style={{ marginTop:8,width:"100%",padding:"5px 0 2px",background:"transparent",border:"none",borderTop:`1px solid ${C.border}30`,color:C.accent,fontSize:11,fontWeight:600,cursor:"pointer" }}>
+                      + {catsMonth.length - 4} {t("više")} · {t("Otvori statistiku →")}
+                    </button>
+                  )}
                 </div>
-                {catsMonth.length > 5 && (
-                  <button onClick={()=>{setPage("charts");}} style={{ marginTop:6,width:"100%",padding:"4px",background:"transparent",border:"none",color:C.textMuted,fontSize:10,cursor:"pointer" }}>
-                    + {catsMonth.length - 5} {t("više")} · {t("Otvori statistiku →")}
-                  </button>
-                )}
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
       </div>

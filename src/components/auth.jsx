@@ -126,7 +126,7 @@ function LockScreen({ C, sec, onUnlock, onWipe, onResetPin, supaUser, t }) {
           <div style={{ width:64, height:64, borderRadius:20, background:"#38BDF8", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", overflow:"hidden" }}>
             <LynxLogoWhite s={44}/>
           </div>
-          <h1 style={{ fontSize:22, fontWeight:700, color:C.text }}>{t("Money Lynx")}</h1>
+          <h1 style={{ fontSize:22, fontWeight:700, color:C.text }}>{t("Moja Lova")}</h1>
           <p style={{ fontSize:13, color:C.textMuted, marginTop:4 }}>{t("Unesite PIN za pristup")}</p>
         </div>
 
@@ -313,7 +313,7 @@ function LanguageScreen({ C, onSelect }) {
         <div style={{ width:72, height:72, borderRadius:22, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", boxShadow:`0 4px 15px ${C.accentGlow}` }}>
           <LynxLogoWhite s={34}/>
         </div>
-        <h1 style={{ fontSize:28, fontWeight:700, color:C.text, marginBottom:6 }}>Money Lynx</h1>
+        <h1 style={{ fontSize:28, fontWeight:700, color:C.text, marginBottom:6 }}>Moja Lova</h1>
         <p style={{ fontSize:14, color:C.textMuted, marginBottom:32 }}>Odaberite jezik / Choose language</p>
 
         <button onClick={()=>onSelect("hr")} style={{ width:"100%", padding:16, marginBottom:10, background:C.card, border:`1.5px solid ${C.accent}`, borderRadius:14, color:C.text, fontSize:16, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>

@@ -95,6 +95,11 @@ export default function App() {
   const [subPg,     setSubPg]     = useState(null);
   const [showQuickAdd,  setShowQuickAdd]  = useState(false);
   const [showActionHub, setShowActionHub] = useState(false);
+  // Origin tracking for the Transactions screen — when the user opens
+  // Transactions from a non-tab entry point (e.g. Dashboard → "Prikaži sve"),
+  // we remember the origin page so a back button can take them back. When
+  // they reach Transactions via the bottom nav, this stays null = no back btn.
+  const [txListReturnTo, setTxListReturnTo] = useState(null);
 
   // ── Filters ───────────────────────────────────────────────────────────────
   const [txFilter,      setTxFilter]      = useState('pending');
@@ -173,7 +178,7 @@ export default function App() {
 
   // Route back to dashboard when app is backgrounded.
   useEffect(() => {
-    const fn = () => { if (document.hidden) setPage('dashboard'); };
+    const fn = () => { if (document.hidden) { setPage('dashboard'); setTxListReturnTo(null); } };
     document.addEventListener('visibilitychange', fn);
     return () => document.removeEventListener('visibilitychange', fn);
   }, []);
@@ -200,17 +205,72 @@ export default function App() {
   const updS = (p) => setSec(v  => ({ ...v, ...p }));
 
   // ── Theme ─────────────────────────────────────────────────────────────────
-  const theme = useMemo(() => {
-    if (prefs.theme === 'auto') return window.matchMedia?.('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
-    return prefs.theme;
-  }, [prefs.theme]);
+  // Track the OS-level dark preference live. A `useMemo` would only re-evaluate
+  // on prop changes; we need a real subscription so that 'auto' mode reflects
+  // the user toggling their phone's theme while the app is open.
+  const [systemDark, setSystemDark] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : false
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => setSystemDark(e.matches);
+    // Modern browsers + legacy Safari (<14) fallback
+    if (mq.addEventListener) mq.addEventListener('change', handler);
+    else if (mq.addListener) mq.addListener(handler);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler);
+      else if (mq.removeListener) mq.removeListener(handler);
+    };
+  }, []);
+
+  // Resolve final theme. An explicit user choice (light or dark) ALWAYS wins
+  // over OS preference, ambient light, battery-saver, etc. — only 'auto'
+  // defers to the system. Anything else falls back to 'light'.
+  const theme = prefs.theme === 'dark'  ? 'dark'
+              : prefs.theme === 'light' ? 'light'
+              : (systemDark ? 'dark' : 'light');
   const C = T[theme] ?? T.dark;
+
+  // Sync external browser-level theming hints with the chosen theme so
+  // status bar / PWA chrome / browser UA stylesheet all match. Without this,
+  // some Android Chromes will auto-darken a light page that would otherwise
+  // be locked light.
+  useEffect(() => {
+    // <meta name="theme-color"> — controls Android Chrome status bar tint
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', C.bg);
+
+    // iOS PWA status bar
+    const sbar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (sbar) sbar.setAttribute('content', theme === 'dark' ? 'black-translucent' : 'default');
+
+    // Drop the pre-render style injected by index.html — the React-managed
+    // styles below take over from this point.
+    const pre = document.getElementById('ml-theme-pre');
+    if (pre) pre.remove();
+  }, [theme, C.bg]);
 
   const gs = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-    html,body,#root{width:100%;min-height:100vh;background:${C.bg};}
-    input,select,textarea{font-family:inherit;}
+    /* color-scheme is the strongest signal to the browser about which theme
+       this page actually uses. Setting it explicitly disables:
+        – Chrome on Android "Auto-dark for web contents" (force-darken)
+        – Firefox "Override page colours" auto-inversion
+        – ambient-light / reading-mode tone shifts
+       This is what guarantees that the user's choice is respected — no OS
+       layer can darken light or further-darken dark. */
+    :root{color-scheme:${theme};}
+    html,body,#root{width:100%;min-height:100vh;background:${C.bg};color:${C.text};}
+    input,select,textarea{font-family:inherit;color-scheme:${theme};}
     input:focus,select:focus,textarea:focus{outline:none;border-color:${C.accent}!important;}
     ::-webkit-scrollbar{width:3px;} ::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px;}
     @keyframes su{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
@@ -243,7 +303,7 @@ export default function App() {
         <div style={{ width: 56, height: 56, borderRadius: 16, background: `linear-gradient(135deg,${C.accent},${C.accentDk || C.accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', animation: 'pulse 1.5s ease-in-out infinite' }}>
           <LynxLogoWhite s={26}/>
         </div>
-        <span style={{ color: C.textMuted, fontSize: 13 }}>Money Lynx</span>
+        <span style={{ color: C.textMuted, fontSize: 13 }}>Moja Lova</span>
       </div>
     </div>
   );
@@ -375,10 +435,10 @@ export default function App() {
         </div>
       )}
 
-      {page === 'dashboard'    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} setTxFilter={setTxFilter} onQuickAdd={() => setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg} syncing={syncing} supaUser={supaUser}/>}
+      {page === 'dashboard'    && <Dashboard    {...shared} data={txs} setTxs={setTxs} setPage={setPage} setTxFilter={setTxFilter} onQuickAdd={() => setShowQuickAdd(true)} prefs={prefs} updPrefs={updP} setSubPg={setSubPg} syncing={syncing} supaUser={supaUser} onGoToTransactions={(filter) => { if (filter) setTxFilter(filter); setTxListReturnTo('dashboard'); setPage('transactions'); }}/>}
       {page === 'add'          && <TxForm {...shared} txs={txs} draft={draftEdit} setLists={setLists} onSubmit={tx => { addTx(tx); if (draftEdit) { setDrafts(p => p.filter(d => d.id !== draftEdit.id)); setDraftEdit(null); } }} onCancel={() => { setPage('dashboard'); setDraftEdit(null); }} onGoRecurring={() => setPage('recurring')}/>}
       {page === 'edit'         && <TxForm {...shared} txs={txs} tx={txs.find(x => x.id === editId)} setLists={setLists} onSubmit={handleUpdTx} onCancel={() => { setEditId(null); setPage('transactions'); }}/>}
-      {page === 'transactions' && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onEdit={id => { setEditId(id); setPage('edit'); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id => { haptic(40); setTxs(p => p.map(x => x.id === id ? { ...x, status: 'Plaćeno', date: new Date().toISOString().split('T')[0] } : x)); }} onUnpay={id => {
+      {page === 'transactions' && <TxList {...shared} data={txs} filter={txFilter} setFilter={setTxFilter} onBack={txListReturnTo ? () => { const dest = txListReturnTo; setTxListReturnTo(null); setPage(dest); } : null} onEdit={id => { setEditId(id); setPage('edit'); }} onDelete={delTx} onDeleteGroup={delGrp} onPay={id => { haptic(40); setTxs(p => p.map(x => x.id === id ? { ...x, status: 'Plaćeno', date: new Date().toISOString().split('T')[0] } : x)); }} onUnpay={id => {
         const tx = txs.find(x => x.id === id);
         if (!tx) return;
         const previousStatus = tx.status;
@@ -411,7 +471,7 @@ export default function App() {
         {[['dashboard','home','Početna'],['transactions','list','Transakcije'],['add','plus',''],['charts','bar','Statistika'],['settings','gear','Postavke']].map(([id, ic, lb]) => (
           <button key={id} onClick={() => {
             if (id === 'add') { if (drafts.length > 0) { setShowActionHub(true); } else { setDraftEdit(null); setPage('add'); setSubPg(null); } }
-            else { setPage(id); setSubPg(null); }
+            else { setPage(id); setSubPg(null); setTxListReturnTo(null); }
           }} style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '4px 10px', borderRadius: 10 }}>
             {id === 'add'
               ? <div style={{ width: 46, height: 46, borderRadius: 16, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: -24, boxShadow: `0 4px 18px ${C.accentGlow}` }}><Ic n="plus" s={24} c="#fff"/></div>

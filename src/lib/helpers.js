@@ -87,7 +87,7 @@ export const nativeSaveAndShare = async (filename, content) => {
     });
     try {
       await Share.share({
-        title: "Money Lynx — Backup", text: filename,
+        title: "Moja Lova — Backup", text: filename,
         url: writeRes && writeRes.uri, dialogTitle: filename,
       });
     } catch { /* user cancelled share; file is still saved */ }
@@ -115,7 +115,7 @@ export const buildSummary = (txs, year, user, t) => {
   const exp = yd.filter(x=>x.type==="Isplata").reduce((s,x)=>s+(+x.amount||0),0);
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
   return [
-    `${t("Money Lynx")} — ${t("Sažetak")} ${year}.`, "",
+    `${t("Moja Lova")} — ${t("Sažetak")} ${year}.`, "",
     `${t("Korisnik")} : ${name}`,
     user.phone  ? `${t("Telefon")}  : ${user.phone}`  : null,
     user.email  ? `${t("E-mail")}   : ${user.email}`  : null,

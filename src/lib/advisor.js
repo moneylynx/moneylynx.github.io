@@ -284,8 +284,8 @@ export function generateInsights(forecast, anomalies, fmt = (n) => `${n.toFixed(
       icon:     isGood ? '📊' : '⚠️',
       color:    isGood ? 'income' : 'expense',
       title:    isGood
-        ? `Projekcija kraju mjeseca: +${fmt(bal)}`
-        : `Projekcija kraju mjeseca: ${fmt(bal)}`,
+        ? `Projekcija na kraju mjeseca: +${fmt(bal)}`
+        : `Projekcija na kraju mjeseca: ${fmt(bal)}`,
       body: `Potrošeno: ${fmt(forecast.paidSoFar)} · Obveze: ${fmt(forecast.recurringLeft)} · Procjena: ${fmt(forecast.discForecast)} · Ostalo: ${forecast.daysLeft} dana`,
     });
   } else if (!forecast.hasHistory && forecast.incomeSoFar > 0) {

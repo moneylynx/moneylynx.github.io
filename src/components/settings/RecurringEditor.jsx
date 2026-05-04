@@ -55,7 +55,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
       <div className="hdr" style={{ position:"sticky", top:0, zIndex:50, background:C.bg, paddingBottom:10, paddingLeft:16, paddingRight:16, borderBottom:`1px solid ${C.border}` }}>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
           <button title={t("Natrag")} onClick={()=>onBack(arr)} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:10, padding:"8px 10px", cursor:"pointer", display:"flex", alignItems:"center" }}><Ic n="arrow_l" s={18} c={C.accent}/></button>
-          <h2 style={{ fontSize:17, fontWeight:700, color:C.text }}>{t("Redovne obveze")}</h2>
+          <h2 style={{ fontSize:17, fontWeight:700, color:C.text }}>{t(incomeMode ? "Redovni primici" : "Redovne obveze")}</h2>
         </div>
       </div>
 
@@ -101,7 +101,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
             {editId===item.id && (
               <div style={{ background:C.cardAlt, border:`1px solid ${C.accent}50`, borderTop:"none", borderRadius:"0 0 12px 12px", padding:14 }}>
                 <div style={{ fontSize:11, fontWeight:700, color:C.accent, marginBottom:10, display:"flex", alignItems:"center", gap:5 }}>
-                  <Ic n="edit" s={12} c={C.accent}/>{t("Uredi redovnu obvezu")}
+                  <Ic n="edit" s={12} c={C.accent}/>{t(incomeMode ? "Uredi redovni primitak" : "Uredi redovnu obvezu")}
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                   <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:8 }}>
@@ -119,7 +119,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
                       <label style={lbl}>{t("Kategorija")}</label>
                       <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{...fld,color:!form.category?C.textMuted:C.text}}>
                         <option value="">{t("- opcija -")}</option>
-                        {incomeMode ? lists.categories_income : lists.categories_expense.map(c=><option key={c} value={c}>{t(c)}</option>)}
+                        {(incomeMode ? lists.categories_income : lists.categories_expense).map(c=><option key={c} value={c}>{t(c)}</option>)}
                       </select>
                     </div>
                     <div>
@@ -168,7 +168,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
         {adding ? (
           <div style={{ background:C.cardAlt, border:`1.5px dashed ${C.accent}40`, borderRadius:14, padding:14, marginBottom:10 }}>
             <div style={{ fontSize:11, fontWeight:700, color:C.accent, marginBottom:10, display:"flex", alignItems:"center", gap:5 }}>
-              <Ic n="plus" s={12} c={C.accent}/>{t("Nova redovna obveza")}
+              <Ic n="plus" s={12} c={C.accent}/>{t(incomeMode ? "Novi redovni primitak" : "Nova redovna obveza")}
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
               <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:8 }}>
@@ -186,7 +186,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
                   <label style={lbl}>{t("Kategorija")}</label>
                   <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={{...fld,color:!form.category?C.textMuted:C.text}}>
                     <option value="">{t("- opcija -")}</option>
-                    {incomeMode ? lists.categories_income : lists.categories_expense.map(c=><option key={c} value={c}>{t(c)}</option>)}
+                    {(incomeMode ? lists.categories_income : lists.categories_expense).map(c=><option key={c} value={c}>{t(c)}</option>)}
                   </select>
                 </div>
                 <div>
@@ -230,7 +230,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
           </div>
         ) : (
           <button onClick={openAdd} style={{ width:"100%", padding:12, marginBottom:10, background:`${C.accent}15`, border:`1.5px dashed ${C.accent}50`, borderRadius:12, color:C.accent, fontSize:13, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
-            <Ic n="plus" s={16} c={C.accent}/>{t("Dodaj redovnu obvezu")}
+            <Ic n="plus" s={16} c={C.accent}/>{t(incomeMode ? "Dodaj redovni primitak" : "Dodaj redovnu obvezu")}
           </button>
         )}
 

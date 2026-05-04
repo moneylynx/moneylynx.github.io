@@ -70,6 +70,7 @@ export const Ic = ({ n, s=20, c="#fff", style={} }) => {
     shield:      <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"{...p}/></>,
     repeat:      <><polyline points="17 1 21 5 17 9"{...p}/><path d="M3 11V9a4 4 0 014-4h14"{...p}/><polyline points="7 23 3 19 7 15"{...p}/><path d="M21 13v2a4 4 0 01-4 4H3"{...p}/></>,
     clipboard:   <><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 01-2-2V6a2 2 0 012-2h2"{...p}/><rect x="8" y="2" width="8" height="4" rx="1"{...p}/></>,
+    camera:      <><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h3l2-3h8l2 3h3a2 2 0 012 2z"{...p}/><circle cx="12" cy="13" r="4"{...p}/></>,
     dots:        <><circle cx="12" cy="5" r="2" fill={c} stroke="none"/><circle cx="12" cy="12" r="2" fill={c} stroke="none"/><circle cx="12" cy="19" r="2" fill={c} stroke="none"/></>,
     zap:         <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"{...p}/></>
   };

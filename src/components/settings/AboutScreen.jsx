@@ -3,7 +3,7 @@ import { Ic, LynxLogoWhite, StickyHeader } from '../ui.jsx';
 
 const VER = "1.0";
 const YEAR = "2026";
-const EMAIL = "info@moneylynx.net";
+const EMAIL = "info.mojalova@moneylynx.net";
 const WEB = "moneylynx.net";
 
 function AboutScreen({ C, onBack, t, lang }) {
@@ -251,9 +251,9 @@ OSTALA POBOLJŠANJA
     // ── Licences ────────────────────────────────────────────────────────────
     licences: {
       title: t("Licencni uvjeti"),
-      body: `Money Lynx v${VER} — Licencni uvjeti / Licence Terms
+      body: `Moja Lova by MoneyLynx v${VER} — Licencni uvjeti / Licence Terms
 
-© 2024–${YEAR} Money Lynx. Sva prava pridržana.
+© 2024–${YEAR} MoneyLynx. Sva prava pridržana.
 All rights reserved.
 
 UVJETI KORIŠTENJA (HR)
@@ -301,9 +301,9 @@ https://opensource.org/licenses/MIT`
     // ── Disclaimer ──────────────────────────────────────────────────────────
     disclaimer: {
       title: t("Odricanje odgovornosti"),
-      body: en ? `DISCLAIMER — Money Lynx v${VER}
+      body: en ? `DISCLAIMER — Moja Lova by MoneyLynx v${VER}
 
-Money Lynx is provided "as is" without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.
+Moja Lova is provided "as is" without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.
 
 FINANCIAL DECISIONS
 This app is a personal budgeting and tracking tool only. It does not provide financial, investment, tax, or legal advice. All financial decisions made based on data entered into this app are the sole responsibility of the user. The Active Advisor feature (forecasts, anomaly alerts, year-on-year comparisons) produces estimates based solely on the data you have entered — these are not professional financial projections.
@@ -329,9 +329,9 @@ CURRENCY & CALCULATIONS
 • Currency display is for presentation purposes only and does not perform real-time conversion
 • All calculations are based on user-entered amounts in their selected currency
 • The accuracy of all outputs depends entirely on the accuracy of the data entered` :
-`ODRICANJE ODGOVORNOSTI — Money Lynx v${VER}
+`ODRICANJE ODGOVORNOSTI — Moja Lova by MoneyLynx v${VER}
 
-Aplikacija Money Lynx pruža se "kakva jest" bez ikakvih izričitih ili implicitnih jamstava.
+Aplikacija Moja Lova pruža se "kakva jest" bez ikakvih izričitih ili implicitnih jamstava.
 
 FINANCIJSKE ODLUKE
 Ova aplikacija je isključivo alat za osobno budžetiranje i praćenje. Ne pruža financijske, investicijske, porezne niti pravne savjete. Sve financijske odluke donesene na temelju podataka unesenih u aplikaciju isključiva su odgovornost korisnika. Funkcija Aktivnog savjetnika (projekcije, anomalije, usporedbe god/god) proizvodi procjene isključivo na temelju unesenih podataka — to nisu profesionalne financijske projekcije.
@@ -362,10 +362,10 @@ VALUTE I IZRAČUNI
     privacy: {
       title: t("Privatnost i kolačići"),
       body: en ? `PRIVACY & COOKIES POLICY
-Money Lynx v${VER} · Last updated: May ${YEAR}
+Moja Lova by MoneyLynx v${VER} · Last updated: May ${YEAR}
 
 DATA STORAGE
-Money Lynx stores data in two ways:
+Moja Lova stores data in two ways:
 
 1. LOCAL STORAGE (without account)
 All data stored exclusively on your device using browser localStorage. No data sent to any server. Clearing browser data or switching devices will lose data unless you exported a backup.
@@ -424,10 +424,10 @@ YOUR RIGHTS (GDPR)
 
 Contact for privacy requests: ${EMAIL}` :
 `POLITIKA PRIVATNOSTI I KOLAČIĆA
-Money Lynx v${VER} · Posljednje ažuriranje: svibanj ${YEAR}.
+Moja Lova by MoneyLynx v${VER} · Posljednje ažuriranje: svibanj ${YEAR}.
 
 POHRANA PODATAKA
-Money Lynx pohranjuje podatke na tri načina:
+Moja Lova pohranjuje podatke na tri načina:
 
 1. LOKALNA POHRANA (bez računa)
 Svi podaci pohranjuju se isključivo na tvom uređaju putem browser localStorage-a. Nikakvi podaci ne šalju se na server.
@@ -490,7 +490,7 @@ Za zahtjeve vezane za privatnost: ${EMAIL}`
     // ── Contact ─────────────────────────────────────────────────────────────
     contact: {
       title: t("Kontaktiraj nas"),
-      body: `Money Lynx v${VER}
+      body: `Moja Lova by MoneyLynx v${VER}
 
 Web: ${WEB}
 E-mail: ${EMAIL}
@@ -527,7 +527,7 @@ Please describe:
 
 For feature requests, please explain the use case — not just the feature itself.
 
-Thank you for using Money Lynx v${VER}!` :
+Thank you for using Moja Lova by MoneyLynx v${VER}!` :
 `POŠALJI POVRATNU INFORMACIJU
 
 Hvala na povratnoj informaciji! Pomaže nam poboljšati aplikaciju za sve.
@@ -545,7 +545,7 @@ Molimo opiši:
 
 Za zahtjeve za nove funkcionalnosti, objasni slučaj upotrebe — ne samo funkcionalnost.
 
-Hvala što koristiš Money Lynx v${VER}!`
+Hvala što koristiš Moja Lova by MoneyLynx v${VER}!`
     },
 
     // ── Diagnostics ─────────────────────────────────────────────────────────
@@ -593,8 +593,8 @@ Hvala što koristiš Money Lynx v${VER}!`
                 <LynxLogoWhite s={22}/>
               </div>
               <div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>Money Lynx</div>
-                <div style={{ fontSize: 12, color: C.textMuted }}>{t("Verzija")} {VER} · © {cy} Money Lynx</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>Moja Lova</div>
+                <div style={{ fontSize: 12, color: C.textMuted }}>{t("Verzija")} {VER} · © {cy} MoneyLynx</div>
                 <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{WEB}</div>
               </div>
             </div>

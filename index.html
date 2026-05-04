@@ -10,10 +10,54 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#EFF6FF"/>
+    <meta name="color-scheme" content="light dark"/>
     <meta name="apple-mobile-web-app-capable" content="yes"/>
     <meta name="mobile-web-app-capable" content="yes"/>
     <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-    <title>Money Lynx</title>
+    <title>Moja Lova</title>
+
+    <!-- ─── Pre-render theme detection ─────────────────────────────────────────
+         Runs before splash paints. Reads saved theme preference from
+         localStorage and applies the correct background + color-scheme
+         immediately. Without this the user sees a flash of the wrong theme
+         (always #EFF6FF) for ~1–2 s while React boots, even when they have
+         dark theme saved. The `color-scheme` declaration is also what
+         tells Chrome on Android NOT to apply "auto-dark for web contents".
+    ───────────────────────────────────────────────────────────────────────── -->
+    <script>
+      (function () {
+        try {
+          var raw   = localStorage.getItem('ml_prefs');
+          var saved = raw ? JSON.parse(raw) : {};
+          var pref  = saved && saved.theme ? saved.theme : 'auto';
+          var dark  = pref === 'dark'
+                   || (pref === 'auto' && window.matchMedia
+                        && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var bg = dark ? '#0A1628' : '#EEF4FB';
+          var fg = dark ? '#F1F5F9' : '#0F172A';
+
+          // Strongest signal to the browser: page IS this color-scheme.
+          // Disables Chrome auto-dark, Firefox forced-color override, etc.
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+
+          // Theme-color meta — controls Android Chrome status bar tint.
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', bg);
+
+          // Override the static body bg + splash bg in the head <style>.
+          // Placed AFTER that block in DOM order, no !important needed.
+          var s = document.createElement('style');
+          s.id = 'ml-theme-pre';
+          s.textContent =
+            'html,body{background:' + bg + ';color:' + fg + ';}' +
+            '#splash{background:' + bg + ';}' +
+            (dark
+              ? '.splash-sub{color:#94A3B8;}'
+              : '');
+          document.head.appendChild(s);
+        } catch (e) { /* localStorage may be unavailable — keep default light */ }
+      })();
+    </script>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -205,8 +249,8 @@
         </div>
       </div>
 
-      <div class="splash-title">Money Lynx</div>
-      <div class="splash-sub">Personal Finance App</div>
+      <div class="splash-title">Moja Lova</div>
+      <div class="splash-sub">Osobne financije bez kompliciranja</div>
 
       <div class="splash-dots">
         <span></span><span></span><span></span>
