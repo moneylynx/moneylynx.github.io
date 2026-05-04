@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { MONTHS, T } from '../lib/constants.js';
 import { fmtEur, save } from '../lib/helpers.js';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { Ic, StickyHeader } from './ui.jsx';
 import { useSmartDefaults } from '../hooks/useSmartDefaults.js';
+import { recognizeReceiptFromFile } from '../lib/receiptOcr.js';
 
 function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRecurring, t }) {
   const init = tx ?? (draft ? {
@@ -21,6 +22,9 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
 
   const [form, setForm] = useState(init);
   const upd = patch => setForm(f=>({...f,...patch}));
+  const receiptInputRef = useRef(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrMsg, setOcrMsg] = useState("");
 
   const [err, setErr] = useState({ msg: "", field: "" });
   const clearErr = () => setErr({ msg: "", field: "" });
@@ -114,6 +118,38 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
   const payments  = isPrimitak
     ? lists.payments.filter(p => !CARD_PAYMENTS.includes(p))
     : (inst>1 ? lists.payments.filter(p=>p!=="Gotovina") : lists.payments);
+
+  const handleReceiptOcr = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setOcrBusy(true);
+    setOcrMsg(t("Čitam račun…"));
+    try {
+      const res = await recognizeReceiptFromFile(file, { categories: lists.categories_expense || [] });
+      if (!res.ok) {
+        setOcrMsg(res.message || t("OCR nije dostupan u ovom načinu rada."));
+        return;
+      }
+      const patch = {};
+      if (res.fields.date) patch.date = res.fields.date;
+      if (res.fields.amount) patch.amount = res.fields.amount;
+      if (res.fields.description) patch.description = res.fields.description;
+      if (res.fields.category && (lists.categories_expense || []).includes(res.fields.category)) patch.category = res.fields.category;
+      if (res.fields.notes) patch.notes = res.fields.notes;
+      patch.type = "Isplata";
+      patch.status = form.status || "Plaćeno";
+      setForm(prev => ({ ...prev, ...patch }));
+      if (patch.category) setAutoFilledFields(prev => new Set([...prev, 'category']));
+      setShowAdvanced(true);
+      setOcrMsg(t("OCR je popunio podatke. Provjeri iznos, datum i kategoriju prije spremanja."));
+    } catch (err) {
+      console.warn("OCR failed", err);
+      setOcrMsg(t("OCR čitanje nije uspjelo. Pokušaj jasniju fotografiju računa."));
+    } finally {
+      setOcrBusy(false);
+    }
+  };
 
   useEffect(()=>{
     if (!tx && !draft) {
@@ -222,6 +258,22 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
                 <Ic n="info" s={16} c={C.warning}/>
                 <span style={{ fontSize:12, color:C.text, fontWeight:500 }}>{t("Unos iz skice. Dovršite detalje i spremite.")}</span>
             </div>
+        )}
+
+        {isNewEntry && form.type === "Isplata" && (
+          <div style={{ background:C.card, border:`1px solid ${C.accent}35`, borderRadius:14, padding:12, marginBottom:14 }}>
+            <input ref={receiptInputRef} type="file" accept="image/*" capture="environment" onChange={handleReceiptOcr} style={{ display:"none" }}/>
+            <button type="button" onClick={()=>receiptInputRef.current?.click()} disabled={ocrBusy}
+              style={{ width:"100%", padding:"11px 12px", background:`linear-gradient(135deg,${C.accent}18,${C.income}12)`, border:`1px solid ${C.accent}45`, borderRadius:12, color:C.accent, fontSize:13, fontWeight:700, cursor:ocrBusy?"wait":"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+              {ocrBusy ? <span style={{ width:14, height:14, borderRadius:"50%", border:`2px solid ${C.accent}`, borderTopColor:"transparent", animation:"spin 1s linear infinite" }}/> : <Ic n="camera" s={15} c={C.accent}/>}
+              {ocrBusy ? t("Čitam račun…") : t("Skeniraj račun (OCR)")}
+            </button>
+            {ocrMsg && (
+              <div style={{ marginTop:8, fontSize:11, color:ocrMsg.includes("Provjeri")?C.income:C.textMuted, lineHeight:1.45 }}>
+                {ocrMsg}
+              </div>
+            )}
+          </div>
         )}
 
         {/* ─── Recent combos chips — tap to fill the form ──────────────────── */}

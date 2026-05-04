@@ -12,7 +12,7 @@ function ShareModal({ C, txs, year, user, onClose, t, lang }) {
   const sumTxt = buildSummary(txs, year, user, t);
   const csvTxt = buildCSV(txs, t, lang);
   const content = fmt2==="summary" ? sumTxt : csvTxt;
-  const subj    = encodeURIComponent(`${t("Money Lynx")} — ${year}.`);
+  const subj    = encodeURIComponent(`${t("Moja Lova")} — ${year}.`);
   const body    = encodeURIComponent(fmt2==="summary" ? sumTxt : `CSV — ${year}.\n\nUser: ${[user.firstName,user.lastName].filter(Boolean).join(" ")||"—"}`);
 
   const dl = () => {

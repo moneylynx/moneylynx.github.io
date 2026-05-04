@@ -11,6 +11,8 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   const cmIdx = curMonthIdx();
   const cm     = MONTHS[cmIdx];
   const cmName = lang === "en" ? MONTHS_EN[cmIdx] : cm;
+  const MONTHS_GEN_HR = ["siječnja","veljače","ožujka","travnja","svibnja","lipnja","srpnja","kolovoza","rujna","listopada","studenoga","prosinca"];
+  const projectionMonthLabel = lang === "en" ? `Projection at the end of ${cmName}` : `Projekcija na kraju ${MONTHS_GEN_HR[cmIdx]}`;
 
   const yd = data.filter(x => new Date(x.date).getFullYear() === year);
   const md = yd.filter(x => monthOf(x.date) === cm);
@@ -80,9 +82,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   const mm  = String(now.getMonth()+1).padStart(2,"0");
   const yy  = now.getFullYear();
   const W   = Math.min(window.innerWidth??480,480)-64;
+  const VH  = typeof window !== "undefined" ? Math.min(window.innerHeight || 720, 900) : 720;
+  const todoMaxHeight = Math.max(116, Math.min(238, Math.round(VH * 0.24)));
   const dn  = [user.firstName, user.lastName].filter(Boolean).join(" ");
 
   const insightColor = (color) => ({ income:C.income, expense:C.expense, warning:C.warning, accent:C.accent }[color] || C.accent);
+  const visibleInsights = insights.filter(ins => ins.type !== "forecast");
 
   // Forecast projection line — shown inside balance card
   const forecastBal = forecast.hasHistory && forecast.daysLeft > 0 ? forecast.projectedBalance : null;
@@ -114,7 +119,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
             <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
-              <LynxLogo s={22} color={C.accent}/> {t("Money Lynx")} <span style={{fontSize:14,color:C.textMuted,fontWeight:500,verticalAlign:"middle",position:"relative",top:2}}>· {year}.</span>
+              <LynxLogo s={22} color={C.accent}/> {t("Moja Lova")} <span style={{fontSize:14,color:C.textMuted,fontWeight:500,verticalAlign:"middle",position:"relative",top:2}}>· {year}.</span>
             </h1>
             {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
@@ -161,7 +166,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           {forecastBal !== null && (
             <div style={{ marginTop:8, paddingTop:8, borderTop:`1px solid ${bal>=0?C.income:C.expense}25`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <span style={{ fontSize:11, color:C.textMuted, display:"flex", alignItems:"center", gap:4 }}>
-                <span style={{ fontSize:12 }}>📊</span> {t("Projekcija kraj mj.")}
+                <span style={{ fontSize:12 }}>📊</span> {projectionMonthLabel}
               </span>
               <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                 <span style={{ fontSize:13, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:forecastColor }}>
@@ -228,7 +233,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               <div style={{ width:60,height:60,borderRadius:20,background:`linear-gradient(135deg,${C.accent},${C.accentDk})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",boxShadow:`0 4px 15px ${C.accentGlow}` }}>
                 <Ic n="plus" s={28} c="#fff"/>
               </div>
-              <h3 style={{ fontSize:17,fontWeight:700,color:C.text,marginBottom:6 }}>{t("Dobrodošao u Money Lynx!")}</h3>
+              <h3 style={{ fontSize:17,fontWeight:700,color:C.text,marginBottom:6 }}>{t("Dobrodošao u Moja Lova!")}</h3>
               <p style={{ fontSize:13,color:C.textMuted,lineHeight:1.5 }}>{t("Prati financije u 3 koraka:")}</p>
             </div>
 
@@ -286,8 +291,8 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     display:"flex",
                     flexDirection:"column",
                     gap:5,
-                    maxHeight: 168,
-                    overflowY: todoItems.length > 3 ? "auto" : "visible",
+                    maxHeight: todoMaxHeight,
+                    overflowY: todoItems.length > Math.max(3, Math.floor(todoMaxHeight / 44)) ? "auto" : "visible",
                     overscrollBehavior: "contain",
                     WebkitOverflowScrolling: "touch",
                   }}>
@@ -312,7 +317,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     ))}
                   </div>
                   {/* Bottom fade hint — only when scroll is active */}
-                  {todoItems.length > 3 && (
+                  {todoItems.length > Math.max(3, Math.floor(todoMaxHeight / 44)) && (
                     <div style={{ position:"absolute", left:0, right:0, bottom:0, height:14, pointerEvents:"none", background:`linear-gradient(180deg, transparent 0%, ${C.card} 95%)` }}/>
                   )}
                 </div>
@@ -327,13 +332,13 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
             )}
 
             {/* ── 4. ADVISOR INSIGHTS — anomalies + positive ──────────── */}
-            {insights.length > 0 && (
+            {visibleInsights.length > 0 && (
               <div style={{ marginBottom:10 }}>
-                {insights.map((ins, i) => {
+                {visibleInsights.map((ins, i) => {
                   const col = insightColor(ins.color);
                   return (
                     <div key={i} className="su"
-                      style={{ background:`linear-gradient(135deg,${col}18,${col}08)`, border:`1px solid ${col}40`, borderLeft:`4px solid ${col}`, borderRadius:14, padding:"9px 12px", marginBottom:i<insights.length-1?6:0, animationDelay:`${i*.05}s` }}>
+                      style={{ background:`linear-gradient(135deg,${col}18,${col}08)`, border:`1px solid ${col}40`, borderLeft:`4px solid ${col}`, borderRadius:14, padding:"9px 12px", marginBottom:i<visibleInsights.length-1?6:0, animationDelay:`${i*.05}s` }}>
                       <div style={{ display:"flex",alignItems:"flex-start",gap:8 }}>
                         <span style={{ fontSize:15,flexShrink:0,lineHeight:1.3 }}>{ins.icon}</span>
                         <div style={{ flex:1,minWidth:0 }}>
@@ -349,7 +354,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
 
             {/* ── 5. TOP KATEGORIJE — horizontal bar chart, mobile-optimized ── */}
             {catsMonth.length > 0 && (() => {
-              const topN     = catsMonth.slice(0, 5);
+              const topN     = catsMonth.slice(0, 4);
               const maxVal   = topN[0].value;
               const totalAll = catsMonth.reduce((s,c)=>s+c.value, 0);
               const totalTop = topN.reduce((s,c)=>s+c.value, 0);
@@ -403,9 +408,9 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     })}
                   </div>
 
-                  {catsMonth.length > 5 && (
+                  {catsMonth.length > 4 && (
                     <button onClick={()=>{setPage("charts");}} style={{ marginTop:8,width:"100%",padding:"5px 0 2px",background:"transparent",border:"none",borderTop:`1px solid ${C.border}30`,color:C.accent,fontSize:11,fontWeight:600,cursor:"pointer" }}>
-                      + {catsMonth.length - 5} {t("više")} · {t("Otvori statistiku →")}
+                      + {catsMonth.length - 4} {t("više")} · {t("Otvori statistiku →")}
                     </button>
                   )}
                 </div>

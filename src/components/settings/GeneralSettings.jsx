@@ -5,6 +5,7 @@ import { hashPinV2, hashPinLegacy } from '../../lib/crypto.js';
 import { Ic, LynxLogo, LynxLogoWhite, StickyHeader } from '../ui.jsx';
 import { SetupPin } from '../auth.jsx';
 import { saveToGoogleDrive, loadFromGoogleDrive, isDriveConfigured, revokeGoogleToken } from '../../lib/googleDriveBackup.js';
+import { exportReportPdf, exportReportXlsx, exportReportCsvFallback } from '../../lib/reportExports.js';
 
 function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, t, lang }) {
   const [pinChg,  setPinChg]  = useState(false);
@@ -119,7 +120,8 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         __moja_lova_backup: true,
         version: 1,
         exportedAt: new Date().toISOString(),
-        app: "Money Lynx",
+        app: "Moja Lova",
+        brand: "MoneyLynx",
         exportYear: yr || "all",
         data: {
           txs: filteredTxs,
@@ -138,6 +140,24 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     }
   };
 
+  const reportArgs = () => ({ txs, lists, prefs, user, year });
+
+  const runReportExport = async (kind) => {
+    try {
+      if (kind === "pdf") await exportReportPdf(reportArgs());
+      if (kind === "proPdf") await exportReportPdf(reportArgs(), { pro: true });
+      if (kind === "xlsx") await exportReportXlsx(reportArgs());
+    } catch (e) {
+      console.warn("Report export failed", e);
+      if (kind === "xlsx") {
+        exportReportCsvFallback(reportArgs());
+        alert(t("XLSX modul nije dostupan. Izvezen je CSV fallback."));
+      } else {
+        alert(t("Izvoz izvještaja nije uspio. Provjeri internetsku vezu i pokušaj ponovno."));
+      }
+    }
+  };
+
   // Restore — validates payload, confirms, writes to localStorage, reloads.
   const fullImport = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -147,14 +167,14 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     // Quick pre-check by name/type — avoid wasting time on images, PDFs, etc.
     // that the user may accidentally pick (Android's file picker shows everything).
     const looksJson = /\.json$/i.test(file.name) || file.type === "application/json" || file.type === "";
-    if (!looksJson) { alert(t("Datoteka nije valjan Money Lynx backup.")); return; }
+    if (!looksJson) { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
 
     const reader = new FileReader();
     reader.onerror = () => alert(t("Greška pri čitanju datoteke."));
     reader.onload = (ev) => {
       let parsed;
       try { parsed = JSON.parse(ev.target.result); }
-      catch { alert(t("Datoteka nije valjan Money Lynx backup.")); return; }
+      catch { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
 
       // Accept new format (__moja_lova_backup wrapper) OR legacy format (plain txs array)
       let data = null;
@@ -163,7 +183,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       } else if (Array.isArray(parsed)) {
         data = { txs: parsed }; // legacy: file contained just the txs array
       }
-      if (!data) { alert(t("Datoteka nije valjan Money Lynx backup.")); return; }
+      if (!data) { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
 
       if (!window.confirm(t("Vraćanjem podataka trenutni podaci bit će ZAMIJENJENI. Nastaviti?"))) return;
 
@@ -182,7 +202,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         alert(t("Podaci su uspješno vraćeni. Aplikacija će se ponovno učitati."));
         window.location.reload();
       } catch {
-        alert(t("Datoteka nije valjan Money Lynx backup."));
+        alert(t("Datoteka nije valjan Moja Lova backup."));
       }
     };
     reader.readAsText(file);
@@ -408,6 +428,26 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             <Ic n="chevron" s={14} c={C.warning} style={{ transform:"rotate(-90deg)" }}/>
           </button>
 
+          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:12, marginBottom:7 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.text, marginBottom:4, display:"flex", alignItems:"center", gap:6 }}>
+              <Ic n="bar" s={14} c={C.accent}/>{t("Izvještaji PDF / Excel")}
+            </div>
+            <div style={{ fontSize:11, color:C.textMuted, lineHeight:1.45, marginBottom:10 }}>
+              {t("Osnovni grafovi, mjesečni pregled, top kategorije i budžeti. PRO izvještaj dodaje usporedbe, ciljeve i prognoze.")}
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+              <button onClick={()=>runReportExport("pdf")} style={{ padding:"10px 8px", background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, border:"none", borderRadius:11, color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                <Ic n="dl" s={13} c="#fff"/>PDF
+              </button>
+              <button onClick={()=>runReportExport("xlsx")} style={{ padding:"10px 8px", background:`linear-gradient(135deg,${C.income},#059669)`, border:"none", borderRadius:11, color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                <Ic n="dl" s={13} c="#fff"/>XLSX
+              </button>
+              <button onClick={()=>runReportExport("proPdf")} style={{ gridColumn:"1 / -1", padding:"10px 8px", background:`${C.warning}18`, border:`1px solid ${C.warning}50`, borderRadius:11, color:C.warning, fontSize:12, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                <Ic n="zap" s={13} c={C.warning}/>PRO PDF report
+              </button>
+            </div>
+          </div>
+
           {/* 3) IMPORT (RESTORE) — full JSON restore with confirm */}
           <label style={{ display:"block", cursor:"pointer", marginBottom:7 }}>
             <div style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13 }}>
@@ -515,7 +555,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><LynxLogoWhite s={20}/></div>
-            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Money Lynx")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.0</div></div>
+            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja Lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.0</div></div>
             {onAbout && (
               <button onClick={onAbout}
                 style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
@@ -524,10 +564,10 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             )}
           </div>
           <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:11 }}>
-            <p style={{ fontSize:13, fontWeight:600, color:C.accent }}>moneylynx.net</p>
-            <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>E-mail: <a href="mailto:info@moneylynx.net" style={{ color:C.accent, textDecoration:"none" }}>info@moneylynx.net</a></p>
-            <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>© {cy} Money Lynx · {t("Sva prava pridržana.")}</p>
-            <p style={{ fontSize:11, color:C.textMuted, marginTop:2 }}>{t("Osobna upotreba · Nije za komercijalnu distribuciju.")}</p>
+            <p style={{ fontSize:13, fontWeight:600, color:C.accent }}>{t("Moja Lova by MoneyLynx")}</p>
+            <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>E-mail: <a href="mailto:info.mojalova@moneylynx.net" style={{ color:C.accent, textDecoration:"none" }}>info.mojalova@moneylynx.net</a></p>
+            <p style={{ fontSize:11, color:C.textMuted, marginTop:3 }}>© {cy} MoneyLynx · {t("Sva prava pridržana.")}</p>
+            <p style={{ fontSize:11, color:C.textMuted, marginTop:2 }}>{t("Za osobnu upotrebu. · Verzija nije za komercijalnu distribuciju.")}</p>
           </div>
         </div>
         
@@ -590,7 +630,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                     if (typeof File !== "undefined" && typeof navigator !== "undefined" && typeof navigator.canShare === "function") {
                       const file = new File([content], filename, { type: "application/json" });
                       if (navigator.canShare({ files: [file] })) {
-                        await navigator.share({ files: [file], title: "Money Lynx — Backup", text: filename });
+                        await navigator.share({ files: [file], title: "Moja Lova — Backup", text: filename });
                         updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
                         return;
                       }

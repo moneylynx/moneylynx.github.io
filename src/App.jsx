@@ -303,7 +303,7 @@ export default function App() {
         <div style={{ width: 56, height: 56, borderRadius: 16, background: `linear-gradient(135deg,${C.accent},${C.accentDk || C.accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', animation: 'pulse 1.5s ease-in-out infinite' }}>
           <LynxLogoWhite s={26}/>
         </div>
-        <span style={{ color: C.textMuted, fontSize: 13 }}>Money Lynx</span>
+        <span style={{ color: C.textMuted, fontSize: 13 }}>Moja Lova</span>
       </div>
     </div>
   );
