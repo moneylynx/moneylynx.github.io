@@ -36,6 +36,18 @@ import { RecurringScreen } from './components/Settings.jsx';
 // Haptic feedback helper — silent if browser doesn't support vibrate
 const haptic = (ms = 40) => { try { navigator.vibrate?.(ms); } catch {} };
 
+// ── Platform detection ──────────────────────────────────────────────────────
+// `isNative` = true kad app radi unutar Capacitor Android/iOS WebView-a.
+// Na webu ostaje sve isto (Supabase auth + cloud sync). Na nativnom mobilu
+// preskačemo auth i radimo 100% lokalno — podaci u localStorage na uređaju.
+//
+// TODO: NATIVE-CLOUD-SYNC — kasnije dodati opt-in cloud sync preko Postavki:
+//   • korisnik upali "Sinkronizacija s računalom" u Settings
+//   • prijavi se (email/lozinka ili biometrija + token)
+//   • od tog trenutka koristi `useCloudSync` kao i web verzija
+//   • do tada — ovo je čista offline app
+const isNative = typeof window !== 'undefined' && !!window.Capacitor?.isNativePlatform?.();
+
 export default function App() {
   const _sec    = load(K.sec, {});
   const _hasPin = !!_sec.pinHash;
@@ -296,7 +308,8 @@ export default function App() {
 
   // ── Early returns ─────────────────────────────────────────────────────────
 
-  if (!authReady) return (
+  // Auth loading screen — samo na webu (TODO: NATIVE-CLOUD-SYNC: vratiti i za native kad bude opt-in sync)
+  if (!isNative && !authReady) return (
     <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <style>{gs}</style>
       <div style={{ textAlign: 'center' }}>
@@ -308,7 +321,11 @@ export default function App() {
     </div>
   );
 
-  if (authReady && !supaUser) return (
+  // Login screen — samo na webu. Native app (Android/iOS) radi lokalno bez prijave.
+  // TODO: NATIVE-CLOUD-SYNC — kad implementiramo opt-in sync, ovdje dodati provjeru
+  // tipa: `if (!isNative && authReady && !supaUser)` → AuthScreen,
+  //       `if (isNative && cloudSyncEnabled && !supaUser)` → AuthScreen.
+  if (!isNative && authReady && !supaUser) return (
     <div style={wrap}><style>{gs}</style>
       <AuthScreen C={C} t={t} lang={lang} onLangChange={(l) => updP({ lang: l })} onSuccess={(session) => setSupaUser(session?.user)}/>
     </div>
