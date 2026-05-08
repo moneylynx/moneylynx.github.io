@@ -29,6 +29,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   // y = svi izdaci tekućeg mjeseca (plaćeni + pending + recurring koji nisu plaćeni)
   // A = (x - y) / dani_do_kraja_mjeseca - B
   const [dlSavingsEdit, setDlSavingsEdit] = useState(false);
+  const [dlDetailOpen, setDlDetailOpen] = useState(true); // savings detail cards open by default
   const [dlSavingsInput, setDlSavingsInput] = useState("");
   const [dlSavingsPeriod, setDlSavingsPeriod] = useState(() => prefs?.plannedSavingsPeriod || "monthly");
 
@@ -93,6 +94,14 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   const dailyLimitRaw = daysLeft>0 ? (xIncome-yExpenses-effectiveSavings)/daysLeft : 0;
   const dailyLimit = Math.round(dailyLimitRaw * 100) / 100;
   const dlGood = dailyLimit >= 0;
+
+  // ── Savings metrics for detail cards ─────────────────────────────────────
+  const plannedMonthly = savedPeriod === "yearly" ? plannedSavingsRaw / 12 : plannedSavings;
+  const plannedYearly  = savedPeriod === "yearly" ? plannedSavingsRaw : plannedSavings * 12;
+  // "Ušteđeno do sada" = net surplus this month (paid income - paid expenses)
+  const savedSoFar     = Math.max(0, mI - mE);
+  const savingsProgress = plannedMonthly > 0 ? Math.min(1, savedSoFar / plannedMonthly) : 0;
+  const savingsProgressColor = savingsProgress >= 1 ? C.income : savingsProgress >= 0.5 ? C.warning : C.expense;
   const dlColor = dailyLimit >= 20 ? C.income : dailyLimit >= 0 ? C.warning : C.expense;
 
   const { forecast, anomalies, insights } = useAdvisor(data, lists, fmt, t);
@@ -436,7 +445,11 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               {/* Header row */}
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-                  <div style={{ width:28, height:28, borderRadius:9, background:`${dlColor}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>💸</div>
+                  <button onClick={()=>setDlDetailOpen(v=>!v)}
+                    style={{ width:28, height:28, borderRadius:9, background:`${dlColor}20`, border:`1px solid ${dlColor}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, cursor:"pointer", transition:"all .2s", transform:dlDetailOpen?"scale(1.1)":"scale(1)" }}
+                    title={t("Prikaži/sakrij detalje štednje")}>
+                    💸
+                  </button>
                   <div>
                     <div style={{ fontSize:11, fontWeight:700, color:C.textSub, textTransform:"uppercase", letterSpacing:.5 }}>{t("Dnevni limit potrošnje")}</div>
                     <div style={{ fontSize:10, color:C.textMuted, marginTop:1 }}>
@@ -474,19 +487,39 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                 </span>
               </div>
 
-              {/* Breakdown row */}
-              <div style={{ display:"flex", gap:8, marginBottom: dlSavingsEdit ? 10 : 0 }}>
-                {[
-                  { lb: t("Primici"), val: fmt(xIncome), col: C.income, icon:"📥" },
-                  { lb: t("Izdaci"), val: fmt(yExpenses), col: C.expense, icon:"📤" },
-                  { lb: t("Planirana štednja"), val: fmt(savedPeriod === "yearly" ? plannedSavingsRaw : plannedSavings) + " € " + (savedPeriod === "yearly" ? t("godišnje") : t("mjesečno")), col: C.accent, icon:"🎯" },
-                ].map(({ lb, val, col, icon }) => (
-                  <div key={lb} style={{ flex:1, background:C.cardAlt, borderRadius:10, padding:"7px 8px", border:`1px solid ${col}25` }}>
-                    <div style={{ fontSize:10, color:C.textMuted, marginBottom:3 }}>{icon} {lb}</div>
-                    <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:col }}>{val}</div>
+              {/* ── Savings detail cards (toggle with 💸) ─────────── */}
+              {dlDetailOpen && (
+                <div style={{ marginBottom: dlSavingsEdit ? 10 : 0 }}>
+                  <div style={{ display:"flex", gap:7, marginBottom:7 }}>
+
+                    {/* Card 1: Planirana ušteda mjesečno */}
+                    <div style={{ flex:1, background:C.cardAlt, borderRadius:11, padding:"8px 9px", border:`1px solid ${C.income}25` }}>
+                      <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:.3 }}>💰 {t("Ušteda/mj.")}</div>
+                      <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:C.income }}>{fmt(plannedMonthly)}</div>
+                      <div style={{ fontSize:9, color:C.textMuted, marginTop:2 }}>{t("planirano")}</div>
+                    </div>
+
+                    {/* Card 2: Planirana ušteda godišnje */}
+                    <div style={{ flex:1, background:C.cardAlt, borderRadius:11, padding:"8px 9px", border:`1px solid ${C.accent}25` }}>
+                      <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:.3 }}>📅 {t("Ušteda/god.")}</div>
+                      <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:C.accent }}>{fmt(plannedYearly)}</div>
+                      <div style={{ fontSize:9, color:C.textMuted, marginTop:2 }}>{t("planirano")}</div>
+                    </div>
+
+                    {/* Card 3: Ušteđeno do sada */}
+                    <div style={{ flex:1, background:C.cardAlt, borderRadius:11, padding:"8px 9px", border:`1px solid ${savingsProgressColor}40` }}>
+                      <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:.3 }}>✅ {t("Ušteđeno")}</div>
+                      <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:savingsProgressColor }}>{fmt(savedSoFar)}</div>
+                      {plannedMonthly > 0 && (
+                        <div style={{ marginTop:4, height:3, borderRadius:2, background:`${savingsProgressColor}20`, overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:`${savingsProgress*100}%`, background:savingsProgressColor, borderRadius:2, transition:"width .4s" }}/>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
 
               {/* Savings input panel */}
               {dlSavingsEdit && (
