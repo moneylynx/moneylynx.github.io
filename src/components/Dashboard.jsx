@@ -39,22 +39,58 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
 
   const today = new Date();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const daysLeft = daysInMonth - today.getDate(); // days remaining after today
+  const daysLeft = daysInMonth - today.getDate();
 
-  // x = monthly income: paid + recurring income not yet paid
-  const recIncUnpaid = (lists.recurring_income || [])
-    .filter(r => !md.find(x => x.recurringIncomeId === r.id))
-    .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  // Next payday: find largest recurring income, compute days until next dueDay
+  const nextPayday = (() => {
+    const recInc = lists.recurring_income || [];
+    if (recInc.length === 0) return null;
+    // Find largest by amount
+    const biggest = recInc.reduce((best, r) => (parseFloat(r.amount)||0) > (parseFloat(best.amount)||0) ? r : best, recInc[0]);
+    const dDay = Math.max(1, Math.min(28, parseInt(biggest.dueDay)||1));
+    const tDay = today.getDate();
+    // Days until next occurrence
+    let daysUntil;
+    if (dDay >= tDay) {
+      daysUntil = dDay - tDay;
+    } else {
+      // Next month
+      const nextOcc = new Date(today.getFullYear(), today.getMonth()+1, dDay);
+      daysUntil = Math.ceil((nextOcc - today) / 86400000);
+    }
+    return { name: biggest.description, days: daysUntil, dDay };
+  })();
+
+  const daysLeftYear = (() => { const e=new Date(today.getFullYear(),11,31); return Math.ceil((e-today)/86400000); })();
+
+  // x = monthly income (paid + upcoming recurring this month)
+  const recIncUnpaid = (lists.recurring_income||[]).filter(r=>!md.find(x=>x.recurringIncomeId===r.id)).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   const xIncome = mI + recIncUnpaid;
 
-  // y = monthly expenses: paid + pending transactions + unpaid recurring
-  const mEPending = md.filter(x => x.type === "Isplata" && x.status !== "Plaćeno").reduce((s,x) => s + (+x.amount||0), 0);
-  const recUnpaid = (lists.recurring || [])
-    .filter(r => !md.find(x => x.recurringId === r.id))
-    .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  // xYear = yearly income (all year + remaining recurring months)
+  const ydYear = data.filter(x=>new Date(x.date).getFullYear()===today.getFullYear());
+  const monthsLeft = 12-(today.getMonth()+1);
+  const xIncomeYear = ydYear.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0)
+    + (lists.recurring_income||[]).reduce((s,r)=>s+(parseFloat(r.amount)||0)*monthsLeft,0);
+
+  // y = monthly expenses (paid + pending + unpaid recurring)
+  const mEPending = md.filter(x=>x.type==="Isplata"&&x.status!=="Plaćeno").reduce((s,x)=>s+(+x.amount||0),0);
+  const recUnpaid = (lists.recurring||[]).filter(r=>!md.find(x=>x.recurringId===r.id)).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   const yExpenses = mE + mEPending + recUnpaid;
 
-  const dailyLimitRaw = daysLeft > 0 ? (xIncome - yExpenses - plannedSavings) / daysLeft : 0;
+  // yYear = yearly expenses + remaining recurring
+  const yExpensesYear = ydYear.filter(x=>x.type==="Isplata").reduce((s,x)=>s+(+x.amount||0),0)
+    + (lists.recurring||[]).reduce((s,r)=>s+(parseFloat(r.amount)||0)*monthsLeft,0);
+
+  // Savings validation: reject if exceeds available funds
+  const maxSavings = savedPeriod==="yearly" ? Math.max(0,xIncomeYear-yExpensesYear) : Math.max(0,xIncome-yExpenses);
+  const savingsExceedsIncome = plannedSavingsRaw > 0 && plannedSavingsRaw > maxSavings && maxSavings > 0;
+
+  // Effective daily savings contribution
+  const effectiveSavings = savedPeriod==="yearly"
+    ? (daysLeftYear>0 ? plannedSavingsRaw*(daysLeft/daysLeftYear) : 0)
+    : plannedSavings;
+  const dailyLimitRaw = daysLeft>0 ? (xIncome-yExpenses-effectiveSavings)/daysLeft : 0;
   const dailyLimit = Math.round(dailyLimitRaw * 100) / 100;
   const dlGood = dailyLimit >= 0;
   const dlColor = dailyLimit >= 20 ? C.income : dailyLimit >= 0 ? C.warning : C.expense;
@@ -83,10 +119,18 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
     // ── Upcoming recurring income ────────────────────────────────────────
     const recInc = lists.recurring_income || [];
     const recIncPaidIds = new Set(md.filter(x => x.recurringIncomeId).map(x => x.recurringIncomeId));
+    const todayDate = new Date();
     recInc.forEach(r => {
       if (recIncPaidIds.has(r.id)) return;
       const day = Math.max(1, Math.min(28, parseInt(r.dueDay)||1));
-      items.push({ kind:"recurring_income", id:r.id, date:new Date(cy,cmi,day).toISOString().split("T")[0], description:r.description, category:r.category, amount:parseFloat(r.amount)||0, recurring:r });
+      // If dueDay already passed this month → show next month's occurrence
+      let incDate;
+      if (day < todayDate.getDate()) {
+        incDate = new Date(cy, cmi + 1, day);
+      } else {
+        incDate = new Date(cy, cmi, day);
+      }
+      items.push({ kind:"recurring_income", id:r.id, date:incDate.toISOString().split("T")[0], description:r.description, category:r.category, amount:parseFloat(r.amount)||0, recurring:r });
     });
 
     return items.sort((a,b) => a.date.localeCompare(b.date));
@@ -327,7 +371,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               <div className="su" style={{ background:C.card,border:`1px solid ${C.warning}40`,borderLeft:`4px solid ${C.warning}`,borderRadius:14,marginBottom:10,overflow:"hidden" }}>
                 <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px 7px",borderBottom:`1px solid ${C.border}` }}>
                   <div style={{ fontSize:11,fontWeight:600,color:C.warning,display:"flex",alignItems:"center",gap:5 }}>
-                    <Ic n="coins" s={12} c={C.warning}/>{t("Za platiti")}
+                    <Ic n="coins" s={12} c={C.warning}/>
+                    {todoItems.some(i=>i.kind==="recurring_income") && todoItems.some(i=>i.kind!=="recurring_income")
+                      ? t("Dospijeva")
+                      : todoItems.every(i=>i.kind==="recurring_income")
+                      ? t("Za naplatiti")
+                      : t("Za platiti")}
                     <span style={{ background:`${C.warning}25`,borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:C.warning }}>{todoItems.length}</span>
                   </div>
                   <div style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.warning }}>{fmt(todoItems.reduce((s,i)=>s+i.amount,0))}</div>
@@ -390,7 +439,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                   <div style={{ width:28, height:28, borderRadius:9, background:`${dlColor}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>💸</div>
                   <div>
                     <div style={{ fontSize:11, fontWeight:700, color:C.textSub, textTransform:"uppercase", letterSpacing:.5 }}>{t("Dnevni limit potrošnje")}</div>
-                    <div style={{ fontSize:10, color:C.textMuted, marginTop:1 }}>{daysLeft} {t("dana do kraja mjeseca")}</div>
+                    <div style={{ fontSize:10, color:C.textMuted, marginTop:1 }}>
+                      {nextPayday && nextPayday.days <= 31
+                        ? <>{nextPayday.days === 0 ? t("Danas") : `${nextPayday.days} ${t("dana do")} ${nextPayday.name}`}</>
+                        : <>{daysLeft} {t("dana do kraja mjeseca")}</>
+                      }
+                    </div>
                   </div>
                 </div>
                 {/* Savings edit button */}
@@ -425,7 +479,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                 {[
                   { lb: t("Primici"), val: fmt(xIncome), col: C.income, icon:"📥" },
                   { lb: t("Izdaci"), val: fmt(yExpenses), col: C.expense, icon:"📤" },
-                  { lb: t("Planirana štednja"), val: fmt(plannedSavings) + (savedPeriod === "yearly" ? t("/god.÷12") : t("/mj.")), col: C.accent, icon:"🎯" },
+                  { lb: t("Planirana štednja"), val: fmt(savedPeriod === "yearly" ? plannedSavingsRaw : plannedSavings) + " € " + (savedPeriod === "yearly" ? t("godišnje") : t("mjesečno")), col: C.accent, icon:"🎯" },
                 ].map(({ lb, val, col, icon }) => (
                   <div key={lb} style={{ flex:1, background:C.cardAlt, borderRadius:10, padding:"7px 8px", border:`1px solid ${col}25` }}>
                     <div style={{ fontSize:10, color:C.textMuted, marginBottom:3 }}>{icon} {lb}</div>
@@ -448,7 +502,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                       ))}
                     </div>
                   </div>
-                  <div style={{ fontSize:10, color:C.textMuted, marginBottom:8 }}>{dlSavingsPeriod==="monthly" ? t("Iznos koji odvajate svaki mjesec") : t("Godišnji iznos — dijelit će se s 12")}</div>
+                  <div style={{ fontSize:10, color:C.textMuted, marginBottom:6 }}>{dlSavingsPeriod==="monthly" ? t("Iznos koji odvajate svaki mjesec") : t("Godišnji iznos — dijelit će se s 12")}</div>
+                  {savingsExceedsIncome && (
+                    <div style={{ fontSize:10, color:C.expense, fontWeight:600, marginBottom:8, padding:"4px 8px", background:`${C.expense}12`, borderRadius:6, border:`1px solid ${C.expense}30` }}>
+                      ⚠️ {t("Planirana štednja premašuje raspoložive prihode")}
+                    </div>
+                  )}
                   <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                   <div style={{ flex:1, position:"relative" }}>
                     <input

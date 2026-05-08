@@ -452,23 +452,30 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </div>
           </div>
 
-          {/* 3) IMPORT (RESTORE) — full JSON restore with confirm */}
-          <label style={{ display:"block", cursor:"pointer", marginBottom:7 }}>
-            <div style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <Ic n="ul" s={19} c={C.income}/>
-                <div style={{ textAlign:"left" }}>
-                  <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Učitaj (Import / Restore)")}</div>
-                  <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
+          {/* 3) IMPORT (RESTORE) — ref-based for Capacitor/Android compatibility */}
+          {(() => {
+            const fileInputRef = { current: null };
+            return (
+              <>
+                <div onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                  style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13, cursor:"pointer", marginBottom:7 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <Ic n="ul" s={19} c={C.income}/>
+                    <div style={{ textAlign:"left" }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Učitaj (Import / Restore)")}</div>
+                      <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
+                    </div>
+                  </div>
+                  <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
                 </div>
-              </div>
-              <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
-            </div>
-            {/* Use multiple accept values for maximum Android compatibility.
-                Some Android file pickers need explicit .json MIME type,
-                others need wildcard. Both are listed. */}
-            <input type="file" accept=".json,application/json,application/octet-stream,text/plain,*/*" onChange={fullImport} style={{ display:"none" }}/>
-          </label>
+                <input ref={el => { fileInputRef.current = el; }}
+                  type="file"
+                  accept=".json,application/json,application/octet-stream,text/plain,*/*"
+                  onChange={fullImport}
+                  style={{ display:"none", position:"absolute", opacity:0, pointerEvents:"none" }}/>
+              </>
+            );
+          })()}
         </div>
 
         {/* ── Google Drive backup section ──────────────────────────────── */}
