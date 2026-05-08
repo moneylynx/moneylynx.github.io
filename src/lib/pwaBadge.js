@@ -32,7 +32,7 @@ export function updateBadge(count) {
     }
     // Persist count in Cache Storage as SW fallback.
     if ('caches' in self) {
-      caches.open('moneylynx-v1.0').then(cache =>
+      caches.open('moneylynx-v1.1').then(cache =>
         cache.put('/__ml_badge__', new Response(String(count)))
       ).catch(() => {});
     }

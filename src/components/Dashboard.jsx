@@ -30,8 +30,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   // A = (x - y) / dani_do_kraja_mjeseca - B
   const [dlSavingsEdit, setDlSavingsEdit] = useState(false);
   const [dlSavingsInput, setDlSavingsInput] = useState("");
+  const [dlSavingsPeriod, setDlSavingsPeriod] = useState(() => prefs?.plannedSavingsPeriod || "monthly");
 
-  const plannedSavings = parseFloat(prefs?.plannedSavings) || 0;
+  const plannedSavingsRaw = parseFloat(prefs?.plannedSavings) || 0;
+  const savedPeriod = prefs?.plannedSavingsPeriod || "monthly";
+  // Normalize to monthly for formula
+  const plannedSavings = savedPeriod === "yearly" ? plannedSavingsRaw / 12 : plannedSavingsRaw;
 
   const today = new Date();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
@@ -182,16 +186,28 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           </div>
         )}
 
-        {/* ── 1. HERO BALANCE CARD — with inline forecast projection ──── */}
+        {/* ── 1. HERO BALANCE CARD — ultra-modern redesign ────────── */}
         <div className="su" onClick={() => forecast.hasHistory && setForecastOpen(v => !v)}
-          style={{ background:`linear-gradient(135deg,${C.accent}22,${bal>=0?C.income:C.expense}18)`, border:`1px solid ${bal>=0?C.income:C.expense}40`, borderRadius:18, padding:"16px 18px 18px 16px", marginBottom:10, position:"relative", overflow:"hidden", cursor: forecast.hasHistory ? "pointer" : "default" }}>
-          <div style={{ position:"absolute", top:12, right:18, textAlign:"right" }}>
-            <div style={{ fontSize:10,fontWeight:700,color:C.textSub,letterSpacing:.3,marginRight:6 }}>{wd}</div>
-            <div style={{ fontSize:13,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.textSub,marginRight:-6 }}>{dd}.{mm}.</div>
-            <div style={{ fontSize:10,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.textMuted,marginTop:1,marginRight:-6 }}>{yy}.</div>
+          style={{ background:bal>=0?`linear-gradient(135deg,${C.accent}18 0%,${C.income}12 100%)`:`linear-gradient(135deg,${C.expense}22 0%,${C.accent}10 100%)`, border:`1.5px solid ${bal>=0?C.income:C.expense}35`, borderRadius:22, padding:"18px 18px 16px", marginBottom:10, position:"relative", overflow:"hidden", cursor: forecast.hasHistory ? "pointer" : "default",
+            boxShadow:`0 4px 24px ${bal>=0?C.income:C.expense}18` }}>
+          {/* Background decoration */}
+          <div style={{ position:"absolute",right:-30,top:-30,width:120,height:120,borderRadius:"50%",background:`${bal>=0?C.income:C.expense}12`,pointerEvents:"none" }}/>
+          <div style={{ position:"absolute",right:20,bottom:-20,width:80,height:80,borderRadius:"50%",background:`${C.accent}08`,pointerEvents:"none" }}/>
+
+          {/* Top row: label + date */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+              <div style={{ width:6,height:6,borderRadius:"50%",background:bal>=0?C.income:C.expense,boxShadow:`0 0 6px ${bal>=0?C.income:C.expense}` }}/>
+              <span style={{ fontSize:11,fontWeight:600,color:C.textSub,letterSpacing:.5,textTransform:"uppercase" }}>{t("Stanje na dan")}</span>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <span style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.textSub }}>{dd}.{mm}.</span>
+              <span style={{ fontSize:10,color:C.textMuted,marginLeft:3 }}>{yy}.</span>
+            </div>
           </div>
-          <div style={{ fontSize:11,color:C.textSub,marginBottom:4,textAlign:"left" }}>{t("Stanje na dan")}</div>
-          <div style={{ fontSize:28,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:bal>=0?C.income:C.expense,textAlign:"left",paddingRight:65 }}>{fmt(bal)}</div>
+
+          {/* Balance amount */}
+          <div style={{ fontSize:bal>=0&&Math.abs(bal)<10000?36:32,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:bal>=0?C.income:C.expense,letterSpacing:-1,lineHeight:1.1,marginBottom:2 }}>{fmt(bal)}</div>
 
           {/* Inline forecast row */}
           {forecastBal !== null && (
@@ -232,7 +248,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           <div style={{ position:"absolute",right:-20,top:-20,width:90,height:90,borderRadius:"50%",background:`${bal>=0?C.income:C.expense}10` }}/>
         </div>
 
-        {/* ── 2. MINI CARDS — month summary with YoY improvement ──────── */}
+        {/* ── 2. MINI CARDS — modern glassmorphism style ──────────── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
           <div className="su" style={{ background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.income}`,borderRadius:14,padding:"10px 12px" }}>
             <div style={{ fontSize:10,color:C.textMuted,marginBottom:3,display:"flex",alignItems:"center",gap:4 }}><Ic n="up" s={13} c={C.income}/>{cmName} {t("primici")}</div>
@@ -261,7 +277,8 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           /* ── EMPTY STATE — onboarding guide ─────────────────────────── */
           <div className="su" style={{ marginTop:8 }}>
             <div style={{ textAlign:"center", marginBottom:20 }}>
-              <div style={{ width:60,height:60,borderRadius:20,background:`linear-gradient(135deg,${C.accent},${C.accentDk})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",boxShadow:`0 4px 15px ${C.accentGlow}` }}>
+              <div style={{ width:60,height:60,borderRadius:20,background:`linear-gradient(135deg,${C.accent},${C.accentDk})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",boxShadow:`0 4px 15px ${C.accentGlow}`,cursor:"pointer" }}
+                onClick={()=>setPage("add")}>
                 <Ic n="plus" s={28} c="#fff"/>
               </div>
               <h3 style={{ fontSize:17,fontWeight:700,color:C.text,marginBottom:6 }}>{t("Dobrodošao u Moja Lova!")}</h3>
@@ -377,7 +394,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                   </div>
                 </div>
                 {/* Savings edit button */}
-                <button onClick={() => { setDlSavingsEdit(v => !v); setDlSavingsInput(plannedSavings > 0 ? String(plannedSavings) : ""); }}
+                <button onClick={() => { setDlSavingsEdit(v => !v); setDlSavingsInput(plannedSavingsRaw > 0 ? String(plannedSavingsRaw) : ""); setDlSavingsPeriod(savedPeriod); }}
                   style={{ background:`${C.accent}18`, border:`1px solid ${C.accent}40`, borderRadius:20, padding:"4px 10px", fontSize:11, fontWeight:600, color:C.accent, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}>
                   🎯 {t("Štednja")}
                 </button>
@@ -408,7 +425,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                 {[
                   { lb: t("Primici"), val: fmt(xIncome), col: C.income, icon:"📥" },
                   { lb: t("Izdaci"), val: fmt(yExpenses), col: C.expense, icon:"📤" },
-                  { lb: t("Planirana štednja"), val: fmt(plannedSavings) + t("/mj."), col: C.accent, icon:"🎯" },
+                  { lb: t("Planirana štednja"), val: fmt(plannedSavings) + (savedPeriod === "yearly" ? t("/god.÷12") : t("/mj.")), col: C.accent, icon:"🎯" },
                 ].map(({ lb, val, col, icon }) => (
                   <div key={lb} style={{ flex:1, background:C.cardAlt, borderRadius:10, padding:"7px 8px", border:`1px solid ${col}25` }}>
                     <div style={{ fontSize:10, color:C.textMuted, marginBottom:3 }}>{icon} {lb}</div>
@@ -419,7 +436,20 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
 
               {/* Savings input panel */}
               {dlSavingsEdit && (
-                <div style={{ marginTop:10, display:"flex", gap:8, alignItems:"center" }}>
+                <div style={{ marginTop:10 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                    <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, letterSpacing:.3 }}>{t("Planirana štednja")}</div>
+                    <div style={{ display:"flex", gap:6 }}>
+                      {[{k:"monthly",lhr:"Mjesečno",len:"Monthly"},{k:"yearly",lhr:"Godišnje",len:"Yearly"}].map(opt=>(
+                        <button key={opt.k} onClick={()=>setDlSavingsPeriod(opt.k)}
+                          style={{ fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, cursor:"pointer", border:`1px solid ${dlSavingsPeriod===opt.k?C.accent:C.border}`, background:dlSavingsPeriod===opt.k?C.accent:"transparent", color:dlSavingsPeriod===opt.k?"#fff":C.textMuted, transition:"all .2s" }}>
+                          {t(opt.lhr)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ fontSize:10, color:C.textMuted, marginBottom:8 }}>{dlSavingsPeriod==="monthly" ? t("Iznos koji odvajate svaki mjesec") : t("Godišnji iznos — dijelit će se s 12")}</div>
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                   <div style={{ flex:1, position:"relative" }}>
                     <input
                       type="number" min="0" step="10"
@@ -434,7 +464,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                   <button
                     onClick={() => {
                       const v = parseFloat(dlSavingsInput) || 0;
-                      updPrefs({ plannedSavings: v });
+                      updPrefs({ plannedSavings: v, plannedSavingsPeriod: dlSavingsPeriod });
                       setDlSavingsEdit(false);
                     }}
                     style={{ background:C.accent, color:"#fff", border:"none", borderRadius:10, padding:"8px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
@@ -445,6 +475,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     style={{ background:C.cardAlt, color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:10, padding:"8px 12px", fontSize:13, cursor:"pointer" }}>
                     ✕
                   </button>
+                </div>
                 </div>
               )}
             </div>

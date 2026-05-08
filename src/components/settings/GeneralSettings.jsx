@@ -464,9 +464,10 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
               </div>
               <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
             </div>
-            {/* Android opens the Files/Documents picker when accept is a
-                wildcard; JSON validity is verified inside fullImport. */}
-            <input type="file" accept="*/*" onChange={fullImport} style={{ display:"none" }}/>
+            {/* Use multiple accept values for maximum Android compatibility.
+                Some Android file pickers need explicit .json MIME type,
+                others need wildcard. Both are listed. */}
+            <input type="file" accept=".json,application/json,application/octet-stream,text/plain,*/*" onChange={fullImport} style={{ display:"none" }}/>
           </label>
         </div>
 
@@ -559,7 +560,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><LynxLogoWhite s={20}/></div>
-            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja Lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.0</div></div>
+            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja Lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.1</div></div>
             {onAbout && (
               <button onClick={onAbout}
                 style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
