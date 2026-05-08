@@ -16,6 +16,8 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   const [vErr,    setVErr]    = useState("");
   const [share,   setShare]   = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [importPending, setImportPending] = useState(null);
+  const importInputRef = useRef(null); // stable ref for file input
   // Fallback state: if no download/share path works (some APK wrappers block both),
   // we show the JSON in a modal with a Copy button so the user can paste into any
   // note/chat app and save it elsewhere.
@@ -160,16 +162,28 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     }
   };
 
-  // Restore — validates payload, confirms, writes to localStorage, reloads.
-  const fullImport = async (e) => {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = ""; // allow re-selecting the same file
-    if (!file) return;
+  // Restore — validates payload, shows custom confirm UI (window.confirm blocked on Android WebView)
+  // Opens file picker by creating a temp input on document.body — bypasses all
+  // container click propagation and Capacitor WebView restrictions.
+  const openImportPicker = (e) => {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json,text/plain,*/*";
+    input.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;";
+    document.body.appendChild(input);
+    input.onchange = (ev) => {
+      fullImport(ev);
+      setTimeout(() => { try { document.body.removeChild(input); } catch {} }, 2000);
+    };
+    input.oncancel = () => { try { document.body.removeChild(input); } catch {} };
+    // Small delay ensures DOM is ready before click
+    setTimeout(() => input.click(), 50);
+  };
 
-    // Quick pre-check by name/type — avoid wasting time on images, PDFs, etc.
-    // Accept any file — validate by content, not MIME type.
-    // Android WebView often reports JSON files as "application/octet-stream" or other types,
-    // so MIME-based filtering causes false rejections on native APK.
+  const fullImport = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
 
     const reader = new FileReader();
     reader.onerror = () => alert(t("Greška pri čitanju datoteke."));
@@ -178,38 +192,49 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       try { parsed = JSON.parse(ev.target.result); }
       catch { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
 
-      // Accept new format (__moja_lova_backup wrapper) OR legacy format (plain txs array)
       let data = null;
       if (parsed && parsed.__moja_lova_backup && parsed.data && typeof parsed.data === "object") {
         data = parsed.data;
       } else if (Array.isArray(parsed)) {
-        data = { txs: parsed }; // legacy: file contained just the txs array
+        data = { txs: parsed };
       }
       if (!data) { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
 
-      if (!window.confirm(t("Vraćanjem podataka trenutni podaci bit će ZAMIJENJENI. Nastaviti?"))) return;
-
-      try {
-        if (Array.isArray(data.txs))    save(K.db,  data.txs);
-        if (Array.isArray(data.drafts)) save(K.drf, data.drafts);
-        if (data.lists && typeof data.lists === "object") save(K.lst, { ...DEF_LISTS, ...data.lists });
-        if (data.user  && typeof data.user  === "object") save(K.usr, data.user);
-        if (data.prefs && typeof data.prefs === "object") {
-          // Preserve onboarded=true so user doesn't re-enter onboarding after restore.
-          // Set lastBackupAt=now since successful import means data exists in a backup file.
-          save(K.prf, { ...load(K.prf,{}), ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
-        }
-        // Set flag so App.jsx knows to sync after reload
-        try { localStorage.setItem("ml_sync_needed", "1"); } catch {}
-        alert(t("Podaci su uspješno vraćeni. Aplikacija će se ponovno učitati."));
-        // Rebuild AI categorizer model from imported transactions
-        if (Array.isArray(data.txs)) rebuildModel(data.txs);
-        window.location.reload();
-      } catch {
-        alert(t("Datoteka nije valjan Moja Lova backup."));
-      }
+      setImportPending({ data, txCount: Array.isArray(data.txs) ? data.txs.length : 0 });
     };
     reader.readAsText(file);
+  };
+
+  const confirmImport = () => {
+    if (!importPending) return;
+    const { data } = importPending;
+    try {
+      // Write to localStorage
+      if (Array.isArray(data.txs))    save(K.db,  data.txs);
+      if (Array.isArray(data.drafts)) save(K.drf, data.drafts);
+      if (data.lists && typeof data.lists === "object") save(K.lst, { ...DEF_LISTS, ...data.lists });
+      if (data.user  && typeof data.user  === "object") save(K.usr, data.user);
+      if (data.prefs && typeof data.prefs === "object") {
+        save(K.prf, { ...load(K.prf,{}), ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
+      }
+
+      // Update React state directly — no reload needed, no Capacitor issues
+      if (Array.isArray(data.txs))    setTxs(data.txs);
+      if (data.lists && typeof data.lists === "object") setLists({ ...DEF_LISTS, ...data.lists });
+      if (data.user  && typeof data.user  === "object") updUser(data.user);
+      if (data.prefs && typeof data.prefs === "object") updPrefs({ ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
+
+      // Train AI model on imported transactions
+      if (Array.isArray(data.txs)) rebuildModel(data.txs);
+
+      setImportPending(null);
+      // Close settings and go back to show imported data
+      if (onBack) onBack();
+    } catch (err) {
+      console.error("Import error:", err);
+      setImportPending(null);
+      alert(t("Greška pri vraćanju podataka."));
+    }
   };
 
   const removePIN = async () => {
@@ -452,22 +477,18 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </div>
           </div>
 
-          {/* 3) IMPORT (RESTORE) — full JSON restore with confirm */}
-          <label style={{ display:"block", cursor:"pointer", marginBottom:7 }}>
-            <div style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <Ic n="ul" s={19} c={C.income}/>
-                <div style={{ textAlign:"left" }}>
-                  <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Učitaj (Import / Restore)")}</div>
-                  <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
-                </div>
+          {/* 3) IMPORT (RESTORE) — dynamic input on body, bypasses all container restrictions */}
+          <div onClick={openImportPicker}
+            style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13, cursor:"pointer", marginBottom:7 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <Ic n="ul" s={19} c={C.income}/>
+              <div style={{ textAlign:"left" }}>
+                <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Učitaj (Import / Restore)")}</div>
+                <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
               </div>
-              <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
             </div>
-            {/* Android opens the Files/Documents picker when accept is a
-                wildcard; JSON validity is verified inside fullImport. */}
-            <input type="file" accept="*/*" onChange={fullImport} style={{ display:"none" }}/>
-          </label>
+            <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
+          </div>
         </div>
 
         {/* ── Google Drive backup section ──────────────────────────────── */}
@@ -554,12 +575,35 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                 </div>
               </div>
           }
+
+          {/* ── Import confirm overlay ─────────────────────────────────── */}
+          {importPending && (
+            <div style={{ position:"fixed", inset:0, zIndex:999, background:"rgba(0,0,0,.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+              <div style={{ background:C.card, borderRadius:20, padding:24, maxWidth:340, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,.4)" }}>
+                <div style={{ fontSize:28, textAlign:"center", marginBottom:12 }}>📂</div>
+                <div style={{ fontSize:16, fontWeight:700, color:C.text, textAlign:"center", marginBottom:8 }}>{t("Vrati podatke?")}</div>
+                <div style={{ fontSize:13, color:C.textMuted, textAlign:"center", lineHeight:1.6, marginBottom:20 }}>
+                  {t("Bit će uvezeno")} <strong style={{ color:C.text }}>{importPending.txCount}</strong> {t("transakcija. Trenutni podaci bit će zamijenjeni.")}
+                </div>
+                <div style={{ display:"flex", gap:10 }}>
+                  <button onClick={()=>setImportPending(null)}
+                    style={{ flex:1, padding:"12px 0", background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:12, color:C.text, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+                    {t("Odustani")}
+                  </button>
+                  <button onClick={confirmImport}
+                    style={{ flex:1, padding:"12px 0", background:C.income, border:"none", borderRadius:12, color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+                    {t("Da, vrati")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><LynxLogoWhite s={20}/></div>
-            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja Lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.0</div></div>
+            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja Lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.1</div></div>
             {onAbout && (
               <button onClick={onAbout}
                 style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>

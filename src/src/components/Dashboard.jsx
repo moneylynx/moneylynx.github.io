@@ -29,30 +29,79 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   // y = svi izdaci tekućeg mjeseca (plaćeni + pending + recurring koji nisu plaćeni)
   // A = (x - y) / dani_do_kraja_mjeseca - B
   const [dlSavingsEdit, setDlSavingsEdit] = useState(false);
+  const [dlDetailOpen, setDlDetailOpen] = useState(true); // savings detail cards open by default
   const [dlSavingsInput, setDlSavingsInput] = useState("");
+  const [dlSavingsPeriod, setDlSavingsPeriod] = useState(() => prefs?.plannedSavingsPeriod || "monthly");
 
-  const plannedSavings = parseFloat(prefs?.plannedSavings) || 0;
+  const plannedSavingsRaw = parseFloat(prefs?.plannedSavings) || 0;
+  const savedPeriod = prefs?.plannedSavingsPeriod || "monthly";
+  // Normalize to monthly for formula
+  const plannedSavings = savedPeriod === "yearly" ? plannedSavingsRaw / 12 : plannedSavingsRaw;
 
   const today = new Date();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const daysLeft = daysInMonth - today.getDate(); // days remaining after today
+  const daysLeft = daysInMonth - today.getDate();
 
-  // x = monthly income: paid + recurring income not yet paid
-  const recIncUnpaid = (lists.recurring_income || [])
-    .filter(r => !md.find(x => x.recurringIncomeId === r.id))
-    .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  // Next payday: find largest recurring income, compute days until next dueDay
+  const nextPayday = (() => {
+    const recInc = lists.recurring_income || [];
+    if (recInc.length === 0) return null;
+    // Find largest by amount
+    const biggest = recInc.reduce((best, r) => (parseFloat(r.amount)||0) > (parseFloat(best.amount)||0) ? r : best, recInc[0]);
+    const dDay = Math.max(1, Math.min(28, parseInt(biggest.dueDay)||1));
+    const tDay = today.getDate();
+    // Days until next occurrence
+    let daysUntil;
+    if (dDay >= tDay) {
+      daysUntil = dDay - tDay;
+    } else {
+      // Next month
+      const nextOcc = new Date(today.getFullYear(), today.getMonth()+1, dDay);
+      daysUntil = Math.ceil((nextOcc - today) / 86400000);
+    }
+    return { name: biggest.description, days: daysUntil, dDay };
+  })();
+
+  const daysLeftYear = (() => { const e=new Date(today.getFullYear(),11,31); return Math.ceil((e-today)/86400000); })();
+
+  // x = monthly income (paid + upcoming recurring this month)
+  const recIncUnpaid = (lists.recurring_income||[]).filter(r=>!md.find(x=>x.recurringIncomeId===r.id)).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   const xIncome = mI + recIncUnpaid;
 
-  // y = monthly expenses: paid + pending transactions + unpaid recurring
-  const mEPending = md.filter(x => x.type === "Isplata" && x.status !== "Plaćeno").reduce((s,x) => s + (+x.amount||0), 0);
-  const recUnpaid = (lists.recurring || [])
-    .filter(r => !md.find(x => x.recurringId === r.id))
-    .reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  // xYear = yearly income (all year + remaining recurring months)
+  const ydYear = data.filter(x=>new Date(x.date).getFullYear()===today.getFullYear());
+  const monthsLeft = 12-(today.getMonth()+1);
+  const xIncomeYear = ydYear.filter(x=>x.type==="Primitak").reduce((s,x)=>s+(+x.amount||0),0)
+    + (lists.recurring_income||[]).reduce((s,r)=>s+(parseFloat(r.amount)||0)*monthsLeft,0);
+
+  // y = monthly expenses (paid + pending + unpaid recurring)
+  const mEPending = md.filter(x=>x.type==="Isplata"&&x.status!=="Plaćeno").reduce((s,x)=>s+(+x.amount||0),0);
+  const recUnpaid = (lists.recurring||[]).filter(r=>!md.find(x=>x.recurringId===r.id)).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   const yExpenses = mE + mEPending + recUnpaid;
 
-  const dailyLimitRaw = daysLeft > 0 ? (xIncome - yExpenses - plannedSavings) / daysLeft : 0;
+  // yYear = yearly expenses + remaining recurring
+  const yExpensesYear = ydYear.filter(x=>x.type==="Isplata").reduce((s,x)=>s+(+x.amount||0),0)
+    + (lists.recurring||[]).reduce((s,r)=>s+(parseFloat(r.amount)||0)*monthsLeft,0);
+
+  // Savings validation: reject if exceeds available funds
+  const maxSavings = savedPeriod==="yearly" ? Math.max(0,xIncomeYear-yExpensesYear) : Math.max(0,xIncome-yExpenses);
+  const savingsExceedsIncome = plannedSavingsRaw > 0 && plannedSavingsRaw > maxSavings && maxSavings > 0;
+
+  // Effective daily savings contribution
+  const effectiveSavings = savedPeriod==="yearly"
+    ? (daysLeftYear>0 ? plannedSavingsRaw*(daysLeft/daysLeftYear) : 0)
+    : plannedSavings;
+  const dailyLimitRaw = daysLeft>0 ? (xIncome-yExpenses-effectiveSavings)/daysLeft : 0;
   const dailyLimit = Math.round(dailyLimitRaw * 100) / 100;
   const dlGood = dailyLimit >= 0;
+
+  // ── Savings metrics for detail cards ─────────────────────────────────────
+  const plannedMonthly = savedPeriod === "yearly" ? plannedSavingsRaw / 12 : plannedSavings;
+  const plannedYearly  = savedPeriod === "yearly" ? plannedSavingsRaw : plannedSavings * 12;
+  // "Ušteđeno do sada" = net surplus this month (paid income - paid expenses)
+  const savedSoFar     = Math.max(0, mI - mE);
+  const savingsProgress = plannedMonthly > 0 ? Math.min(1, savedSoFar / plannedMonthly) : 0;
+  const savingsProgressColor = savingsProgress >= 1 ? C.income : savingsProgress >= 0.5 ? C.warning : C.expense;
   const dlColor = dailyLimit >= 20 ? C.income : dailyLimit >= 0 ? C.warning : C.expense;
 
   const { forecast, anomalies, insights } = useAdvisor(data, lists, fmt, t);
@@ -79,10 +128,18 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
     // ── Upcoming recurring income ────────────────────────────────────────
     const recInc = lists.recurring_income || [];
     const recIncPaidIds = new Set(md.filter(x => x.recurringIncomeId).map(x => x.recurringIncomeId));
+    const todayDate = new Date();
     recInc.forEach(r => {
       if (recIncPaidIds.has(r.id)) return;
       const day = Math.max(1, Math.min(28, parseInt(r.dueDay)||1));
-      items.push({ kind:"recurring_income", id:r.id, date:new Date(cy,cmi,day).toISOString().split("T")[0], description:r.description, category:r.category, amount:parseFloat(r.amount)||0, recurring:r });
+      // If dueDay already passed this month → show next month's occurrence
+      let incDate;
+      if (day < todayDate.getDate()) {
+        incDate = new Date(cy, cmi + 1, day);
+      } else {
+        incDate = new Date(cy, cmi, day);
+      }
+      items.push({ kind:"recurring_income", id:r.id, date:incDate.toISOString().split("T")[0], description:r.description, category:r.category, amount:parseFloat(r.amount)||0, recurring:r });
     });
 
     return items.sort((a,b) => a.date.localeCompare(b.date));
@@ -182,16 +239,28 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           </div>
         )}
 
-        {/* ── 1. HERO BALANCE CARD — with inline forecast projection ──── */}
+        {/* ── 1. HERO BALANCE CARD — ultra-modern redesign ────────── */}
         <div className="su" onClick={() => forecast.hasHistory && setForecastOpen(v => !v)}
-          style={{ background:`linear-gradient(135deg,${C.accent}22,${bal>=0?C.income:C.expense}18)`, border:`1px solid ${bal>=0?C.income:C.expense}40`, borderRadius:18, padding:"16px 18px 18px 16px", marginBottom:10, position:"relative", overflow:"hidden", cursor: forecast.hasHistory ? "pointer" : "default" }}>
-          <div style={{ position:"absolute", top:12, right:18, textAlign:"right" }}>
-            <div style={{ fontSize:10,fontWeight:700,color:C.textSub,letterSpacing:.3,marginRight:6 }}>{wd}</div>
-            <div style={{ fontSize:13,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.textSub,marginRight:-6 }}>{dd}.{mm}.</div>
-            <div style={{ fontSize:10,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.textMuted,marginTop:1,marginRight:-6 }}>{yy}.</div>
+          style={{ background:bal>=0?`linear-gradient(135deg,${C.accent}18 0%,${C.income}12 100%)`:`linear-gradient(135deg,${C.expense}22 0%,${C.accent}10 100%)`, border:`1.5px solid ${bal>=0?C.income:C.expense}35`, borderRadius:22, padding:"18px 18px 16px", marginBottom:10, position:"relative", overflow:"hidden", cursor: forecast.hasHistory ? "pointer" : "default",
+            boxShadow:`0 4px 24px ${bal>=0?C.income:C.expense}18` }}>
+          {/* Background decoration */}
+          <div style={{ position:"absolute",right:-30,top:-30,width:120,height:120,borderRadius:"50%",background:`${bal>=0?C.income:C.expense}12`,pointerEvents:"none" }}/>
+          <div style={{ position:"absolute",right:20,bottom:-20,width:80,height:80,borderRadius:"50%",background:`${C.accent}08`,pointerEvents:"none" }}/>
+
+          {/* Top row: label + date */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+              <div style={{ width:6,height:6,borderRadius:"50%",background:bal>=0?C.income:C.expense,boxShadow:`0 0 6px ${bal>=0?C.income:C.expense}` }}/>
+              <span style={{ fontSize:11,fontWeight:600,color:C.textSub,letterSpacing:.5,textTransform:"uppercase" }}>{t("Stanje na dan")}</span>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <span style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.textSub }}>{dd}.{mm}.</span>
+              <span style={{ fontSize:10,color:C.textMuted,marginLeft:3 }}>{yy}.</span>
+            </div>
           </div>
-          <div style={{ fontSize:11,color:C.textSub,marginBottom:4,textAlign:"left" }}>{t("Stanje na dan")}</div>
-          <div style={{ fontSize:28,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:bal>=0?C.income:C.expense,textAlign:"left",paddingRight:65 }}>{fmt(bal)}</div>
+
+          {/* Balance amount */}
+          <div style={{ fontSize:bal>=0&&Math.abs(bal)<10000?36:32,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:bal>=0?C.income:C.expense,letterSpacing:-1,lineHeight:1.1,marginBottom:2 }}>{fmt(bal)}</div>
 
           {/* Inline forecast row */}
           {forecastBal !== null && (
@@ -232,7 +301,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           <div style={{ position:"absolute",right:-20,top:-20,width:90,height:90,borderRadius:"50%",background:`${bal>=0?C.income:C.expense}10` }}/>
         </div>
 
-        {/* ── 2. MINI CARDS — month summary with YoY improvement ──────── */}
+        {/* ── 2. MINI CARDS — modern glassmorphism style ──────────── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
           <div className="su" style={{ background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.income}`,borderRadius:14,padding:"10px 12px" }}>
             <div style={{ fontSize:10,color:C.textMuted,marginBottom:3,display:"flex",alignItems:"center",gap:4 }}><Ic n="up" s={13} c={C.income}/>{cmName} {t("primici")}</div>
@@ -261,7 +330,8 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           /* ── EMPTY STATE — onboarding guide ─────────────────────────── */
           <div className="su" style={{ marginTop:8 }}>
             <div style={{ textAlign:"center", marginBottom:20 }}>
-              <div style={{ width:60,height:60,borderRadius:20,background:`linear-gradient(135deg,${C.accent},${C.accentDk})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",boxShadow:`0 4px 15px ${C.accentGlow}` }}>
+              <div style={{ width:60,height:60,borderRadius:20,background:`linear-gradient(135deg,${C.accent},${C.accentDk})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px",boxShadow:`0 4px 15px ${C.accentGlow}`,cursor:"pointer" }}
+                onClick={()=>setPage("add")}>
                 <Ic n="plus" s={28} c="#fff"/>
               </div>
               <h3 style={{ fontSize:17,fontWeight:700,color:C.text,marginBottom:6 }}>{t("Dobrodošao u Moja Lova!")}</h3>
@@ -310,7 +380,12 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               <div className="su" style={{ background:C.card,border:`1px solid ${C.warning}40`,borderLeft:`4px solid ${C.warning}`,borderRadius:14,marginBottom:10,overflow:"hidden" }}>
                 <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px 7px",borderBottom:`1px solid ${C.border}` }}>
                   <div style={{ fontSize:11,fontWeight:600,color:C.warning,display:"flex",alignItems:"center",gap:5 }}>
-                    <Ic n="coins" s={12} c={C.warning}/>{t("Za platiti")}
+                    <Ic n="coins" s={12} c={C.warning}/>
+                    {todoItems.some(i=>i.kind==="recurring_income") && todoItems.some(i=>i.kind!=="recurring_income")
+                      ? t("Dospijeva")
+                      : todoItems.every(i=>i.kind==="recurring_income")
+                      ? t("Za naplatiti")
+                      : t("Za platiti")}
                     <span style={{ background:`${C.warning}25`,borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:C.warning }}>{todoItems.length}</span>
                   </div>
                   <div style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.warning }}>{fmt(todoItems.reduce((s,i)=>s+i.amount,0))}</div>
@@ -370,14 +445,23 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               {/* Header row */}
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-                  <div style={{ width:28, height:28, borderRadius:9, background:`${dlColor}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>💸</div>
+                  <button onClick={()=>setDlDetailOpen(v=>!v)}
+                    style={{ width:28, height:28, borderRadius:9, background:`${dlColor}20`, border:`1px solid ${dlColor}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, cursor:"pointer", transition:"all .2s", transform:dlDetailOpen?"scale(1.1)":"scale(1)" }}
+                    title={t("Prikaži/sakrij detalje štednje")}>
+                    💸
+                  </button>
                   <div>
                     <div style={{ fontSize:11, fontWeight:700, color:C.textSub, textTransform:"uppercase", letterSpacing:.5 }}>{t("Dnevni limit potrošnje")}</div>
-                    <div style={{ fontSize:10, color:C.textMuted, marginTop:1 }}>{daysLeft} {t("dana do kraja mjeseca")}</div>
+                    <div style={{ fontSize:10, color:C.textMuted, marginTop:1 }}>
+                      {nextPayday && nextPayday.days <= 31
+                        ? <>{nextPayday.days === 0 ? t("Danas") : `${nextPayday.days} ${t("dana do")} ${nextPayday.name}`}</>
+                        : <>{daysLeft} {t("dana do kraja mjeseca")}</>
+                      }
+                    </div>
                   </div>
                 </div>
                 {/* Savings edit button */}
-                <button onClick={() => { setDlSavingsEdit(v => !v); setDlSavingsInput(plannedSavings > 0 ? String(plannedSavings) : ""); }}
+                <button onClick={() => { setDlSavingsEdit(v => !v); setDlSavingsInput(plannedSavingsRaw > 0 ? String(plannedSavingsRaw) : ""); setDlSavingsPeriod(savedPeriod); }}
                   style={{ background:`${C.accent}18`, border:`1px solid ${C.accent}40`, borderRadius:20, padding:"4px 10px", fontSize:11, fontWeight:600, color:C.accent, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}>
                   🎯 {t("Štednja")}
                 </button>
@@ -403,23 +487,61 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                 </span>
               </div>
 
-              {/* Breakdown row */}
-              <div style={{ display:"flex", gap:8, marginBottom: dlSavingsEdit ? 10 : 0 }}>
-                {[
-                  { lb: t("Primici"), val: fmt(xIncome), col: C.income, icon:"📥" },
-                  { lb: t("Izdaci"), val: fmt(yExpenses), col: C.expense, icon:"📤" },
-                  { lb: t("Planirana štednja"), val: fmt(plannedSavings) + t("/mj."), col: C.accent, icon:"🎯" },
-                ].map(({ lb, val, col, icon }) => (
-                  <div key={lb} style={{ flex:1, background:C.cardAlt, borderRadius:10, padding:"7px 8px", border:`1px solid ${col}25` }}>
-                    <div style={{ fontSize:10, color:C.textMuted, marginBottom:3 }}>{icon} {lb}</div>
-                    <div style={{ fontSize:12, fontWeight:700, fontFamily:"'JetBrains Mono',monospace", color:col }}>{val}</div>
+              {/* ── Savings detail cards (toggle with 💸) ─────────── */}
+              {dlDetailOpen && (
+                <div style={{ marginBottom: dlSavingsEdit ? 10 : 0 }}>
+                  <div style={{ display:"flex", gap:7, marginBottom:7 }}>
+
+                    {/* Card 1: Planirana ušteda mjesečno */}
+                    <div style={{ flex:1, background:C.cardAlt, borderRadius:11, padding:"8px 9px", border:`1px solid ${C.income}25` }}>
+                      <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:.3 }}>💰 {t("Ušteda/mj.")}</div>
+                      <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:C.income }}>{fmt(plannedMonthly)}</div>
+                      <div style={{ fontSize:9, color:C.textMuted, marginTop:2 }}>{t("planirano")}</div>
+                    </div>
+
+                    {/* Card 2: Planirana ušteda godišnje */}
+                    <div style={{ flex:1, background:C.cardAlt, borderRadius:11, padding:"8px 9px", border:`1px solid ${C.accent}25` }}>
+                      <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:.3 }}>📅 {t("Ušteda/god.")}</div>
+                      <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:C.accent }}>{fmt(plannedYearly)}</div>
+                      <div style={{ fontSize:9, color:C.textMuted, marginTop:2 }}>{t("planirano")}</div>
+                    </div>
+
+                    {/* Card 3: Ušteđeno do sada */}
+                    <div style={{ flex:1, background:C.cardAlt, borderRadius:11, padding:"8px 9px", border:`1px solid ${savingsProgressColor}40` }}>
+                      <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:.3 }}>✅ {t("Ušteđeno")}</div>
+                      <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:savingsProgressColor }}>{fmt(savedSoFar)}</div>
+                      {plannedMonthly > 0 && (
+                        <div style={{ marginTop:4, height:3, borderRadius:2, background:`${savingsProgressColor}20`, overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:`${savingsProgress*100}%`, background:savingsProgressColor, borderRadius:2, transition:"width .4s" }}/>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
 
               {/* Savings input panel */}
               {dlSavingsEdit && (
-                <div style={{ marginTop:10, display:"flex", gap:8, alignItems:"center" }}>
+                <div style={{ marginTop:10 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                    <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, letterSpacing:.3 }}>{t("Planirana štednja")}</div>
+                    <div style={{ display:"flex", gap:6 }}>
+                      {[{k:"monthly",lhr:"Mjesečno",len:"Monthly"},{k:"yearly",lhr:"Godišnje",len:"Yearly"}].map(opt=>(
+                        <button key={opt.k} onClick={()=>setDlSavingsPeriod(opt.k)}
+                          style={{ fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, cursor:"pointer", border:`1px solid ${dlSavingsPeriod===opt.k?C.accent:C.border}`, background:dlSavingsPeriod===opt.k?C.accent:"transparent", color:dlSavingsPeriod===opt.k?"#fff":C.textMuted, transition:"all .2s" }}>
+                          {t(opt.lhr)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ fontSize:10, color:C.textMuted, marginBottom:6 }}>{dlSavingsPeriod==="monthly" ? t("Iznos koji odvajate svaki mjesec") : t("Godišnji iznos — dijelit će se s 12")}</div>
+                  {savingsExceedsIncome && (
+                    <div style={{ fontSize:10, color:C.expense, fontWeight:600, marginBottom:8, padding:"4px 8px", background:`${C.expense}12`, borderRadius:6, border:`1px solid ${C.expense}30` }}>
+                      ⚠️ {t("Planirana štednja premašuje raspoložive prihode")}
+                    </div>
+                  )}
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                   <div style={{ flex:1, position:"relative" }}>
                     <input
                       type="number" min="0" step="10"
@@ -434,7 +556,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                   <button
                     onClick={() => {
                       const v = parseFloat(dlSavingsInput) || 0;
-                      updPrefs({ plannedSavings: v });
+                      updPrefs({ plannedSavings: v, plannedSavingsPeriod: dlSavingsPeriod });
                       setDlSavingsEdit(false);
                     }}
                     style={{ background:C.accent, color:"#fff", border:"none", borderRadius:10, padding:"8px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
@@ -445,6 +567,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     style={{ background:C.cardAlt, color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:10, padding:"8px 12px", fontSize:13, cursor:"pointer" }}>
                     ✕
                   </button>
+                </div>
                 </div>
               )}
             </div>
