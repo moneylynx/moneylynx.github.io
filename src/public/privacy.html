@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Politika privatnosti — Moja Lova</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.7;color:#1a202c;background:#fff;max-width:720px;margin:0 auto;padding:32px 20px 64px}
+    h1{font-size:24px;font-weight:700;color:#0f172a;margin-bottom:6px}
+    h2{font-size:16px;font-weight:600;color:#0f172a;margin:28px 0 8px}
+    h3{font-size:14px;font-weight:600;color:#334155;margin:18px 0 6px}
+    p{margin-bottom:12px;color:#374151}
+    ul{margin:8px 0 12px 20px}
+    li{margin-bottom:6px;color:#374151}
+    .meta{font-size:13px;color:#6b7280;margin-bottom:32px}
+    .badge{display:inline-block;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;margin-bottom:20px}
+    a{color:#2563eb;text-decoration:none}
+    a:hover{text-decoration:underline}
+    hr{border:none;border-top:1px solid #e5e7eb;margin:32px 0}
+    .section{border-left:3px solid #e2e8f0;padding-left:16px;margin:20px 0}
+    .lang-switch{text-align:right;margin-bottom:24px}
+    .lang-switch a{font-size:13px;color:#6b7280;margin-left:12px}
+    .lang-switch a.active{color:#1d4ed8;font-weight:500}
+    [data-lang="en"]{display:none}
+    body.en [data-lang="hr"]{display:none}
+    body.en [data-lang="en"]{display:block}
+    body.en .en-inline{display:inline}
+    body.en .hr-inline{display:none}
+    .en-inline{display:none}
+    .hr-inline{display:inline}
+  </style>
+</head>
+<body>
+
+<div class="lang-switch">
+  <a href="#" onclick="setLang('hr')" id="lnk-hr" class="active">HR</a>
+  <a href="#" onclick="setLang('en')" id="lnk-en">EN</a>
+</div>
+
+<!-- ── CROATIAN ──────────────────────────────────────────────────────────── -->
+<div data-lang="hr">
+  <span class="badge">Politika privatnosti</span>
+  <h1>Moja Lova by MoneyLynx</h1>
+  <p class="meta">Posljednje ažuriranje: svibanj 2026. · Verzija 1.0</p>
+
+  <p>Ova Politika privatnosti opisuje kako aplikacija <strong>Moja Lova</strong> prikuplja, koristi i štiti podatke korisnika. Korištenjem aplikacije prihvaćaš ovu politiku.</p>
+
+  <h2>1. Podaci koji se prikupljaju</h2>
+  <div class="section">
+    <h3>Bez korisničkog računa (lokalni način rada)</h3>
+    <p>Nikakvi podaci se ne šalju izvan tvog uređaja. Sve transakcije, postavke i preferencije pohranjuju se isključivo u <code>localStorage</code> preglednika ili internoj pohrani uređaja. Aplikacija može se koristiti u potpunosti offline.</p>
+
+    <h3>S korisničkim računom (cloud sinkronizacija)</h3>
+    <p>Prijavom putem Google računa ili e-mail/lozinke, sljedeći podaci se pohranjuju na sigurne Supabase poslužitelje:</p>
+    <ul>
+      <li>E-mail adresa (iz Google profila ili ručnog unosa)</li>
+      <li>Ime i prezime (iz Google profila ili ručnog unosa)</li>
+      <li>Transakcije koje unosiš (iznosi, opisi, kategorije, datumi, statusi)</li>
+      <li>Postavke aplikacije (tema, jezik, valuta, vremenska zona)</li>
+      <li>Liste kategorija, lokacija i načina plaćanja koje kreiraš</li>
+    </ul>
+    <p>Svaki korisnik može pristupiti isključivo <strong>vlastitim podacima</strong>. Pristup je zaštićen Supabase Row Level Security (RLS) pravilima na razini baze podataka.</p>
+  </div>
+
+  <h2>2. Google Drive Backup (opcionalno)</h2>
+  <div class="section">
+    <p>Kada koristiš Google Drive backup funkcionalnost:</p>
+    <ul>
+      <li>Eksplicitno autoriziraš pristup putem Google OAuth prozora</li>
+      <li>Aplikacija pohranjuje <strong>jedan backup JSON fajl</strong> u tvoj privatni <code>appdata</code> folder na Google Driveu</li>
+      <li>Tražimo isključivo opseg <strong><code>drive.appdata</code></strong> — aplikacija <em>ne može</em> čitati, mijenjati niti brisati bilo koji drugi fajl na tvom Google Driveu</li>
+      <li>Tvoje Google vjerodajnice se nikad ne pohranjuju na naše poslužitelje</li>
+      <li>Pristup možeš opozvati u bilo koje doba na: <a href="https://myaccount.google.com/permissions" target="_blank">myaccount.google.com/permissions</a></li>
+    </ul>
+  </div>
+
+  <h2>3. Autentikacija</h2>
+  <div class="section">
+    <p><strong>Google prijava:</strong> Koristimo OAuth 2.0 s PKCE protokolom putem Supabase Auth. Tvoja Google lozinka se nikada ne dijeli s ovom aplikacijom.</p>
+    <p><strong>E-mail/lozinka:</strong> Lozinke hashira Supabase koristeći bcrypt algoritam. Aplikacija nikada ne vidi izvornu lozinku.</p>
+  </div>
+
+  <h2>4. Enkripcija lokalnih podataka</h2>
+  <div class="section">
+    <p>Kada je PIN zaštita uključena:</p>
+    <ul>
+      <li>Lokalni podaci enkriptirani su algoritmom <strong>AES-256-GCM</strong></li>
+      <li>Ključ se derivira iz PIN-a koristeći <strong>PBKDF2</strong> s 100.000 iteracija i SHA-256</li>
+      <li>PIN hash i salt pohranjuju se isključivo lokalno — nikada se ne prenose na server</li>
+    </ul>
+  </div>
+
+  <h2>5. Kolačići i lokalna pohrana</h2>
+  <div class="section">
+    <p>Web verzija aplikacije <strong>ne koristi kolačiće za praćenje, oglašavanje niti analitiku</strong>.</p>
+    <p>Aplikacija koristi:</p>
+    <ul>
+      <li><code>localStorage</code> — podaci aplikacije i korisničke preferencije</li>
+      <li><code>sessionStorage</code> — privremeni ključevi sesijske enkripcije</li>
+      <li>Supabase auth tokeni — u <code>localStorage</code> za trajnost sesije prijave</li>
+    </ul>
+  </div>
+
+  <h2>6. Usluge trećih strana</h2>
+  <div class="section">
+    <ul>
+      <li><strong>Supabase</strong> (supabase.com) — baza podataka, autentikacija, real-time sinkronizacija</li>
+      <li><strong>GitHub Pages</strong> (github.com) — web hosting</li>
+      <li><strong>Google</strong> (accounts.google.com) — OAuth prijava</li>
+      <li><strong>Google Drive API</strong> (googleapis.com) — isključivo za opcionalni backup</li>
+      <li><strong>Google Fonts</strong> (fonts.googleapis.com) — učitavanje fontova</li>
+    </ul>
+    <p>Navedene usluge mogu prikupljati standardne pristupne zapise (IP adresa, vrsta preglednika). Pogledaj njihove vlastite politike privatnosti za detalje.</p>
+  </div>
+
+  <h2>7. Tvoja prava (GDPR)</h2>
+  <div class="section">
+    <ul>
+      <li><strong>Pristup podacima:</strong> Izvezi sve podatke u bilo koje doba (Postavke → Backup → Izvezi)</li>
+      <li><strong>Brisanje cloud podataka:</strong> Odjavi se i pošalji zahtjev na gornju e-mail adresu</li>
+      <li><strong>Brisanje lokalnih podataka:</strong> Briši pohrane preglednika ili deinstaliraj aplikaciju</li>
+      <li><strong>Pravo na prenosivost:</strong> Podaci se mogu izvesti u JSON i CSV formatu</li>
+      <li><strong>Opoziv Google pristupa:</strong> <a href="https://myaccount.google.com/permissions" target="_blank">myaccount.google.com/permissions</a></li>
+    </ul>
+  </div>
+
+  <h2>8. Kontakt</h2>
+  <div class="section">
+    <p>Za sve upite vezane uz privatnost podataka:<br>
+    <strong>E-mail:</strong> <a href="mailto:info.mojalova@moneylynx.net">info.mojalova@moneylynx.net</a><br>
+    <strong>Web:</strong> <a href="https://moneylynx.net" target="_blank">moneylynx.net</a></p>
+  </div>
+
+  <hr>
+  <p style="font-size:13px;color:#9ca3af;text-align:center">© 2024–2026 MoneyLynx. Moja Lova v1.0</p>
+</div>
+
+<!-- ── ENGLISH ────────────────────────────────────────────────────────────── -->
+<div data-lang="en">
+  <span class="badge">Privacy Policy</span>
+  <h1>Moja Lova by MoneyLynx</h1>
+  <p class="meta">Last updated: May 2026 · Version 1.0</p>
+
+  <p>This Privacy Policy describes how <strong>Moja Lova</strong> collects, uses, and protects user data. By using the app you accept this policy.</p>
+
+  <h2>1. Data We Collect</h2>
+  <div class="section">
+    <h3>Without an account (local-only mode)</h3>
+    <p>No data leaves your device. All transactions, settings, and preferences are stored exclusively in browser <code>localStorage</code> or the device's internal storage. The app works fully offline.</p>
+
+    <h3>With an account (cloud sync)</h3>
+    <p>When signed in via Google or email/password, the following data is stored on secure Supabase servers:</p>
+    <ul>
+      <li>Email address (from Google profile or manual entry)</li>
+      <li>Display name (from Google profile or manual entry)</li>
+      <li>Transactions you enter (amounts, descriptions, categories, dates, statuses)</li>
+      <li>App preferences (theme, language, currency, timezone)</li>
+      <li>Category, location, and payment method lists you create</li>
+    </ul>
+    <p>Each user can access <strong>only their own data</strong>. Access is protected by Supabase Row Level Security (RLS) policies at the database level.</p>
+  </div>
+
+  <h2>2. Google Drive Backup (Optional)</h2>
+  <div class="section">
+    <p>When you use the Google Drive backup feature:</p>
+    <ul>
+      <li>You explicitly authorise access via a Google OAuth popup</li>
+      <li>The app stores <strong>one backup JSON file</strong> in your private <code>appdata</code> folder on Google Drive</li>
+      <li>We request only the <strong><code>drive.appdata</code></strong> scope — the app <em>cannot</em> read, modify, or delete any other file in your Google Drive</li>
+      <li>Your Google credentials are never stored on our servers</li>
+      <li>You can revoke access at any time at: <a href="https://myaccount.google.com/permissions" target="_blank">myaccount.google.com/permissions</a></li>
+    </ul>
+  </div>
+
+  <h2>3. Authentication</h2>
+  <div class="section">
+    <p><strong>Google Sign-In:</strong> We use OAuth 2.0 with PKCE via Supabase Auth. Your Google password is never shared with this app.</p>
+    <p><strong>Email/password:</strong> Passwords are hashed by Supabase using bcrypt. The app never sees your raw password.</p>
+  </div>
+
+  <h2>4. Local Data Encryption</h2>
+  <div class="section">
+    <p>When PIN protection is enabled:</p>
+    <ul>
+      <li>Local data is encrypted with <strong>AES-256-GCM</strong></li>
+      <li>The key is derived from the PIN using <strong>PBKDF2</strong> with 100,000 iterations and SHA-256</li>
+      <li>The PIN hash and salt are stored locally only — never transmitted to any server</li>
+    </ul>
+  </div>
+
+  <h2>5. Cookies &amp; Local Storage</h2>
+  <div class="section">
+    <p>The web version <strong>does not use tracking, advertising, or analytics cookies</strong>.</p>
+    <p>The app uses:</p>
+    <ul>
+      <li><code>localStorage</code> — app data and user preferences</li>
+      <li><code>sessionStorage</code> — temporary session encryption keys</li>
+      <li>Supabase auth tokens — in <code>localStorage</code> for session persistence</li>
+    </ul>
+  </div>
+
+  <h2>6. Third-Party Services</h2>
+  <div class="section">
+    <ul>
+      <li><strong>Supabase</strong> (supabase.com) — database, auth, real-time sync</li>
+      <li><strong>GitHub Pages</strong> (github.com) — web hosting</li>
+      <li><strong>Google</strong> (accounts.google.com) — OAuth sign-in</li>
+      <li><strong>Google Drive API</strong> (googleapis.com) — optional backup only</li>
+      <li><strong>Google Fonts</strong> (fonts.googleapis.com) — font loading</li>
+    </ul>
+    <p>These services may collect standard access logs (IP address, browser type). See their respective privacy policies for details.</p>
+  </div>
+
+  <h2>7. Your Rights (GDPR)</h2>
+  <div class="section">
+    <ul>
+      <li><strong>Data access:</strong> Export all data at any time (Settings → Backup → Export)</li>
+      <li><strong>Delete cloud data:</strong> Sign out and send a request to the email below</li>
+      <li><strong>Delete local data:</strong> Clear browser storage or uninstall the app</li>
+      <li><strong>Data portability:</strong> Data can be exported in JSON and CSV formats</li>
+      <li><strong>Revoke Google access:</strong> <a href="https://myaccount.google.com/permissions" target="_blank">myaccount.google.com/permissions</a></li>
+    </ul>
+  </div>
+
+  <h2>8. Contact</h2>
+  <div class="section">
+    <p>For all privacy-related inquiries:<br>
+    <strong>Email:</strong> <a href="mailto:info.mojalova@moneylynx.net">info.mojalova@moneylynx.net</a><br>
+    <strong>Web:</strong> <a href="https://moneylynx.net" target="_blank">moneylynx.net</a></p>
+  </div>
+
+  <hr>
+  <p style="font-size:13px;color:#9ca3af;text-align:center">© 2024–2026 MoneyLynx. Moja Lova v1.0</p>
+</div>
+
+<script>
+  function setLang(l) {
+    document.body.classList.toggle('en', l === 'en');
+    document.getElementById('lnk-hr').classList.toggle('active', l === 'hr');
+    document.getElementById('lnk-en').classList.toggle('active', l === 'en');
+    return false;
+  }
+  // Auto-detect browser language
+  if (navigator.language && !navigator.language.startsWith('hr')) setLang('en');
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<<<<<<< HEAD
+{
+  "name": "moja-lova",
+  "private": true,
+  "version": "1.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.12.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.10"
+  },
+  "dependencies": {
+  "react": "^18.2.0",
+  "react-dom": "^18.2.0",
+  "recharts": "^2.12.0",
+  "@capacitor/core": "^8.0.0",
+  "@capacitor/filesystem": "^8.1.2",
+  "@capacitor/share": "^8.0.1"
+}
+}
+=======
+{
+  "name": "moja-lova",
+  "private": true,
+  "version": "1.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.12.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.10"
+  },
+  "dependencies": {
+  "react": "^18.2.0",
+  "react-dom": "^18.2.0",
+  "recharts": "^2.12.0",
+  "@capacitor/core": "^8.0.0",
+  "@capacitor/filesystem": "^8.1.2",
+  "@capacitor/share": "^8.0.1"
+}
+}
+>>>>>>> 64f150c5478661ce4f63cf476ff7afce6c70dadc

@@ -1,0 +1,38 @@
+{
+  "name": "Moja Lova",
+  "short_name": "Moja Lova",
+  "description": "Smart personal finance management — track, forecast, split",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A1628",
+  "theme_color": "#0A1628",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/favicon-16.png",       "sizes": "16x16",       "type": "image/png" },
+    { "src": "/icons/favicon-32.png",       "sizes": "32x32",       "type": "image/png" },
+    { "src": "/icons/icon-192.png",         "sizes": "192x192",     "type": "image/png" },
+    { "src": "/icons/icon-512.png",         "sizes": "512x512",     "type": "image/png" },
+    { "src": "/icons/icon-512-maskable.png","sizes": "512x512",     "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/apple-touch-icon.png", "sizes": "180x180",     "type": "image/png" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Novi unos",
+      "short_name": "Dodaj",
+      "description": "Dodaj novu transakciju",
+      "url": "/?action=add",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Za platiti",
+      "short_name": "Dospjelo",
+      "description": "Pregled dospjelih obveza",
+      "url": "/?action=overdue",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "lang": "hr",
+  "dir": "ltr",
+  "display_override": ["standalone", "minimal-ui"]
+}
