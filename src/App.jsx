@@ -32,6 +32,7 @@ import TxList        from './components/TxList.jsx';
 import Charts        from './components/Charts.jsx';
 import Settings      from './components/Settings.jsx';
 import { RecurringScreen } from './components/Settings.jsx';
+import { JourneyScreen }  from './components/JourneyScreen.jsx';
 
 // Haptic feedback helper — silent if browser doesn't support vibrate
 const haptic = (ms = 40) => { try { navigator.vibrate?.(ms); } catch {} };
@@ -190,7 +191,7 @@ export default function App() {
 
   // Route back to dashboard when app is backgrounded.
   useEffect(() => {
-    const fn = () => { if (document.hidden && pageRef.current !== 'settings') { setPage('dashboard'); setTxListReturnTo(null); } };
+    const fn = () => { if (document.hidden && pageRef.current !== 'settings' && pageRef.current !== 'journey') { setPage('dashboard'); setTxListReturnTo(null); } };
     document.addEventListener('visibilitychange', fn);
     return () => document.removeEventListener('visibilitychange', fn);
   }, []);
@@ -465,7 +466,8 @@ export default function App() {
           setTxs(p => p.map(x => x.id === id ? { ...x, status: previousStatus, date: previousDate } : x));
         });
       }}/>}
-      {page === 'charts'       && <ChunkErrorBoundary C={C} label={t('Statistika')} t={t}><Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/></ChunkErrorBoundary>}
+        {page === 'journey' && <ChunkErrorBoundary C={C} label={t('Financijski put')} t={t}><JourneyScreen C={C} txs={txs} lists={lists} prefs={prefs} user={user} setPage={setPage} t={t} lang={lang}/></ChunkErrorBoundary>}
+    {page === 'charts'       && <ChunkErrorBoundary C={C} label={t('Statistika')} t={t}><Charts {...shared} data={txs} tab={statTab} setTab={setStatTab} selMonth={statMonth} setSelMonth={setStatMonth} expFilter={statExpFilter} setExpFilter={setStatExpFilter}/></ChunkErrorBoundary>}
       {page === 'recurring'    && <RecurringScreen {...shared} data={txs} setTxs={setTxs} onBack={() => setPage('dashboard')}/>}
       {page === 'settings'     && <ChunkErrorBoundary C={C} label={t('Postavke')} t={t}><Settings {...shared} txs={txs} setTxs={setTxs} drafts={drafts} prefs={prefs} updPrefs={updP} updUser={updU} sec={sec} updSec={updS} lists={lists} setLists={setLists} subPg={subPg} setSubPg={setSubPg} setUnlocked={setUnlocked} setSetupMode={setSetupMode} onChangePinCrypto={handleChangePinCrypto} onRemovePinCrypto={handleRemovePinCrypto} supaUser={supaUser} onSignOut={async () => { await signOut(); setSupaUser(null); }} onSyncToCloud={supaUser ? async (t, l, u) => { await uploadAll(supaUser.id, { txs: t || txs, lists: l || lists, user: u || user }); } : null}/></ChunkErrorBoundary>}
 
@@ -485,7 +487,7 @@ export default function App() {
       )}
 
       <nav style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: C.navBg, borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-around', padding: '6px 0 16px', zIndex: 100, backdropFilter: 'blur(12px)' }}>
-        {[['dashboard','home','Početna'],['transactions','list','Transakcije'],['add','plus',''],['charts','bar','Statistika'],['settings','gear','Postavke']].map(([id, ic, lb]) => (
+        {[['dashboard','home','Početna'],['transactions','list','Transakcije'],['add','plus',''],['charts','bar','Statistika'],['journey','route','Put'],['settings','gear','Postavke']].map(([id, ic, lb]) => (
           <button key={id} onClick={() => {
             if (id === 'add') { if (drafts.length > 0) { setShowActionHub(true); } else { setDraftEdit(null); setPage('add'); setSubPg(null); } }
             else { setPage(id); setSubPg(null); setTxListReturnTo(null); }

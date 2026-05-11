@@ -6,8 +6,8 @@ import { Ic, LynxLogo } from './ui.jsx';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { useAdvisor } from '../hooks/useAdvisor.js';
 
-const CHART_TREND_ICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+PHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjIyIiBoZWlnaHQ9IjIyIiByeD0iNCIgZmlsbD0iIzFlM2E1ZiIgc3Ryb2tlPSIjMjJkM2VlIiBzdHJva2Utd2lkdGg9IjEiLz48cmVjdCB4PSI0IiB5PSIxNCIgd2lkdGg9IjMiIGhlaWdodD0iNyIgcng9IjEiIGZpbGw9IiMyMmQzZWUiLz48cmVjdCB4PSI5IiB5PSIxMCIgd2lkdGg9IjMiIGhlaWdodD0iMTEiIHJ4PSIxIiBmaWxsPSIjMjJkM2VlIi8+PHJlY3QgeD0iMTQiIHk9IjciIHdpZHRoPSIzIiBoZWlnaHQ9IjE0IiByeD0iMSIgZmlsbD0iIzIyZDNlZSIvPjxyZWN0IHg9IjE5IiB5PSI0IiB3aWR0aD0iMiIgaGVpZ2h0PSIxNyIgcng9IjEiIGZpbGw9IiMyMmQzZWUiIG9wYWNpdHk9IjAuNiIvPjxwb2x5bGluZSBwb2ludHM9IjUuNSwxNCAxMC41LDEwIDE1LjUsNyAyMCw0IiBzdHJva2U9IiM0YWRlODAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSI1LjUiIGN5PSIxNCIgcj0iMSIgZmlsbD0iIzRhZGU4MCIvPjxjaXJjbGUgY3g9IjEwLjUiIGN5PSIxMCIgcj0iMSIgZmlsbD0iIzRhZGU4MCIvPjxjaXJjbGUgY3g9IjE1LjUiIGN5PSI3IiByPSIxIiBmaWxsPSIjNGFkZTgwIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSI0IiByPSIxIiBmaWxsPSIjNGFkZTgwIi8+PC9zdmc+";
 const WALLET_GAUGE_ICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+PHJlY3QgeD0iMiIgeT0iNyIgd2lkdGg9IjIwIiBoZWlnaHQ9IjEzIiByeD0iMiIgZmlsbD0iIzFlM2E1ZiIgc3Ryb2tlPSIjMjJkM2VlIiBzdHJva2Utd2lkdGg9IjEuMiIvPjxwYXRoIGQ9Ik02IDdWNWEyIDIgMCAwIDEgMi0yaDhhMiAyIDAgMCAxIDIgMnYyIiBzdHJva2U9IiMyMmQzZWUiIHN0cm9rZS13aWR0aD0iMS4yIi8+PHJlY3QgeD0iMTYiIHk9IjExIiB3aWR0aD0iNCIgaGVpZ2h0PSIzIiByeD0iMSIgZmlsbD0iIzIyZDNlZSIvPjxjaXJjbGUgY3g9IjkiIGN5PSIxNSIgcj0iMi41IiBmaWxsPSJub25lIiBzdHJva2U9IiM0YWRlODAiIHN0cm9rZS13aWR0aD0iMS4yIi8+PHBhdGggZD0iTTcgMTYuMkEyLjUgMi41IDAgMCAxIDkgMTIuNSIgc3Ryb2tlPSIjNGFkZTgwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjkiIHkxPSIxNSIgeDI9IjEwLjUiIHkyPSIxMy41IiBzdHJva2U9IiM0YWRlODAiIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+";
+const CHART_TREND_ICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+PHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjIyIiBoZWlnaHQ9IjIyIiByeD0iNCIgZmlsbD0iIzFlM2E1ZiIgc3Ryb2tlPSIjMjJkM2VlIiBzdHJva2Utd2lkdGg9IjEiLz48cmVjdCB4PSI0IiB5PSIxNCIgd2lkdGg9IjMiIGhlaWdodD0iNyIgcng9IjEiIGZpbGw9IiMyMmQzZWUiLz48cmVjdCB4PSI5IiB5PSIxMCIgd2lkdGg9IjMiIGhlaWdodD0iMTEiIHJ4PSIxIiBmaWxsPSIjMjJkM2VlIi8+PHJlY3QgeD0iMTQiIHk9IjciIHdpZHRoPSIzIiBoZWlnaHQ9IjE0IiByeD0iMSIgZmlsbD0iIzIyZDNlZSIvPjxwb2x5bGluZSBwb2ludHM9IjUuNSwxNCAxMC41LDEwIDE1LjUsNyIgc3Ryb2tlPSIjNGFkZTgwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iNS41IiBjeT0iMTQiIHI9IjEiIGZpbGw9IiM0YWRlODAiLz48Y2lyY2xlIGN4PSIxMC41IiBjeT0iMTAiIHI9IjEiIGZpbGw9IiM0YWRlODAiLz48Y2lyY2xlIGN4PSIxNS41IiBjeT0iNyIgcj0iMSIgZmlsbD0iIzRhZGU4MCIvPjwvc3ZnPg==";
 
 function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD, onGoToTransactions }) {
   const fmt = fmtProp || fmtEur;
@@ -212,7 +212,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
             <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
               <LynxLogo s={22} color={C.accent}/> {t("Moja Lova")} <span style={{fontSize:14,color:C.textMuted,fontWeight:500,verticalAlign:"middle",position:"relative",top:2}}>· {year}.</span>
             </h1>
-            {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
+            {dn && <span style={{ fontSize:12, color:C.textMuted, marginTop:3, paddingLeft:30 }}>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             {syncing && <span title={t("Sinkronizacija…")} style={{ width:8,height:8,borderRadius:"50%",background:C.warning,display:"inline-block",animation:"pulse 1s infinite" }}/>}
@@ -448,7 +448,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               {/* Header row */}
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-                  <div style={{ width:28, height:28, borderRadius:9, background:`${dlColor}20`, border:`1px solid ${dlColor}25`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
+                  <div style={{ width:28, height:28, borderRadius:9, overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center" }}>
                     <img src={WALLET_GAUGE_ICON} style={{ width:22, height:22 }} alt=""/>
                   </div>
                   <div>
@@ -526,7 +526,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     <div style={{ flex:1, background:C.cardAlt, borderRadius:12, padding:"8px 9px", border:`1.5px solid ${savingsProgressColor}50` }}>
                       <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:5 }}>
                         <span style={{ fontSize:12 }}>{savingsProgress >= 1 ? "🏆" : savingsProgress >= .5 ? "📊" : "🎯"}</span>
-                        <span style={{ fontSize:9, fontWeight:700, color:savingsProgressColor, textTransform:"uppercase", letterSpacing:.5 }}>{t("Ukupno")}</span>
+                        <span style={{ fontSize:9, fontWeight:700, color:savingsProgressColor, textTransform:"uppercase", letterSpacing:.5 }}>{t("Ovaj mj.")}</span>
                       </div>
                       <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:savingsProgressColor }}>{fmt(savedSoFar)}</div>
                       {plannedMonthly > 0 ? (

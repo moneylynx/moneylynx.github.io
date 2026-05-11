@@ -165,7 +165,30 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   // Restore — validates payload, shows custom confirm UI (window.confirm blocked on Android WebView)
   // Opens file picker by creating a temp input on document.body — bypasses all
   // container click propagation and Capacitor WebView restrictions.
-  
+  const openImportPicker = (e) => {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    
+    // Create visible (1x1px) input - must be visible for Android WebView picker to open
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json,text/plain,*/*";
+    // position:fixed at bottom, 1px visible - Android WebView requires visible element
+    Object.assign(input.style, {
+      position: "fixed", bottom: "0", left: "0",
+      width: "1px", height: "1px",
+      opacity: "0.01", zIndex: "9999",
+      fontSize: "16px" // prevents iOS zoom
+    });
+    document.body.appendChild(input);
+    
+    const cleanup = () => setTimeout(() => { try { document.body.removeChild(input); } catch {} }, 5000);
+    
+    input.addEventListener("change", (ev) => { fullImport(ev); cleanup(); });
+    input.addEventListener("cancel", cleanup);
+    
+    // Must be synchronous click within user gesture
+    input.click();
+  };
 
   const fullImport = (e) => {
     const file = e.target.files && e.target.files[0];
@@ -463,9 +486,8 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </div>
           </div>
 
-          {/* 3) IMPORT (RESTORE) — transparent input overlay, most reliable on all Android versions */}
+          {/* 3) IMPORT (RESTORE) — transparent overlay */}
           <div style={{ position:"relative", marginBottom:7 }}>
-            {/* Visible button UI */}
             <div style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13 }}>
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                 <Ic n="ul" s={19} c={C.income}/>
@@ -476,15 +498,9 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
               </div>
               <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
             </div>
-            {/* Invisible file input covering entire button — tap triggers native file picker directly */}
-            <input
-              type="file"
-              accept=".json,application/json,text/plain,*/*"
-              onChange={fullImport}
-              style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0, cursor:"pointer", zIndex:10 }}
-            />
+            <input type="file" accept=".json,application/json,text/plain,*/*" onChange={fullImport}
+              style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0, cursor:"pointer", zIndex:10 }}/>
           </div>
-        </div>
 
         {/* ── Google Drive backup section ──────────────────────────────── */}
         {isDriveConfigured() && (
@@ -732,6 +748,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
