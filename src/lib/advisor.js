@@ -292,7 +292,7 @@ export function generateInsights(forecast, anomalies, fmt = (n) => `${n.toFixed(
     insights.push({
       type:     'no_history',
       severity: 0,
-      icon:     '📈',
+      icon:     'WALLET_GAUGE',
       color:    'accent',
       title:    t('Dodaj više transakcija za projekciju'),
       body:     t('Nakon 1–2 mjeseca praćenja, aplikacija može projicirati stanje kraju svakog mjeseca.'),

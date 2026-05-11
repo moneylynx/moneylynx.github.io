@@ -6,6 +6,8 @@ import { Ic, LynxLogo } from './ui.jsx';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { useAdvisor } from '../hooks/useAdvisor.js';
 
+const WALLET_GAUGE_ICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+PHJlY3QgeD0iMiIgeT0iNyIgd2lkdGg9IjIwIiBoZWlnaHQ9IjEzIiByeD0iMiIgZmlsbD0iIzFlM2E1ZiIgc3Ryb2tlPSIjMjJkM2VlIiBzdHJva2Utd2lkdGg9IjEuMiIvPjxwYXRoIGQ9Ik02IDdWNWEyIDIgMCAwIDEgMi0yaDhhMiAyIDAgMCAxIDIgMnYyIiBzdHJva2U9IiMyMmQzZWUiIHN0cm9rZS13aWR0aD0iMS4yIi8+PHJlY3QgeD0iMTYiIHk9IjExIiB3aWR0aD0iNCIgaGVpZ2h0PSIzIiByeD0iMSIgZmlsbD0iIzIyZDNlZSIvPjxjaXJjbGUgY3g9IjkiIGN5PSIxNSIgcj0iMi41IiBmaWxsPSJub25lIiBzdHJva2U9IiM0YWRlODAiIHN0cm9rZS13aWR0aD0iMS4yIi8+PHBhdGggZD0iTTcgMTYuMkEyLjUgMi41IDAgMCAxIDkgMTIuNSIgc3Ryb2tlPSIjNGFkZTgwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjkiIHkxPSIxNSIgeDI9IjEwLjUiIHkyPSIxMy41IiBzdHJva2U9IiM0YWRlODAiIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+";
+
 function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD, onGoToTransactions }) {
   const fmt = fmtProp || fmtEur;
   const cmIdx = curMonthIdx();
@@ -209,7 +211,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
             <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
               <LynxLogo s={22} color={C.accent}/> {t("Moja Lova")} <span style={{fontSize:14,color:C.textMuted,fontWeight:500,verticalAlign:"middle",position:"relative",top:2}}>· {year}.</span>
             </h1>
-            {dn && <span style={{ fontSize:12, color:C.textMuted, marginTop:3, paddingLeft:30 }}>{t("Bok,")} {user.firstName || dn}!</span>}
+            {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             {syncing && <span title={t("Sinkronizacija…")} style={{ width:8,height:8,borderRadius:"50%",background:C.warning,display:"inline-block",animation:"pulse 1s infinite" }}/>}
@@ -445,8 +447,8 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               {/* Header row */}
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-                  <div style={{ width:28, height:28, borderRadius:9, overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    <img src="data:image/png;base64,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" style={{ width:28, height:28, objectFit:"cover", borderRadius:9 }} alt=""/>
+                  <div style={{ width:28, height:28, borderRadius:9, background:`${dlColor}20`, border:`1px solid ${dlColor}25`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
+                    <img src={WALLET_GAUGE_ICON} style={{ width:22, height:22 }} alt=""/>
                   </div>
                   <div>
                     <div style={{ fontSize:11, fontWeight:700, color:C.textSub, textTransform:"uppercase", letterSpacing:.5 }}>{t("Dnevni limit potrošnje")}</div>
@@ -498,33 +500,48 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               {/* ── Savings detail cards (toggle with 💸) ─────────── */}
               {dlDetailOpen && (
                 <div style={{ marginBottom: dlSavingsEdit ? 10 : 0 }}>
-                  <div style={{ display:"flex", gap:7, marginBottom:7 }}>
-
-                    {/* Card 1: Planirana ušteda mjesečno */}
-                    <div style={{ flex:1, background:C.cardAlt, borderRadius:11, padding:"8px 9px", border:`1px solid ${C.income}25` }}>
-                      <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:.3 }}>💰 {t("Ušteda/mj.")}</div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                    <div style={{ flex:1, height:1, background:C.border }}/>
+                    <span style={{ fontSize:9, fontWeight:700, color:C.textMuted, letterSpacing:1, textTransform:"uppercase" }}>{t("Štednja")}</span>
+                    <div style={{ flex:1, height:1, background:C.border }}/>
+                  </div>
+                  <div style={{ display:"flex", gap:7, marginBottom:8 }}>
+                    <div style={{ flex:1, background:C.cardAlt, borderRadius:12, padding:"8px 9px", border:`1px solid ${C.income}30` }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:5 }}>
+                        <span style={{ fontSize:12 }}>💰</span>
+                        <span style={{ fontSize:9, fontWeight:700, color:C.income, textTransform:"uppercase", letterSpacing:.5 }}>{t("Mjes.")}</span>
+                      </div>
                       <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:C.income }}>{fmt(plannedMonthly)}</div>
-                      <div style={{ fontSize:9, color:C.textMuted, marginTop:2 }}>{t("planirano")}</div>
+                      <div style={{ fontSize:9, color:C.textMuted, marginTop:3, fontStyle:"italic" }}>{t("planirano")}</div>
                     </div>
-
-                    {/* Card 2: Planirana ušteda godišnje */}
-                    <div style={{ flex:1, background:C.cardAlt, borderRadius:11, padding:"8px 9px", border:`1px solid ${C.accent}25` }}>
-                      <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:.3 }}>📅 {t("Ušteda/god.")}</div>
+                    <div style={{ flex:1, background:C.cardAlt, borderRadius:12, padding:"8px 9px", border:`1px solid ${C.accent}30` }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:5 }}>
+                        <span style={{ fontSize:12 }}>📅</span>
+                        <span style={{ fontSize:9, fontWeight:700, color:C.accent, textTransform:"uppercase", letterSpacing:.5 }}>{t("God.")}</span>
+                      </div>
                       <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:C.accent }}>{fmt(plannedYearly)}</div>
-                      <div style={{ fontSize:9, color:C.textMuted, marginTop:2 }}>{t("planirano")}</div>
+                      <div style={{ fontSize:9, color:C.textMuted, marginTop:3, fontStyle:"italic" }}>{t("planirano")}</div>
                     </div>
-
-                    {/* Card 3: Ušteđeno do sada */}
-                    <div style={{ flex:1, background:C.cardAlt, borderRadius:11, padding:"8px 9px", border:`1px solid ${savingsProgressColor}40` }}>
-                      <div style={{ fontSize:9, color:C.textMuted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:.3 }}>✅ {t("Ušteđeno")}</div>
+                    <div style={{ flex:1, background:C.cardAlt, borderRadius:12, padding:"8px 9px", border:`1.5px solid ${savingsProgressColor}50` }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:5 }}>
+                        <span style={{ fontSize:12 }}>{savingsProgress >= 1 ? "🏆" : savingsProgress >= .5 ? "📊" : "🎯"}</span>
+                        <span style={{ fontSize:9, fontWeight:700, color:savingsProgressColor, textTransform:"uppercase", letterSpacing:.5 }}>{t("Ukupno")}</span>
+                      </div>
                       <div style={{ fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:savingsProgressColor }}>{fmt(savedSoFar)}</div>
-                      {plannedMonthly > 0 && (
-                        <div style={{ marginTop:4, height:3, borderRadius:2, background:`${savingsProgressColor}20`, overflow:"hidden" }}>
-                          <div style={{ height:"100%", width:`${savingsProgress*100}%`, background:savingsProgressColor, borderRadius:2, transition:"width .4s" }}/>
+                      {plannedMonthly > 0 ? (
+                        <div style={{ marginTop:4 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
+                            <span style={{ fontSize:8, color:C.textMuted }}>{Math.round(savingsProgress*100)}%</span>
+                            <span style={{ fontSize:8, color:savingsProgressColor, fontWeight:700 }}>{fmt(plannedMonthly)}</span>
+                          </div>
+                          <div style={{ height:4, borderRadius:3, background:`${C.textMuted}20` }}>
+                            <div style={{ height:"100%", width:`${Math.min(100,savingsProgress*100)}%`, background:`linear-gradient(90deg,${savingsProgressColor}90,${savingsProgressColor})`, borderRadius:3, transition:"width .5s" }}/>
+                          </div>
                         </div>
+                      ) : (
+                        <div style={{ fontSize:8, color:C.textMuted, marginTop:3, fontStyle:"italic" }}>{t("Postavi cilj")}</div>
                       )}
                     </div>
-
                   </div>
                 </div>
               )}
@@ -598,7 +615,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     <div key={i} className="su"
                       style={{ background:`linear-gradient(135deg,${col}18,${col}08)`, border:`1px solid ${col}40`, borderLeft:`4px solid ${col}`, borderRadius:14, padding:"9px 12px", marginBottom:i<visibleInsights.length-1?6:0, animationDelay:`${i*.05}s` }}>
                       <div style={{ display:"flex",alignItems:"flex-start",gap:8 }}>
-                        <span style={{ fontSize:15,flexShrink:0,lineHeight:1.3 }}>{ins.icon}</span>
+                        {ins.icon === 'WALLET_GAUGE' ? <img src={WALLET_GAUGE_ICON} style={{ width:20,height:20,flexShrink:0 }} alt=""/> : <span style={{ fontSize:15,flexShrink:0,lineHeight:1.3 }}>{ins.icon}</span>}
                         <div style={{ flex:1,minWidth:0 }}>
                           <div style={{ fontSize:12,fontWeight:700,color:col,marginBottom:1 }}>{ins.title}</div>
                           <div style={{ fontSize:11,color:C.textMuted,lineHeight:1.4 }}>{ins.body}</div>
