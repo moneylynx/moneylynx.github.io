@@ -165,30 +165,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   // Restore — validates payload, shows custom confirm UI (window.confirm blocked on Android WebView)
   // Opens file picker by creating a temp input on document.body — bypasses all
   // container click propagation and Capacitor WebView restrictions.
-  const openImportPicker = (e) => {
-    if (e) { e.stopPropagation(); e.preventDefault(); }
-    
-    // Create input directly on body - works on both web and Capacitor Android
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json,application/json,text/plain,*/*";
-    input.setAttribute("accept", ".json,application/json,text/plain,*/*");
-    // Must be visible (even 1px) for Android WebView to trigger picker
-    input.style.cssText = "position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0.01;z-index:-1;";
-    document.body.appendChild(input);
-    
-    const cleanup = () => { setTimeout(() => { try { document.body.removeChild(input); } catch {} }, 3000); };
-    
-    input.addEventListener("change", (ev) => {
-      const file = ev.target.files && ev.target.files[0];
-      if (file) fullImport(ev);
-      cleanup();
-    });
-    input.addEventListener("cancel", cleanup);
-    
-    // Trigger click — must happen synchronously within user gesture on iOS/Android
-    try { input.click(); } catch { setTimeout(() => { try { input.click(); } catch {} }, 10); }
-  };
+  
 
   const fullImport = (e) => {
     const file = e.target.files && e.target.files[0];
@@ -486,17 +463,26 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </div>
           </div>
 
-          {/* 3) IMPORT (RESTORE) — dynamic input on body, bypasses all container restrictions */}
-          <div onClick={openImportPicker}
-            style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13, cursor:"pointer", marginBottom:7 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <Ic n="ul" s={19} c={C.income}/>
-              <div style={{ textAlign:"left" }}>
-                <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Učitaj (Import / Restore)")}</div>
-                <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
+          {/* 3) IMPORT (RESTORE) — transparent input overlay, most reliable on all Android versions */}
+          <div style={{ position:"relative", marginBottom:7 }}>
+            {/* Visible button UI */}
+            <div style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <Ic n="ul" s={19} c={C.income}/>
+                <div style={{ textAlign:"left" }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Učitaj (Import / Restore)")}</div>
+                  <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
+                </div>
               </div>
+              <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
             </div>
-            <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
+            {/* Invisible file input covering entire button — tap triggers native file picker directly */}
+            <input
+              type="file"
+              accept=".json,application/json,text/plain,*/*"
+              onChange={fullImport}
+              style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0, cursor:"pointer", zIndex:10 }}
+            />
           </div>
         </div>
 

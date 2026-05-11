@@ -29,7 +29,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   // y = svi izdaci tekućeg mjeseca (plaćeni + pending + recurring koji nisu plaćeni)
   // A = (x - y) / dani_do_kraja_mjeseca - B
   const [dlSavingsEdit, setDlSavingsEdit] = useState(false);
-  const [dlDetailOpen, setDlDetailOpen] = useState(true); // savings detail cards open by default
+  const [dlDetailOpen, setDlDetailOpen] = useState(false); // savings detail cards open by default
   const [dlSavingsInput, setDlSavingsInput] = useState("");
   const [dlSavingsPeriod, setDlSavingsPeriod] = useState(() => prefs?.plannedSavingsPeriod || "monthly");
 
@@ -209,7 +209,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
             <h1 style={{ fontSize:20, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.accent }}>
               <LynxLogo s={22} color={C.accent}/> {t("Moja Lova")} <span style={{fontSize:14,color:C.textMuted,fontWeight:500,verticalAlign:"middle",position:"relative",top:2}}>· {year}.</span>
             </h1>
-            {dn && <span style={{ fontSize:12, color:C.textMuted, display:"flex", alignItems:"center", gap:4, marginTop:3 }}><span style={{ width:6, height:6, borderRadius:"50%", background:C.income, display:"inline-block" }}/>{t("Bok,")} {user.firstName || dn}!</span>}
+            {dn && <span style={{ fontSize:12, color:C.textMuted, marginTop:3, paddingLeft:30 }}>{t("Bok,")} {user.firstName || dn}!</span>}
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             {syncing && <span title={t("Sinkronizacija…")} style={{ width:8,height:8,borderRadius:"50%",background:C.warning,display:"inline-block",animation:"pulse 1s infinite" }}/>}
@@ -445,11 +445,9 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               {/* Header row */}
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-                  <button onClick={()=>setDlDetailOpen(v=>!v)}
-                    style={{ width:28, height:28, borderRadius:9, background:`${dlColor}20`, border:`1px solid ${dlColor}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, cursor:"pointer", transition:"all .2s", transform:dlDetailOpen?"scale(1.1)":"scale(1)" }}
-                    title={t("Prikaži/sakrij detalje štednje")}>
-                    💸
-                  </button>
+                  <div style={{ width:28, height:28, borderRadius:9, overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <img src="data:image/png;base64,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" style={{ width:28, height:28, objectFit:"cover", borderRadius:9 }} alt=""/>
+                  </div>
                   <div>
                     <div style={{ fontSize:11, fontWeight:700, color:C.textSub, textTransform:"uppercase", letterSpacing:.5 }}>{t("Dnevni limit potrošnje")}</div>
                     <div style={{ fontSize:10, color:C.textMuted, marginTop:1 }}>
@@ -461,7 +459,17 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                   </div>
                 </div>
                 {/* Savings edit button */}
-                <button onClick={() => { setDlSavingsEdit(v => !v); setDlSavingsInput(plannedSavingsRaw > 0 ? String(plannedSavingsRaw) : ""); setDlSavingsPeriod(savedPeriod); }}
+                <button onClick={() => {
+                    if (dlDetailOpen && dlSavingsEdit) {
+                      // Both open → close both
+                      setDlDetailOpen(false); setDlSavingsEdit(false);
+                    } else {
+                      // Open both
+                      setDlDetailOpen(true); setDlSavingsEdit(true);
+                      setDlSavingsInput(plannedSavingsRaw > 0 ? String(plannedSavingsRaw) : "");
+                      setDlSavingsPeriod(savedPeriod);
+                    }
+                  }}
                   style={{ background:`${C.accent}18`, border:`1px solid ${C.accent}40`, borderRadius:20, padding:"4px 10px", fontSize:11, fontWeight:600, color:C.accent, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}>
                   🎯 {t("Štednja")}
                 </button>
@@ -472,7 +480,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                 <div style={{ fontSize:36, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:dlColor, lineHeight:1 }}>
                   {dlGood ? "" : "-"}{fmt(Math.abs(dailyLimit))}
                 </div>
-                <div style={{ fontSize:12, color:C.textMuted, marginBottom:6, fontWeight:500 }}>{t("/ dan")}</div>
+                <div style={{ fontSize:16, color:dlColor, marginBottom:5, fontWeight:700, opacity:.75 }}>{t("/ dan")}</div>
               </div>
 
               {/* Status message */}
@@ -521,6 +529,15 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                 </div>
               )}
 
+
+              {/* Otvori/Zatvori štednju toggle */}
+              <div onClick={() => { setDlDetailOpen(v=>!v); if (!dlDetailOpen) setDlSavingsEdit(false); }}
+                style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:5, cursor:"pointer", padding:"6px 0 2px", marginBottom:4 }}>
+                <span style={{ fontSize:11, color:C.accent, fontWeight:600 }}>
+                  {dlDetailOpen ? t("Zatvori štednju") : t("Otvori štednju")}
+                </span>
+                <span style={{ fontSize:11, color:C.accent, transform:dlDetailOpen?"rotate(180deg)":"rotate(0deg)", transition:"transform .2s", display:"inline-block" }}>▼</span>
+              </div>
               {/* Savings input panel */}
               {dlSavingsEdit && (
                 <div style={{ marginTop:10 }}>

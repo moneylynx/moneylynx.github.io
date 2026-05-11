@@ -190,7 +190,7 @@ export default function App() {
 
   // Route back to dashboard when app is backgrounded.
   useEffect(() => {
-    const fn = () => { if (document.hidden) { setPage('dashboard'); setTxListReturnTo(null); } };
+    const fn = () => { if (document.hidden && pageRef.current !== 'settings') { setPage('dashboard'); setTxListReturnTo(null); } };
     document.addEventListener('visibilitychange', fn);
     return () => document.removeEventListener('visibilitychange', fn);
   }, []);
