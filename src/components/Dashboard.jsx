@@ -6,6 +6,7 @@ import { Ic, LynxLogo } from './ui.jsx';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { useAdvisor } from '../hooks/useAdvisor.js';
 
+const CHART_TREND_ICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+PHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjIyIiBoZWlnaHQ9IjIyIiByeD0iNCIgZmlsbD0iIzFlM2E1ZiIgc3Ryb2tlPSIjMjJkM2VlIiBzdHJva2Utd2lkdGg9IjEiLz48cmVjdCB4PSI0IiB5PSIxNCIgd2lkdGg9IjMiIGhlaWdodD0iNyIgcng9IjEiIGZpbGw9IiMyMmQzZWUiLz48cmVjdCB4PSI5IiB5PSIxMCIgd2lkdGg9IjMiIGhlaWdodD0iMTEiIHJ4PSIxIiBmaWxsPSIjMjJkM2VlIi8+PHJlY3QgeD0iMTQiIHk9IjciIHdpZHRoPSIzIiBoZWlnaHQ9IjE0IiByeD0iMSIgZmlsbD0iIzIyZDNlZSIvPjxyZWN0IHg9IjE5IiB5PSI0IiB3aWR0aD0iMiIgaGVpZ2h0PSIxNyIgcng9IjEiIGZpbGw9IiMyMmQzZWUiIG9wYWNpdHk9IjAuNiIvPjxwb2x5bGluZSBwb2ludHM9IjUuNSwxNCAxMC41LDEwIDE1LjUsNyAyMCw0IiBzdHJva2U9IiM0YWRlODAiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSI1LjUiIGN5PSIxNCIgcj0iMSIgZmlsbD0iIzRhZGU4MCIvPjxjaXJjbGUgY3g9IjEwLjUiIGN5PSIxMCIgcj0iMSIgZmlsbD0iIzRhZGU4MCIvPjxjaXJjbGUgY3g9IjE1LjUiIGN5PSI3IiByPSIxIiBmaWxsPSIjNGFkZTgwIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSI0IiByPSIxIiBmaWxsPSIjNGFkZTgwIi8+PC9zdmc+";
 const WALLET_GAUGE_ICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+PHJlY3QgeD0iMiIgeT0iNyIgd2lkdGg9IjIwIiBoZWlnaHQ9IjEzIiByeD0iMiIgZmlsbD0iIzFlM2E1ZiIgc3Ryb2tlPSIjMjJkM2VlIiBzdHJva2Utd2lkdGg9IjEuMiIvPjxwYXRoIGQ9Ik02IDdWNWEyIDIgMCAwIDEgMi0yaDhhMiAyIDAgMCAxIDIgMnYyIiBzdHJva2U9IiMyMmQzZWUiIHN0cm9rZS13aWR0aD0iMS4yIi8+PHJlY3QgeD0iMTYiIHk9IjExIiB3aWR0aD0iNCIgaGVpZ2h0PSIzIiByeD0iMSIgZmlsbD0iIzIyZDNlZSIvPjxjaXJjbGUgY3g9IjkiIGN5PSIxNSIgcj0iMi41IiBmaWxsPSJub25lIiBzdHJva2U9IiM0YWRlODAiIHN0cm9rZS13aWR0aD0iMS4yIi8+PHBhdGggZD0iTTcgMTYuMkEyLjUgMi41IDAgMCAxIDkgMTIuNSIgc3Ryb2tlPSIjNGFkZTgwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjkiIHkxPSIxNSIgeDI9IjEwLjUiIHkyPSIxMy41IiBzdHJva2U9IiM0YWRlODAiIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+";
 
 function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, onQuickAdd, t, lang, prefs, updPrefs, setSubPg, syncing, supaUser, fmt: fmtProp, fmtD, onGoToTransactions }) {
@@ -531,15 +532,15 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                       {plannedMonthly > 0 ? (
                         <div style={{ marginTop:4 }}>
                           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
-                            <span style={{ fontSize:8, color:C.textMuted }}>{Math.round(savingsProgress*100)}%</span>
-                            <span style={{ fontSize:8, color:savingsProgressColor, fontWeight:700 }}>{fmt(plannedMonthly)}</span>
+                            <span style={{ fontSize:8, color:C.textMuted }}>{Math.min(100,Math.round(savingsProgress*100))}%</span>
+                            <span style={{ fontSize:8, color:savingsProgressColor, fontWeight:700 }}>{t("cilj:")} {fmt(plannedMonthly)}</span>
                           </div>
                           <div style={{ height:4, borderRadius:3, background:`${C.textMuted}20` }}>
                             <div style={{ height:"100%", width:`${Math.min(100,savingsProgress*100)}%`, background:`linear-gradient(90deg,${savingsProgressColor}90,${savingsProgressColor})`, borderRadius:3, transition:"width .5s" }}/>
                           </div>
                         </div>
                       ) : (
-                        <div style={{ fontSize:8, color:C.textMuted, marginTop:3, fontStyle:"italic" }}>{t("Postavi cilj")}</div>
+                        <div style={{ fontSize:8, color:C.textMuted, marginTop:3, fontStyle:"italic" }}>{t("slobodan novac")}</div>
                       )}
                     </div>
                   </div>
@@ -562,7 +563,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     <div style={{ fontSize:11, fontWeight:600, color:C.textMuted, letterSpacing:.3 }}>{t("Planirana štednja")}</div>
                     <div style={{ display:"flex", gap:6 }}>
                       {[{k:"monthly",lhr:"Mjesečno",len:"Monthly"},{k:"yearly",lhr:"Godišnje",len:"Yearly"}].map(opt=>(
-                        <button key={opt.k} onClick={()=>setDlSavingsPeriod(opt.k)}
+                        <button key={opt.k} type="button" onClick={(e)=>{e.stopPropagation();setDlSavingsPeriod(opt.k);}}
                           style={{ fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20, cursor:"pointer", border:`1px solid ${dlSavingsPeriod===opt.k?C.accent:C.border}`, background:dlSavingsPeriod===opt.k?C.accent:"transparent", color:dlSavingsPeriod===opt.k?"#fff":C.textMuted, transition:"all .2s" }}>
                           {t(opt.lhr)}
                         </button>
@@ -615,7 +616,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     <div key={i} className="su"
                       style={{ background:`linear-gradient(135deg,${col}18,${col}08)`, border:`1px solid ${col}40`, borderLeft:`4px solid ${col}`, borderRadius:14, padding:"9px 12px", marginBottom:i<visibleInsights.length-1?6:0, animationDelay:`${i*.05}s` }}>
                       <div style={{ display:"flex",alignItems:"flex-start",gap:8 }}>
-                        {ins.icon === 'WALLET_GAUGE' ? <img src={WALLET_GAUGE_ICON} style={{ width:20,height:20,flexShrink:0 }} alt=""/> : <span style={{ fontSize:15,flexShrink:0,lineHeight:1.3 }}>{ins.icon}</span>}
+                        {ins.icon === 'WALLET_GAUGE' ? <img src={WALLET_GAUGE_ICON} style={{ width:20,height:20,flexShrink:0 }} alt=""/> : ins.icon === 'CHART_TREND' ? <img src={CHART_TREND_ICON} style={{ width:20,height:20,flexShrink:0 }} alt=""/> : <span style={{ fontSize:15,flexShrink:0,lineHeight:1.3 }}>{ins.icon}</span>}
                         <div style={{ flex:1,minWidth:0 }}>
                           <div style={{ fontSize:12,fontWeight:700,color:col,marginBottom:1 }}>{ins.title}</div>
                           <div style={{ fontSize:11,color:C.textMuted,lineHeight:1.4 }}>{ins.body}</div>
