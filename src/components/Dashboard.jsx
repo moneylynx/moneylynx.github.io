@@ -369,19 +369,21 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
           <>
             {/* ── 3. ZA PLATITI — moved up, compact, 4 items max ─────── */}
             {todoItems.length === 0 ? (
-              <div className="su" style={{ background:C.card,border:`1px solid ${C.income}40`,borderLeft:`4px solid ${C.income}`,borderRadius:14,padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:10 }}>
-                <div style={{ width:30,height:30,borderRadius:9,background:`${C.income}20`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                  <Ic n="check" s={15} c={C.income}/>
+              <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                <div className="su" style={{ flex:1, background:C.card,border:`1px solid ${C.income}40`,borderLeft:`4px solid ${C.income}`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:10 }}>
+                  <div style={{ width:30,height:30,borderRadius:9,background:`${C.income}20`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                    <Ic n="check" s={15} c={C.income}/>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:12,fontWeight:700,color:C.income }}>{t("Sve obveze podmirene!")}</div>
+                    <div style={{ fontSize:10,color:C.textMuted,marginTop:1 }}>{cmName} {year}.</div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontSize:12,fontWeight:700,color:C.income }}>{t("Sve obveze podmirene!")}</div>
-                  <div style={{ fontSize:10,color:C.textMuted,marginTop:1 }}>{cmName} {year}.</div>
+                <div className="su" onClick={()=>setPage("journey")}
+                  style={{ background:`linear-gradient(135deg,${C.accent}18,${C.accent}08)`, border:`1px solid ${C.accent}40`, borderRadius:14, padding:"10px 12px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, cursor:"pointer", flexShrink:0, minWidth:64 }}>
+                  <Ic n="gauge" s={18} c={C.accent}/>
+                  <span style={{ fontSize:10, fontWeight:700, color:C.accent }}>{t("Trening")}</span>
                 </div>
-              </div>
-              <div className="su" onClick={()=>setPage("journey")}
-                style={{ background:`linear-gradient(135deg,${C.accent}18,${C.accent}08)`, border:`1px solid ${C.accent}40`, borderRadius:14, padding:"10px 12px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, cursor:"pointer", flexShrink:0, minWidth:64 }}>
-                <Ic n="gauge" s={18} c={C.accent}/>
-                <span style={{ fontSize:10, fontWeight:700, color:C.accent }}>{t("Trening")}</span>
               </div>
             ) : (
               <div className="su" style={{ background:C.card,border:`1px solid ${C.warning}40`,borderLeft:`4px solid ${C.warning}`,borderRadius:14,marginBottom:10,overflow:"hidden" }}>
