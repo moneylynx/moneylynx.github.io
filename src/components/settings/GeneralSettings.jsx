@@ -192,10 +192,10 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       if (!file.data) { alert(t("Greška pri čitanju datoteke.")); return; }
       const decoded = atob(file.data);
       const { data, txCount } = parseImportJsonRaw(decoded);
-      // Odgoda 300ms – Capacitor "resume" event se završi, UI se smiri
+      // Odgoda 1000ms – Capacitor "resume" event se završi, UI se smiri
       setTimeout(() => {
         setImportPending({ data, txCount });
-      }, 300);
+      }, 1000);
     } catch (err) {
       console.error("FilePicker error:", err);
       // Fallback na HTML input ako nešto pođe po krivu
