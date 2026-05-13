@@ -200,7 +200,7 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
 
   return (
     <div className="fi" style={{ width: '100%', paddingBottom: 80 }}>
-      <StickyHeader C={C} icon="route" title={t('Financijski put')}
+      <StickyHeader C={C} icon="gauge" title={t('Trening')}
         right={
           <button onClick={() => setShowQuiz(true)}
             style={{ background: C.cardAlt, border: `1px solid ${C.border}`, color: C.textMuted, padding: '6px 12px', borderRadius: 10, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -211,7 +211,7 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
 
       <div style={{ padding: '12px 16px 0' }}>
 
-        {/* ── Score + stepenica header ──────────────────────────────────── */}
+        {/* ── Score + korak header ──────────────────────────────────── */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: C.cardAlt, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: `2px solid ${scoreColor}` }}>
@@ -219,7 +219,7 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
               <div style={{ fontSize: 9, color: C.textMuted, marginTop: 1 }}>/100</div>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 2 }}>{t('Trenutna stepenica')}</div>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 2 }}>{t('Trenutni korak')}</div>
               <div style={{ fontSize: 18, fontWeight: 500, color: C.text }}>{STEPS[currentStep]?.icon} {t(STEPS[currentStep]?.name)}</div>
               <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{t(STEPS[currentStep]?.desc)}</div>
             </div>
@@ -255,7 +255,7 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, marginBottom: 10, overflow: 'hidden' }}>
           <button onClick={() => toggle('steps')} type="button"
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-            <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{t('7 stepenica')}</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{t('7 koraka')}</span>
             <Ic n="chevron-down" s={14} c={C.textMuted} style={{ transform: expandedSection === 'steps' ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}/>
           </button>
           {expandedSection === 'steps' && (
