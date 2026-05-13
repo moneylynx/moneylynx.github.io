@@ -18,6 +18,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   const [confirm, setConfirm] = useState(false);
   const [importPending, setImportPending] = useState(null);
   const importInputRef = useRef(null); // stable ref for file input
+  const [importKey, setImportKey] = useState(0);
   // Fallback state: if no download/share path works (some APK wrappers block both),
   // we show the JSON in a modal with a Copy button so the user can paste into any
   // note/chat app and save it elsewhere.
@@ -165,52 +166,46 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   // Restore — validates payload, shows custom confirm UI (window.confirm blocked on Android WebView)
   // Opens file picker by creating a temp input on document.body — bypasses all
   // container click propagation and Capacitor WebView restrictions.
-  const openImportPicker = (e) => {
-    if (e) { e.stopPropagation(); e.preventDefault(); }
-    
-    // Create visible (1x1px) input - must be visible for Android WebView picker to open
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json,application/json,text/plain,*/*";
-    // position:fixed at bottom, 1px visible - Android WebView requires visible element
-    Object.assign(input.style, {
-      position: "fixed", bottom: "0", left: "0",
-      width: "1px", height: "1px",
-      opacity: "0.01", zIndex: "9999",
-      fontSize: "16px" // prevents iOS zoom
-    });
-    document.body.appendChild(input);
-    
-    const cleanup = () => setTimeout(() => { try { document.body.removeChild(input); } catch {} }, 5000);
-    
-    input.addEventListener("change", (ev) => { fullImport(ev); cleanup(); });
-    input.addEventListener("cancel", cleanup);
-    
-    // Must be synchronous click within user gesture
-    input.click();
+  const processImportData = (jsonText) => {
+    let parsed;
+    try { parsed = JSON.parse(jsonText); }
+    catch { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
+    let data = null;
+    if (parsed && parsed.__moja_lova_backup && parsed.data && typeof parsed.data === "object") {
+      data = parsed.data;
+    } else if (Array.isArray(parsed)) {
+      data = { txs: parsed };
+    }
+    if (!data) { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
+    setImportPending({ data, txCount: Array.isArray(data.txs) ? data.txs.length : 0 });
+  };
+
+  const handleNativeImport = async () => {
+    try {
+      const { FilePicker } = await import("@capawesome/capacitor-file-picker");
+      const result = await FilePicker.pickFiles({
+        types: ["application/json", "text/plain", "*/*"],
+        readData: true,
+        multiple: false
+      });
+      if (!result?.files?.length) return;
+      const file = result.files[0];
+      const jsonText = file.data ? atob(file.data) : null;
+      if (!jsonText) { alert(t("Greška pri čitanju datoteke.")); return; }
+      processImportData(jsonText);
+    } catch (err) {
+      console.error("FilePicker error:", err);
+      // Fallback: trigger hidden input
+      if (importInputRef.current) importInputRef.current.click();
+    }
   };
 
   const fullImport = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onerror = () => alert(t("Greška pri čitanju datoteke."));
-    reader.onload = (ev) => {
-      let parsed;
-      try { parsed = JSON.parse(ev.target.result); }
-      catch { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
-
-      let data = null;
-      if (parsed && parsed.__moja_lova_backup && parsed.data && typeof parsed.data === "object") {
-        data = parsed.data;
-      } else if (Array.isArray(parsed)) {
-        data = { txs: parsed };
-      }
-      if (!data) { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
-
-      setImportPending({ data, txCount: Array.isArray(data.txs) ? data.txs.length : 0 });
-    };
+    reader.onload = (ev) => processImportData(ev.target.result);
     reader.readAsText(file);
   };
 
@@ -487,19 +482,22 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           </div>
 
           {/* 3) IMPORT (RESTORE) — transparent overlay */}
-          <div style={{ position:"relative", marginBottom:7 }}>
-            <div style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13 }}>
+          <div style={{ marginBottom:7 }}>
+            <div onClick={isCapacitor() ? handleNativeImport : undefined}
+              style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13, cursor:"pointer", position:"relative" }}>
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                 <Ic n="ul" s={19} c={C.income}/>
                 <div style={{ textAlign:"left" }}>
-                  <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("Učitaj (Import / Restore)")}</div>
+                  <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("U\u010ditaj (Import / Restore)")}</div>
                   <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
                 </div>
               </div>
               <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
+              {!isCapacitor() && <label htmlFor="ml-import-file" style={{ position:"absolute", inset:0, cursor:"pointer" }}/>}
             </div>
-            <input type="file" accept=".json,application/json,text/plain,*/*" onChange={fullImport}
-              style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0, cursor:"pointer", zIndex:10 }}/>
+            <input key={importKey} ref={importInputRef} id="ml-import-file" type="file"
+              accept=".json,application/json,text/plain,*/*"
+              onChange={fullImport} style={{ display:"none" }}/>
           </div>
 
         {/* ── Google Drive backup section ──────────────────────────────── */}
