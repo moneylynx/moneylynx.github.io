@@ -164,58 +164,58 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     }
   };
 
-  // Restore — validates payload, shows custom confirm UI (window.confirm blocked on Android WebView)
-  // Opens file picker by creating a temp input on document.body — bypasses all
-  // container click propagation and Capacitor WebView restrictions.
-  const parseImportJson = (jsonText) => {
-    alert("DEBUG PI1: parseImportJson start, len=" + jsonText.length);
+  // ----- Pomocna funkcija za parsiranje JSON-a (sinkrona, samo parsira, ne postavlja state)
+  const parseImportJsonRaw = (jsonText) => {
     let parsed;
     try { parsed = JSON.parse(jsonText); }
-    catch (e) { alert("DEBUG PI2: JSON.parse GREŠKA: " + e.message); return; }
-    alert("DEBUG PI3: JSON parsed ok, type=" + typeof parsed + " isArray=" + Array.isArray(parsed) + " hasBackupKey=" + (parsed && !!parsed.__moja_lova_backup));
+    catch (e) { throw new Error(t("Datoteka nije valjan Moja Lova backup.")); }
     let data = null;
     if (parsed && parsed.__moja_lova_backup && parsed.data && typeof parsed.data === "object") {
       data = parsed.data;
     } else if (Array.isArray(parsed)) {
       data = { txs: parsed };
     }
-    alert("DEBUG PI4: data=" + (data ? "NAĐEN, txs=" + (Array.isArray(data.txs) ? data.txs.length : "N/A") : "NULL - nije valjan backup"));
-    if (!data) { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
-    setImportPending({ data, txCount: Array.isArray(data.txs) ? data.txs.length : 0 });
-    alert("DEBUG PI5: setImportPending pozvan!");
+    if (!data) throw new Error(t("Datoteka nije valjan Moja Lova backup."));
+    const txCount = Array.isArray(data.txs) ? data.txs.length : 0;
+    return { data, txCount };
   };
 
+  // ----- Native import za Capacitor (koristi FilePicker)
   const handleNativeImport = async () => {
-    alert("DEBUG 1: handleNativeImport pozvan");
     try {
       const result = await FilePicker.pickFiles({
         types: ["application/json", "text/plain"],
         readData: true,
       });
-      alert("DEBUG 2: FilePicker rezultat: " + JSON.stringify(result?.files?.length));
       if (!result?.files?.length) return;
       const file = result.files[0];
-      alert("DEBUG 2b: file.data duljina: " + (file.data ? file.data.length : "NULL"));
       if (!file.data) { alert(t("Greška pri čitanju datoteke.")); return; }
-      alert("DEBUG 2c: pozivam atob+parse...");
       const decoded = atob(file.data);
-      alert("DEBUG 2d: atob ok, duljina: " + decoded.length);
-      parseImportJson(decoded);
+      const { data, txCount } = parseImportJsonRaw(decoded);
+      // Odgoda 300ms – Capacitor "resume" event se završi, UI se smiri
+      setTimeout(() => {
+        setImportPending({ data, txCount });
+      }, 300);
     } catch (err) {
-      alert("DEBUG ERR: " + err.message);
+      console.error("FilePicker error:", err);
+      // Fallback na HTML input ako nešto pođe po krivu
       if (importInputRef.current) importInputRef.current.click();
     }
   };
 
+  // ----- Web fallback (klasični file input)
   const fullImport = (e) => {
-    const file = e.target.files && e.target.files[0];
-    alert("DEBUG 3: onChange fired. File: " + (file ? file.name : "NEMA FAJLA"));
+    const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onerror = () => alert("DEBUG 4: FileReader greška");
+    reader.onerror = () => alert(t("Greška pri čitanju datoteke."));
     reader.onload = (ev) => {
-      alert("DEBUG 4: Fajl učitan, duljina: " + ev.target.result.length);
-      parseImportJson(ev.target.result);
+      try {
+        const { data, txCount } = parseImportJsonRaw(ev.target.result);
+        setImportPending({ data, txCount });
+      } catch (err) {
+        alert(err.message);
+      }
     };
     reader.readAsText(file);
   };
@@ -492,8 +492,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </div>
           </div>
 
-          {/* 3) IMPORT (RESTORE) — transparent overlay */}
-          {/* 3) IMPORT — FilePicker native na APK, label fallback na webu */}
+          {/* 3) IMPORT (RESTORE) — FilePicker native na APK, label fallback na webu */}
           <div style={{ marginBottom:7 }}>
             {isCapacitor() ? (
               <div onClick={handleNativeImport}
