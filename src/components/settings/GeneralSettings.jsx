@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
 import { K, DEF_LISTS, T, MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, MAX_ATT, BACKUP_SNOOZE_MS, CURRENCIES, TIMEZONES } from '../../lib/constants.js';
 import { fmtEur, fDate, load, save, curYear, buildCSV, buildSummary, nativeSaveAndShare, isCapacitor } from '../../lib/helpers.js';
@@ -18,18 +19,14 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   const [share,   setShare]   = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [importPending, setImportPending] = useState(null);
-  const importInputRef = useRef(null); // stable ref for file input
+  const importInputRef = useRef(null);
   const [importKey, setImportKey] = useState(0);
-  // Fallback state: if no download/share path works (some APK wrappers block both),
-  // we show the JSON in a modal with a Copy button so the user can paste into any
-  // note/chat app and save it elsewhere.
-  const [exportFallback, setExportFallback] = useState(null); // { filename, content }
-  const [exportYear, setExportYear]         = useState("all"); // "all" or specific year
+  const [exportFallback, setExportFallback] = useState(null);
+  const [exportYear, setExportYear] = useState("all");
 
-  // ── Google Drive backup state ──────────────────────────────────────────────
-  const [driveStatus,  setDriveStatus]  = useState(null); // null | 'saving' | 'saved' | 'error' | 'loading'
-  const [driveMsg,     setDriveMsg]     = useState("");
-  const [driveLastAt,  setDriveLastAt]  = useState(() => load(K.prf, {}).driveLastBackup || null);
+  const [driveStatus, setDriveStatus] = useState(null);
+  const [driveMsg, setDriveMsg] = useState("");
+  const [driveLastAt, setDriveLastAt] = useState(() => load(K.prf, {}).driveLastBackup || null);
 
   const hasProfileData = user.firstName || user.lastName || user.phone || user.email;
   const [isEditingProfile, setIsEditingProfile] = useState(!hasProfileData);
@@ -69,9 +66,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     </button>
   );
 
-  // Complete backup — serializes all app data except PIN hash (safety).
-  // Instead of trying to silently pick the "right" save path (which fails
-  // ── Google Drive handlers ──────────────────────────────────────────────────
   const buildBackupPayload = () => {
     const yr = exportYear === "all" ? null : parseInt(exportYear);
     const filtTxs = yr ? txs.filter(x => new Date(x.date).getFullYear() === yr) : txs;
@@ -115,9 +109,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     }
   };
 
-  // unpredictably in WebView/APK environments), we ALWAYS show the backup
-  // content in a modal with three clear action buttons: Copy, Share, Download.
-  // Whatever fails, the user always has a working option.
   const fullExport = () => {
     try {
       const yr = exportYear === "all" ? null : parseInt(exportYear);
@@ -164,7 +155,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     }
   };
 
-  // ----- Pomocna funkcija za parsiranje JSON-a (sinkrona, samo parsira, ne postavlja state)
+  // Pomocna funkcija za parsiranje JSON-a (sinkrona, samo parsira, ne postavlja state)
   const parseImportJsonRaw = (jsonText) => {
     let parsed;
     try { parsed = JSON.parse(jsonText); }
@@ -180,7 +171,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     return { data, txCount };
   };
 
-  // ----- Native import za Capacitor (koristi FilePicker)
+  // Native import za Capacitor (koristi FilePicker) – sa zaštitom od Capacitor resume eventa
   const handleNativeImport = async () => {
     try {
       const result = await FilePicker.pickFiles({
@@ -192,18 +183,19 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       if (!file.data) { alert(t("Greška pri čitanju datoteke.")); return; }
       const decoded = atob(file.data);
       const { data, txCount } = parseImportJsonRaw(decoded);
-      // Odgoda 1000ms – Capacitor "resume" event se završi, UI se smiri
-      setTimeout(() => {
-        setImportPending({ data, txCount });
-      }, 1000);
+      // Dvostruka odgoda: prvo čekamo da Capacitor završi resume, zatim da se UI smiri
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          setImportPending({ data, txCount });
+        }, 100);
+      });
     } catch (err) {
       console.error("FilePicker error:", err);
-      // Fallback na HTML input ako nešto pođe po krivu
       if (importInputRef.current) importInputRef.current.click();
     }
   };
 
-  // ----- Web fallback (klasični file input)
+  // Web fallback (klasični file input)
   const fullImport = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -224,7 +216,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     if (!importPending) return;
     const { data } = importPending;
     try {
-      // Write to localStorage
       if (Array.isArray(data.txs))    save(K.db,  data.txs);
       if (Array.isArray(data.drafts)) save(K.drf, data.drafts);
       if (data.lists && typeof data.lists === "object") save(K.lst, { ...DEF_LISTS, ...data.lists });
@@ -233,17 +224,14 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         save(K.prf, { ...load(K.prf,{}), ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
       }
 
-      // Update React state directly — no reload needed, no Capacitor issues
       if (Array.isArray(data.txs))    setTxs(data.txs);
       if (data.lists && typeof data.lists === "object") setLists({ ...DEF_LISTS, ...data.lists });
       if (data.user  && typeof data.user  === "object") updUser(data.user);
       if (data.prefs && typeof data.prefs === "object") updPrefs({ ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
 
-      // Train AI model on imported transactions
       if (Array.isArray(data.txs)) rebuildModel(data.txs);
 
       setImportPending(null);
-      // Close settings and go back to show imported data
       if (onBack) onBack();
     } catch (err) {
       console.error("Import error:", err);
@@ -263,7 +251,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     }
     if (isCorrect) {
       if (onRemovePinCrypto) onRemovePinCrypto();
-      // Also clear biometry.
       updSec({ pinHash:null, pinSalt:null, encSalt:null, pinHashVersion:null,
                bioEnabled:false, bioCredId:null, attempts:0, totalFailed:0, lockedUntil:null });
       setRmPin(false); setVPin(""); setVErr("");
@@ -299,7 +286,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       };
       const cred = await navigator.credentials.create(createOpt);
       const idBase64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
-      // Read current sec directly from localStorage to avoid stale prop.
       const currentSec = JSON.parse(localStorage.getItem("ml_sec") || "{}");
       const newSec = { ...currentSec, bioEnabled: true, bioCredId: idBase64 };
       localStorage.setItem("ml_sec", JSON.stringify(newSec));
@@ -386,7 +372,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </div>
           </div>
 
-          {/* Currency selector */}
           <div style={{ marginBottom:16 }}>
             <p style={{ fontSize:12, color:C.textMuted, marginBottom:8 }}>{t("Valuta")}</p>
             <select value={prefs.currency||"EUR"} onChange={e=>updPrefs({currency:e.target.value})}
@@ -397,7 +382,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </select>
           </div>
 
-          {/* Timezone selector */}
           <div style={{ marginBottom:4 }}>
             <p style={{ fontSize:12, color:C.textMuted, marginBottom:8 }}>{t("Vremenska zona")}</p>
             <select value={prefs.timezone||"Europe/Zagreb"} onChange={e=>updPrefs({timezone:e.target.value})}
@@ -434,7 +418,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         <div style={{ marginTop:14, marginBottom:6 }}>
           <SL text={t("Dijeli i izvezi")} icon="share"/>
           
-          {/* 1) SHARE — send via WhatsApp/Telegram/E-mail/CSV etc. */}
           <button onClick={()=>setShare(true)} style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.accent}20,${C.income}15)`, border:`1px solid ${C.accent}40`, borderRadius:13, marginBottom:7, cursor:"pointer" }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <Ic n="share" s={19} c={C.accent}/>
@@ -446,8 +429,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             <Ic n="chevron" s={14} c={C.accent} style={{ transform:"rotate(-90deg)" }}/>
           </button>
 
-          {/* 2) EXPORT (BACKUP) — full JSON backup of all data */}
-          {/* Year filter row */}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, padding:"0 2px" }}>
             <Ic n="cal" s={13} c={C.textMuted}/>
             <span style={{ fontSize:12, color:C.textMuted, flex:1 }}>{t("Izvezi godinu")}:</span>
@@ -492,7 +473,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </div>
           </div>
 
-          {/* 3) IMPORT (RESTORE) — FilePicker native na APK, label fallback na webu */}
           <div style={{ marginBottom:7 }}>
             {isCapacitor() ? (
               <div onClick={handleNativeImport}
@@ -527,7 +507,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             )}
           </div>
 
-        {/* ── Google Drive backup section ──────────────────────────────── */}
         {isDriveConfigured() && (
           <div style={{ marginTop: 14, marginBottom: 6 }}>
             <SL text="Google Drive" icon="repeat"/>
@@ -577,7 +556,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           </div>
         )}
 
-        {/* Account section */}
         {supaUser && (
           <div style={{ marginTop:14, marginBottom:6 }}>
             <SL text={t("Račun")} icon="user"/>
@@ -612,9 +590,9 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
               </div>
           }
 
-          {/* ── Import confirm overlay ─────────────────────────────────── */}
-          {importPending && (
-            <div style={{ position:"fixed", inset:0, zIndex:999, background:"rgba(0,0,0,.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          {/* Import confirm overlay rendered via Portal to avoid Capacitor resume event interference */}
+          {importPending && createPortal(
+            <div style={{ position:"fixed", inset:0, zIndex:9999, background:"rgba(0,0,0,.7)", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
               <div style={{ background:C.card, borderRadius:20, padding:24, maxWidth:340, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,.4)" }}>
                 <div style={{ fontSize:28, textAlign:"center", marginBottom:12 }}>📂</div>
                 <div style={{ fontSize:16, fontWeight:700, color:C.text, textAlign:"center", marginBottom:8 }}>{t("Vrati podatke?")}</div>
@@ -632,7 +610,8 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
 
@@ -657,10 +636,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         
         {share && <ShareModal C={C} txs={txs} year={year} user={user} onClose={()=>setShare(false)} t={t} lang={lang} />}
 
-        {/* Export modal — always shown when the user clicks Export (Backup).
-            Provides three reliable save paths so at least one works on any
-            device: Copy (works everywhere), Share (native share sheet),
-            Download (browser download). */}
         {exportFallback && (
           <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={e=>{ if(e.target===e.currentTarget) setExportFallback(null); }}>
             <div className="su" style={{ background:C.card, borderRadius:18, width:"100%", maxWidth:420, padding:20, border:`1px solid ${C.border}`, maxHeight:"85vh", display:"flex", flexDirection:"column" }}>
@@ -685,7 +660,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                 style={{ width:"100%", flex:1, minHeight:140, padding:10, background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:10, color:C.text, fontSize:11, fontFamily:"'JetBrains Mono',monospace", resize:"none", marginBottom:12 }}
               />
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
-                {/* Copy — works in every environment */}
                 <button onClick={async ()=>{
                   try {
                     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -707,7 +681,6 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                   <Ic n="copy" s={14} c="#000"/>{t("Kopiraj")}
                 </button>
 
-                {/* Share — tries Web Share API (file first, then text) */}
                 <button onClick={async ()=>{
                   const { filename, content } = exportFallback;
                   try {
@@ -733,12 +706,8 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                   <Ic n="share" s={14} c="#fff"/>{t("Podijeli")}
                 </button>
 
-                {/* Download — prefers native Capacitor save on APK (guaranteed
-                    to write a real file into Documents); falls back to the
-                    classic browser download on web. */}
                 <button onClick={async ()=>{
                   const { filename, content } = exportFallback;
-                  // 1) Try native (Capacitor Filesystem + Share).
                   if (isCapacitor()) {
                     const ok = await nativeSaveAndShare(filename, content);
                     if (ok) {
@@ -746,10 +715,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                       alert(t("Backup uspješno spremljen."));
                       return;
                     }
-                    // If native failed (plugins missing or permission denied),
-                    // fall through to web download below.
                   }
-                  // 2) Web fallback — standard anchor download.
                   try {
                     const blob = new Blob([content], { type: "application/json" });
                     const url  = URL.createObjectURL(blob);
