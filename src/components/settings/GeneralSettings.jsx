@@ -168,17 +168,21 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   // Opens file picker by creating a temp input on document.body — bypasses all
   // container click propagation and Capacitor WebView restrictions.
   const parseImportJson = (jsonText) => {
+    alert("DEBUG PI1: parseImportJson start, len=" + jsonText.length);
     let parsed;
     try { parsed = JSON.parse(jsonText); }
-    catch { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
+    catch (e) { alert("DEBUG PI2: JSON.parse GREŠKA: " + e.message); return; }
+    alert("DEBUG PI3: JSON parsed ok, type=" + typeof parsed + " isArray=" + Array.isArray(parsed) + " hasBackupKey=" + (parsed && !!parsed.__moja_lova_backup));
     let data = null;
     if (parsed && parsed.__moja_lova_backup && parsed.data && typeof parsed.data === "object") {
       data = parsed.data;
     } else if (Array.isArray(parsed)) {
       data = { txs: parsed };
     }
+    alert("DEBUG PI4: data=" + (data ? "NAĐEN, txs=" + (Array.isArray(data.txs) ? data.txs.length : "N/A") : "NULL - nije valjan backup"));
     if (!data) { alert(t("Datoteka nije valjan Moja Lova backup.")); return; }
     setImportPending({ data, txCount: Array.isArray(data.txs) ? data.txs.length : 0 });
+    alert("DEBUG PI5: setImportPending pozvan!");
   };
 
   const handleNativeImport = async () => {
@@ -193,7 +197,10 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       const file = result.files[0];
       alert("DEBUG 2b: file.data duljina: " + (file.data ? file.data.length : "NULL"));
       if (!file.data) { alert(t("Greška pri čitanju datoteke.")); return; }
-      parseImportJson(atob(file.data));
+      alert("DEBUG 2c: pozivam atob+parse...");
+      const decoded = atob(file.data);
+      alert("DEBUG 2d: atob ok, duljina: " + decoded.length);
+      parseImportJson(decoded);
     } catch (err) {
       alert("DEBUG ERR: " + err.message);
       if (importInputRef.current) importInputRef.current.click();
