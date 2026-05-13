@@ -182,27 +182,34 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   };
 
   const handleNativeImport = async () => {
+    alert("DEBUG 1: handleNativeImport pozvan");
     try {
       const result = await FilePicker.pickFiles({
         types: ["application/json", "text/plain"],
         readData: true,
       });
+      alert("DEBUG 2: FilePicker rezultat: " + JSON.stringify(result?.files?.length));
       if (!result?.files?.length) return;
       const file = result.files[0];
+      alert("DEBUG 2b: file.data duljina: " + (file.data ? file.data.length : "NULL"));
       if (!file.data) { alert(t("Greška pri čitanju datoteke.")); return; }
       parseImportJson(atob(file.data));
     } catch (err) {
-      console.warn("FilePicker failed, fallback to input:", err);
+      alert("DEBUG ERR: " + err.message);
       if (importInputRef.current) importInputRef.current.click();
     }
   };
 
   const fullImport = (e) => {
     const file = e.target.files && e.target.files[0];
+    alert("DEBUG 3: onChange fired. File: " + (file ? file.name : "NEMA FAJLA"));
     if (!file) return;
     const reader = new FileReader();
-    reader.onerror = () => alert(t("Greška pri čitanju datoteke."));
-    reader.onload = (ev) => parseImportJson(ev.target.result);
+    reader.onerror = () => alert("DEBUG 4: FileReader greška");
+    reader.onload = (ev) => {
+      alert("DEBUG 4: Fajl učitan, duljina: " + ev.target.result.length);
+      parseImportJson(ev.target.result);
+    };
     reader.readAsText(file);
   };
 
