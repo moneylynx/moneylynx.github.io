@@ -32,7 +32,7 @@ import TxList        from './components/TxList.jsx';
 import Charts        from './components/Charts.jsx';
 import Settings      from './components/Settings.jsx';
 import { RecurringScreen } from './components/Settings.jsx';
-import { JourneyScreen }  from './components/JourneyScreen.jsx';
+import JourneyScreen from './components/JourneyScreen.jsx';
 
 // Haptic feedback helper — silent if browser doesn't support vibrate
 const haptic = (ms = 40) => { try { navigator.vibrate?.(ms); } catch {} };
@@ -487,7 +487,7 @@ export default function App() {
       )}
 
       <nav style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: C.navBg, borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-around', padding: '6px 0 16px', zIndex: 100, backdropFilter: 'blur(12px)' }}>
-        {[['dashboard','home','Početna'],['transactions','list','Transakcije'],['add','plus',''],['charts','bar','Statistika'],['journey','route','Put'],['settings','gear','Postavke']].map(([id, ic, lb]) => (
+        {[['dashboard','home','Početna'],['transactions','list','Transakcije'],['add','plus',''],['charts','bar','Statistika'],['settings','gear','Postavke']].map(([id, ic, lb]) => (
           <button key={id} onClick={() => {
             if (id === 'add') { if (drafts.length > 0) { setShowActionHub(true); } else { setDraftEdit(null); setPage('add'); setSubPg(null); } }
             else { setPage(id); setSubPg(null); setTxListReturnTo(null); }
