@@ -378,6 +378,11 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                   <div style={{ fontSize:10,color:C.textMuted,marginTop:1 }}>{cmName} {year}.</div>
                 </div>
               </div>
+              <div className="su" onClick={()=>setPage("journey")}
+                style={{ background:`linear-gradient(135deg,${C.accent}18,${C.accent}08)`, border:`1px solid ${C.accent}40`, borderRadius:14, padding:"10px 12px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, cursor:"pointer", flexShrink:0, minWidth:64 }}>
+                <Ic n="gauge" s={18} c={C.accent}/>
+                <span style={{ fontSize:10, fontWeight:700, color:C.accent }}>{t("Trening")}</span>
+              </div>
             ) : (
               <div className="su" style={{ background:C.card,border:`1px solid ${C.warning}40`,borderLeft:`4px solid ${C.warning}`,borderRadius:14,marginBottom:10,overflow:"hidden" }}>
                 <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px 7px",borderBottom:`1px solid ${C.border}` }}>
@@ -448,7 +453,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:7 }}>
                   <div style={{ width:36, height:36, borderRadius:9, background:`${dlColor}20`, border:`1px solid ${dlColor}25`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
-                    <img src={WALLET_GAUGE_ICON} style={{ width:30, height:30 }} alt=""/>                  </div>
+                    <Ic n="gauge" s={20} c={dlColor}/>                  </div>
                   <div>
                     <div style={{ fontSize:11, fontWeight:700, color:C.textSub, textTransform:"uppercase", letterSpacing:.5 }}>{t("Dnevni limit potrošnje")}</div>
                     <div style={{ fontSize:10, color:C.textMuted, marginTop:1 }}>
@@ -614,7 +619,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     <div key={i} className="su"
                       style={{ background:`linear-gradient(135deg,${col}18,${col}08)`, border:`1px solid ${col}40`, borderLeft:`4px solid ${col}`, borderRadius:14, padding:"9px 12px", marginBottom:i<visibleInsights.length-1?6:0, animationDelay:`${i*.05}s` }}>
                       <div style={{ display:"flex",alignItems:"flex-start",gap:8 }}>
-                        {ins.icon === 'WALLET_GAUGE' ? <img src={WALLET_GAUGE_ICON} style={{ width:24,height:24,flexShrink:0 }} alt=""/> : ins.icon === 'CHART_TREND' ? <img src={CHART_TREND_ICON} style={{ width:24,height:24,flexShrink:0 }} alt=""/> : <span style={{ fontSize:15,flexShrink:0,lineHeight:1.3 }}>{ins.icon}</span>}
+                        {ins.icon === 'WALLET_GAUGE' ? <Ic n="gauge" s={18} c={col} style={{flexShrink:0}}/> : ins.icon === 'CHART_TREND' ? <Ic n="bar" s={18} c={col} style={{flexShrink:0}}/> : <span style={{ fontSize:15,flexShrink:0,lineHeight:1.3 }}>{ins.icon}</span>}
                         <div style={{ flex:1,minWidth:0 }}>
                           <div style={{ fontSize:12,fontWeight:700,color:col,marginBottom:1 }}>{ins.title}</div>
                           <div style={{ fontSize:11,color:C.textMuted,lineHeight:1.4 }}>{ins.body}</div>
