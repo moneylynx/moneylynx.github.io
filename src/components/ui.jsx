@@ -72,6 +72,7 @@ export const Ic = ({ n, s=20, c="#fff", style={} }) => {
     clipboard:   <><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 01-2-2V6a2 2 0 012-2h2"{...p}/><rect x="8" y="2" width="8" height="4" rx="1"{...p}/></>,
     camera:      <><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h3l2-3h8l2 3h3a2 2 0 012 2z"{...p}/><circle cx="12" cy="13" r="4"{...p}/></>,
     dots:        <><circle cx="12" cy="5" r="2" fill={c} stroke="none"/><circle cx="12" cy="12" r="2" fill={c} stroke="none"/><circle cx="12" cy="19" r="2" fill={c} stroke="none"/></>,
+    gauge:        <><path d="M5 17a7 7 0 0 1 14 0"{...p}/><line x1="12" y1="17" x2="15.5" y2="11.5"{...p}/><circle cx="12" cy="17" r="1.5" fill="currentColor"{...p}/></>,
     zap:         <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"{...p}/></>
   };
   return <svg viewBox="0 0 24 24" style={{ width:s, height:s, flexShrink:0, ...style }}>{map[n] ?? null}</svg>;
