@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { FilePicker } from '@capawesome/capacitor-file-picker';
+// V3: FilePicker plugin više se ne koristi — koristimo HTML <input type="file">
+// import { FilePicker } from '@capawesome/capacitor-file-picker';
 import { K, DEF_LISTS, T, MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, MAX_ATT, BACKUP_SNOOZE_MS, CURRENCIES, TIMEZONES } from '../../lib/constants.js';
 import { fmtEur, fDate, load, save, curYear, buildCSV, buildSummary, nativeSaveAndShare, isCapacitor } from '../../lib/helpers.js';
 import { hashPinV2, hashPinLegacy } from '../../lib/crypto.js';
@@ -171,45 +172,74 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     return { data, txCount };
   };
 
-  // Native import za Capacitor (koristi FilePicker) – sa zaštitom od Capacitor resume eventa
-  const handleNativeImport = async () => {
+  // V3: Univerzalni helper za vizualnu povratnu informaciju (radi i kad alert() ne radi).
+  const showToast = (msg, ms = 4000) => {
     try {
-      const result = await FilePicker.pickFiles({
-        types: ["application/json", "text/plain"],
-        readData: true,
-      });
-      if (!result?.files?.length) return;
-      const file = result.files[0];
-      if (!file.data) { alert(t("Greška pri čitanju datoteke.")); return; }
-      const decoded = atob(file.data);
-      const { data, txCount } = parseImportJsonRaw(decoded);
-      // Dvostruka odgoda: prvo čekamo da Capacitor završi resume, zatim da se UI smiri
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          setImportPending({ data, txCount });
-        }, 100);
-      });
-    } catch (err) {
-      console.error("FilePicker error:", err);
-      if (importInputRef.current) importInputRef.current.click();
+      const el = document.createElement("div");
+      el.textContent = msg;
+      el.style.cssText = [
+        "position:fixed", "left:50%", "bottom:80px", "transform:translateX(-50%)",
+        "background:#111", "color:#fff", "padding:12px 18px", "border-radius:10px",
+        "font-size:13px", "font-family:system-ui,sans-serif", "z-index:99999",
+        "max-width:90vw", "text-align:center", "box-shadow:0 4px 14px rgba(0,0,0,.4)",
+        "white-space:pre-wrap", "word-break:break-word",
+      ].join(";");
+      document.body.appendChild(el);
+      setTimeout(() => { try { el.remove(); } catch {} }, ms);
+    } catch {}
+  };
+
+  // V3: Native import sad samo programski klikne na hidden HTML input.
+  // Capacitor's WebView ima ugrađeni WebChromeClient.onShowFileChooser koji
+  // lansira system DocumentsUI i vraća File objekt direktno u JS — bez
+  // base64/atob/UTF-8 manipulacije. Pouzdanije od @capawesome plugina.
+  const handleNativeImport = () => {
+    showToast("Otvaram picker…", 1500);
+    // Resetiraj input value da onChange okine i kad se ista datoteka odabere
+    // dvaput zaredom (Chrome/WebView ne okida onChange za isti value).
+    if (importInputRef.current) {
+      importInputRef.current.value = "";
+      importInputRef.current.click();
+    } else {
+      showToast("GREŠKA: importInputRef nije montiran u DOM.", 6000);
     }
   };
 
   // Web fallback (klasični file input)
+  // V3: Web + native import — koristi FileReader koji ispravno dekodira UTF-8 sam.
+  // Dijagnostički toastovi pokazuju gdje pada ako pada.
   const fullImport = (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      showToast("Nije odabrana datoteka.", 2500);
+      return;
+    }
+    showToast(`Datoteka: ${file.name}\n${file.size} B, type: ${file.type || "?"}`, 2500);
     const reader = new FileReader();
-    reader.onerror = () => alert(t("Greška pri čitanju datoteke."));
+    reader.onerror = () => {
+      showToast("FileReader greška: " + (reader.error && reader.error.message ? reader.error.message : "?"), 6000);
+    };
     reader.onload = (ev) => {
       try {
-        const { data, txCount } = parseImportJsonRaw(ev.target.result);
-        setImportPending({ data, txCount });
+        const text = ev.target.result;
+        showToast(`Pročitano ${text.length} znakova.\nPočetak: ${text.slice(0, 40)}`, 2500);
+        const { data, txCount } = parseImportJsonRaw(text);
+        showToast(`OK — ${txCount} transakcija. Otvaram potvrdu…`, 2000);
+        // Mala odgoda da React stigne procesirati prošli render prije nego
+        // mountamo modal portal — pomaže u Capacitor WebView-u nakon resume eventa.
+        setTimeout(() => {
+          try {
+            setImportPending({ data, txCount });
+          } catch (stateErr) {
+            showToast("setState greška: " + (stateErr.message || stateErr), 6000);
+          }
+        }, 100);
       } catch (err) {
-        alert(err.message);
+        showToast("JSON greška: " + (err.message || err), 6000);
       }
     };
-    reader.readAsText(file);
+    // Eksplicitni UTF-8 — default je ionako UTF-8 ali ne škodi biti eksplicitan.
+    reader.readAsText(file, "UTF-8");
   };
 
   const confirmImport = () => {
@@ -474,18 +504,26 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           </div>
 
           <div style={{ marginBottom:7 }}>
+            {/* V3: Jedinstveni put — i web i Capacitor koriste HTML <input type="file">.
+                Capacitor's WebView ima ugrađeni file chooser koji lansira system DocumentsUI. */}
             {isCapacitor() ? (
-              <div onClick={handleNativeImport}
-                style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13, cursor:"pointer" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <Ic n="ul" s={19} c={C.income}/>
-                  <div style={{ textAlign:"left" }}>
-                    <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("U\u010ditaj (Import / Restore)")}</div>
-                    <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
+              <>
+                <div onClick={handleNativeImport}
+                  style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13, cursor:"pointer" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <Ic n="ul" s={19} c={C.income}/>
+                    <div style={{ textAlign:"left" }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("U\u010ditaj (Import / Restore)")}</div>
+                      <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
+                    </div>
                   </div>
+                  <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
                 </div>
-                <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
-              </div>
+                {/* V3: hidden input je sad i u Capacitor putu — handleNativeImport ga klikne programski */}
+                <input key={importKey} ref={importInputRef} id="ml-import-file" type="file"
+                  accept="*/*"
+                  onChange={fullImport} style={{ display:"none" }}/>
+              </>
             ) : (
               <>
                 <label htmlFor="ml-import-file" style={{ display:"block", width:"100%", cursor:"pointer" }}>
