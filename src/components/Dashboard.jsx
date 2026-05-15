@@ -381,7 +381,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                 </div>
                 <div className="su" onClick={()=>setPage("journey")}
                   style={{ background:`linear-gradient(135deg,${C.accent}18,${C.accent}08)`, border:`1px solid ${C.accent}40`, borderRadius:14, padding:"10px 12px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, cursor:"pointer", flexShrink:0, minWidth:64 }}>
-                  <Ic n="dumbbell" s={18} c={C.accent}/>
+                  <Ic n="run" s={18} c={C.accent}/>
                   <span style={{ fontSize:10, fontWeight:700, color:C.accent }}>{t("Trening")}</span>
                 </div>
               </div>
@@ -397,15 +397,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                       : t("Za platiti")}
                     <span style={{ background:`${C.warning}25`,borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:C.warning }}>{todoItems.length}</span>
                   </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    {/* Trening gumb — uvijek dostupan, čak i kad ima dospjelih obveza */}
-                    <div onClick={()=>setPage("journey")}
-                      style={{ display:"flex", alignItems:"center", gap:4, padding:"3px 8px", background:`${C.accent}15`, border:`1px solid ${C.accent}35`, borderRadius:8, cursor:"pointer", flexShrink:0 }}>
-                      <Ic n="dumbbell" s={12} c={C.accent}/>
-                      <span style={{ fontSize:10, fontWeight:700, color:C.accent }}>{t("Trening")}</span>
-                    </div>
-                    <div style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.warning }}>{fmt(todoItems.reduce((s,i)=>s+i.amount,0))}</div>
-                  </div>
+                  <div style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.warning }}>{fmt(todoItems.reduce((s,i)=>s+i.amount,0))}</div>
                 </div>
                 {/* Scrollable list — fits ~3.5 items, scrolls if more. Subtle bottom fade hints at more content below. */}
                 <div style={{ position:"relative" }}>
@@ -445,11 +437,16 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                   )}
                 </div>
                 {/* Footer — always visible */}
-                <div style={{ padding:"6px 12px 8px",borderTop:`1px solid ${C.border}` }}>
+                <div style={{ padding:"6px 12px 8px", borderTop:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
                   <button onClick={()=>{ if (onGoToTransactions) onGoToTransactions("overdue"); else { if(setTxFilter)setTxFilter("overdue"); setPage("transactions"); } }}
-                    style={{ width:"100%",padding:"5px",background:"transparent",border:"none",color:C.accent,fontSize:11,fontWeight:600,cursor:"pointer" }}>
+                    style={{ flex:1, padding:"5px 0", background:"transparent", border:"none", color:C.accent, fontSize:11, fontWeight:600, cursor:"pointer", textAlign:"left" }}>
                     {todoItems.length > 3 ? `${t("Prikaži sve")} (${todoItems.length}) →` : `${t("Otvori transakcije")} →`}
                   </button>
+                  <div onClick={()=>setPage("journey")}
+                    style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 0", width:110, height:36, justifyContent:"center", background:`${C.accent}15`, border:`1px solid ${C.accent}35`, borderRadius:8, cursor:"pointer", flexShrink:0 }}>
+                    <Ic n="run" s={13} c={C.accent}/>
+                    <span style={{ fontSize:11, fontWeight:700, color:C.accent }}>{t("Trening")}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -460,7 +457,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
               <div style={{ position:"absolute", top:0, right:0, width:120, height:120, borderRadius:"50%", background:`${dlColor}12`, transform:"translate(30%,-30%)", pointerEvents:"none" }}/>
 
               {/* Header row */}
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10, marginRight:-4 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:7 }}>
                   <div style={{ width:36, height:36, borderRadius:9, background:`${dlColor}20`, border:`1px solid ${dlColor}25`, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
                     <Ic n="gauge" s={20} c={dlColor}/>                  </div>
@@ -486,8 +483,9 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                       setDlSavingsPeriod(savedPeriod);
                     }
                   }}
-                  style={{ background:`${C.accent}18`, border:`1px solid ${C.accent}40`, borderRadius:20, padding:"4px 10px", fontSize:11, fontWeight:600, color:C.accent, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}>
-                  🎯 {t("Štednja")}
+                  style={{ display:"flex", alignItems:"center", gap:5, padding:"0 12px", height:36, width:110, justifyContent:"center", background:`${C.accent}15`, border:`1px solid ${C.accent}35`, borderRadius:8, cursor:"pointer", flexShrink:0, fontSize:11, fontWeight:700, color:C.accent }}>
+                  <Ic n="wallet" s={13} c={C.accent}/>
+                  <span>{t("Štednja")}</span>
                 </button>
               </div>
 

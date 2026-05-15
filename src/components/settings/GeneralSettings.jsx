@@ -12,7 +12,7 @@ import { saveToGoogleDrive, loadFromGoogleDrive, isDriveConfigured, revokeGoogle
 import { exportReportPdf, exportReportXlsx, exportReportCsvFallback } from '../../lib/reportExports.js';
 import { ShareModal } from './ShareModal.jsx';
 
-function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, t, lang }) {
+function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, setPage, t, lang }) {
   const [pinChg,  setPinChg]  = useState(false);
   const [rmPin,   setRmPin]   = useState(false);
   const [vPin,    setVPin]    = useState("");
@@ -262,7 +262,8 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       if (Array.isArray(data.txs)) rebuildModel(data.txs);
 
       setImportPending(null);
-      if (onBack) onBack();
+      if (setPage) setPage('dashboard');
+      else if (onBack) onBack();
     } catch (err) {
       console.error("Import error:", err);
       setImportPending(null);
@@ -656,7 +657,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><LynxLogoWhite s={20}/></div>
-            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja Lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.1</div></div>
+            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja Lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.2</div></div>
             {onAbout && (
               <button onClick={onAbout}
                 style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>

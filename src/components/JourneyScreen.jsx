@@ -200,11 +200,17 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
 
   return (
     <div className="fi" style={{ width: '100%', paddingBottom: 80 }}>
-      <StickyHeader C={C} icon="gauge" title={t('Trening')}
-        right={
+      <StickyHeader C={C} icon="run" title={t('Trening')}
+        center={
           <button onClick={() => setShowQuiz(true)}
-            style={{ background: C.cardAlt, border: `1px solid ${C.border}`, color: C.textMuted, padding: '6px 12px', borderRadius: 10, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            style={{ background: C.cardAlt, border: `1px solid ${C.border}`, color: C.textMuted, padding: '6px 12px', borderRadius: 10, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
             <Ic n="edit" s={13} c={C.textMuted}/>{t('Ažuriraj podatke')}
+          </button>
+        }
+        right={
+          <button onClick={() => setPage('dashboard')}
+            style={{ background: C.cardAlt, border: `1px solid ${C.border}`, color: C.textMuted, padding: '6px 12px', borderRadius: 10, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            {t('Natrag')}
           </button>
         }
       />
@@ -237,7 +243,7 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
             <div style={{ marginTop: 12, padding: '8px 12px', background: `${C.warning}18`, border: `1px solid ${C.warning}40`, borderRadius: 10, fontSize: 12, color: C.warning }}>
               💡 {t('Dodaj podatke o štednji i dugovima za precizniji izračun')} →{' '}
               <span style={{ fontWeight: 500, cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setShowQuiz(true)}>
-                {t('2-min. quiz')}
+                {t('2-min. kviz')}
               </span>
             </div>
           )}

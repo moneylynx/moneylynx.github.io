@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Ic, LynxLogoWhite, StickyHeader } from '../ui.jsx';
 
-const VER = "1.1";
+const VER = "1.2";
 const YEAR = "2026";
 const EMAIL = "info.mojalova@moneylynx.net";
 const WEB = "moneylynx.net";
@@ -13,7 +13,7 @@ function AboutScreen({ C, onBack, t, lang }) {
 
   const sections = [
     { id: "help",        icon: "info",  label: t("Pomoć") },
-    { id: "whats_new",   icon: "zap",   label: en ? "What's New in v1.1" : "Što je novo u v1.1" },
+    { id: "whats_new",   icon: "zap",   label: en ? "What's New in v1.2" : "Što je novo u v1.2" },
     { id: "licences",    icon: "lock",  label: t("Licencni uvjeti") },
     { id: "disclaimer",  icon: "alert", label: t("Odricanje odgovornosti") },
     { id: "privacy",     icon: "lock",  label: t("Privatnost i kolačići") },
@@ -65,7 +65,7 @@ Formula: A = ((monthly income − monthly expenses) − planned savings) / days 
 • Red (< 0): over budget
 Set your monthly savings goal by tapping 🎯 Savings in the widget.
 
-PUSH NOTIFICATIONS (NEW in v1.1)
+PUSH NOTIFICATIONS (added in v1.1)
 The app can send payment reminders for obligations due within 3 days.
 Enable in Settings → Notifications → Allow reminders.
 Requires notification permission (asked once on first enable).
@@ -137,7 +137,7 @@ Formula: A = ((primici − izdaci) − planirana štednja) / preostali dani u mj
 • Crveno (< 0): prekoračenje
 Postavi cilj štednje tapom na 🎯 Štednja u widgetu.
 
-PUSH OBAVIJESTI (NOVO u v1.1)
+PUSH OBAVIJESTI (dodano u v1.1)
 Aplikacija šalje podsjetnike za plaćanja koja dospijevaju unutar 3 dana.
 Uključi u Postavke → Obavijesti → Dopusti podsjetnike.
 Zahtijeva dozvolu za obavijesti (traži se jednom pri prvom uključivanju).
@@ -176,89 +176,71 @@ PIN I SIGURNOST
 
     // ── What's new ──────────────────────────────────────────────────────────
     whats_new: {
-      title: en ? "What's New in v1.1" : "Što je novo u v1.1",
+      title: en ? "What's New in v1.2" : "Što je novo u v1.2",
       body: en ? `
-MONEY LYNX v1.1 — RELEASE NOTES
+MONEY LYNX v1.2 — RELEASE NOTES
 Released: May 2026
 
 ─── NEW FEATURES ────────────────────────────────────────────
 
-DAILY SPENDING LIMIT WIDGET
-• New card on the Home screen showing your allowed daily spend
-• Formula: A = ((monthly income − expenses) − planned savings) / days remaining
-• Three-state colour indicator: green ≥ 20 €/day, yellow 0–20 €, red over budget
-• Inline savings goal editor — tap 🎯 Savings to set/change your monthly target
-• Breakdown: monthly income, expenses, savings goal at a glance
+IMPROVED HOME SCREEN LAYOUT
+• "To Pay" panel: footer now shows "Show all (N) →" on the left and a "Training" button on the right — always accessible even when obligations are overdue
+• "Daily Limit" panel: the Savings button is now aligned with the panel icon, same height and width as the Training button
+• Both action buttons (Training, Savings) are identical in shape, size and style
 
-AI CATEGORIZATION ENGINE
-• Built-in Naive Bayes classifier trained on your own transaction history
-• Learns continuously — every new transaction improves predictions
-• Confidence scoring: ≥ 70% → auto-fill, ≥ 50% → AI suggestion, < 50% → frequency fallback
-• Works 100% offline, no API calls, model stored locally (privacy-first)
-• Rebuilds automatically after backup import
-• Suggests top 3 alternative categories when ambiguous
+TRAINING SCREEN IMPROVEMENTS
+• New custom running-figure icon replaces the generic gauge — cleaner, more intuitive at small sizes
+• Header reorganised: title on the left, "Update data" button centred, "Back" button on the right
+• The "Back" button returns directly to the Home screen
 
-PUSH NOTIFICATIONS & PWA IMPROVEMENTS
-• Payment reminders: notifications for obligations due within 3 days
-• Workbox cache strategies: offline-first, background sync, StaleWhileRevalidate
-• Web App Manifest updated: App Shortcuts (Quick Add, Transactions)
-• Faster install and launch on all platforms
+BACKUP & RESTORE IMPROVEMENT
+• After a successful restore, the app automatically navigates to the Home screen
+• Android: fixed file import using the native HTML file picker — no longer relies on the third-party plugin that was unreliable on Samsung Android 14+
 
 ─── BUG FIXES ───────────────────────────────────────────────
 
-• Import / Restore: JSON backups rejected on Android APK (wrong MIME type) — fixed
-• "Stanje 2026." label replaced with "Balance as of" — year removed (date already shown)
-• Missing EN translations on Home screen: Balance, All obligations settled!, Add more transactions — fixed
-• Advisor insight strings now fully translated in EN mode
+• Backup import rejected on Android APK (MIME type / UTF-8 encoding issue) — fixed
+• Training button missing from "To Pay" panel when overdue items were shown — fixed
+• Savings button misaligned with Daily Limit panel header icon — fixed
 
-─── v1.0 HIGHLIGHTS (for reference) ────────────────────────
+─── v1.1 HIGHLIGHTS (for reference) ────────────────────────
 
-• Smart entry with quick-fill chips and auto-fill prediction
-• Active Advisor: forecast, anomaly detection, Year-on-Year comparison
-• Filters: amount range, category, bulk operations
-• Google Drive backup, PDF/Excel/CSV export
-• AES-256-GCM local encryption, PKCE OAuth
+• Daily Spending Limit widget with inline savings goal editor
+• AI Categorisation Engine (Naive Bayes, fully offline, privacy-first)
+• Push notification reminders for obligations due within 3 days
+• Year-on-Year statistics comparison tab
 `.trim() : `
-MONEY LYNX v1.1 — BILJEŠKE O IZDANJU
+MONEY LYNX v1.2 — BILJEŠKE O IZDANJU
 Objavljeno: svibanj 2026.
 
 ─── NOVE FUNKCIONALNOSTI ────────────────────────────────────
 
-WIDGET DNEVNOG LIMITA POTROŠNJE
-• Nova kartica na Početnom ekranu s dopuštenom dnevnom potrošnjom
-• Formula: A = ((primici − izdaci) − planirana štednja) / preostali dani
-• Trostupanjski indikator: zeleno ≥ 20 €/dan, žuto 0–20 €, crveno prekoračenje
-• Inline editor cilja štednje — tapni 🎯 Štednja za postavljanje/promjenu cilja
-• Pregled: primici, izdaci i cilj štednje na jednom pogledu
+POBOLJŠANI IZGLED POČETNOG EKRANA
+• Panel "Za platiti": footer sada prikazuje "Prikaži sve (N) →" lijevo i gumb "Trening" desno — uvijek dostupan čak i kad ima dospjelih obveza
+• Panel "Dnevni limit": gumb Štednja sada je poravnat s ikonom panela, iste visine i širine kao gumb Trening
+• Oba akcijska gumba (Trening, Štednja) identičnog su oblika, veličine i stila
 
-AI MOTOR KATEGORIZACIJE
-• Ugrađeni Naive Bayes klasifikator koji uči iz tvojih transakcija
-• Uči kontinuirano — svaka nova transakcija poboljšava predviđanja
-• Confidence scoring: ≥ 70% → auto-popunjavanje, ≥ 50% → AI prijedlog, < 50% → fallback
-• Radi 100% offline, bez API poziva, model pohranjen lokalno (privatnost first)
-• Automatski rebuilda nakon uvoza backupa
-• Predlaže top 3 alternative kategorije kad je situacija nejasna
+POBOLJŠANJA EKRANA TRENING
+• Nova prilagođena ikona figure trčača zamjenjuje generičku gauge ikonu — čišća, intuitivnija na malim veličinama
+• Header reorganiziran: naziv lijevo, gumb "Ažuriraj podatke" u sredini, gumb "Natrag" desno
+• Gumb "Natrag" vraća izravno na Početni ekran
 
-PUSH OBAVIJESTI I PWA POBOLJŠANJA
-• Podsjetnike za plaćanja: notifikacije za obveze koje dospijevaju unutar 3 dana
-• Workbox cache strategije: offline-first, background sync, StaleWhileRevalidate
-• Web App Manifest ažuriran: App Shortcuts (Brzi unos, Transakcije)
-• Brže instaliranje i pokretanje na svim platformama
+POBOLJŠANJE UVOZA BACKUPA
+• Nakon uspješnog vraćanja backupa, aplikacija automatski otvara Početni ekran
+• Android: ispravljeno učitavanje datoteke nativnim HTML file pickerom — više se ne oslanja na third-party plugin koji nije bio pouzdan na Samsung Android 14+
 
 ─── ISPRAVCI GREŠAKA ────────────────────────────────────────
 
-• Uvoz / Obnova: JSON backup fajlovi odbijeni na Android APK (krivi MIME tip) — ispravljeno
-• Oznaka "Stanje 2026." zamijenjena s "Stanje na dan" — godina uklonjena
-• Nedostajući EN prijevodi na Početnom ekranu — svi ispravljeni
-• Tekstovi Savjetnika sada potpuno prevedeni u EN modu
+• Uvoz backupa odbijen na Android APK (MIME tip / UTF-8 kodiranje) — ispravljeno
+• Gumb Trening nedostupan u panelu "Za platiti" kad su prikazane dospjele stavke — ispravljeno
+• Gumb Štednja neporavnat s headerom panela Dnevni limit — ispravljeno
 
-─── ISTAKNUTO iz v1.0 ───────────────────────────────────────
+─── ISTAKNUTO iz v1.1 ───────────────────────────────────────
 
-• Pametni unos s čipovima i auto-fill predviđanjem
-• Aktivni Savjetnik: projekcija, anomalije, god./god. usporedba
-• Filteri: iznos, kategorija, bulk operacije
-• Google Drive backup, PDF/Excel/CSV izvoz
-• AES-256-GCM lokalna enkripcija, PKCE OAuth
+• Widget dnevnog limita potrošnje s inline editorom cilja štednje
+• AI motor kategorizacije (Naive Bayes, 100% offline, privatnost first)
+• Push obavijesti za obveze koje dospijevaju unutar 3 dana
+• Tab statistike god/god
 `.trim()
     },
     // ── Licences ────────────────────────────────────────────────────────────

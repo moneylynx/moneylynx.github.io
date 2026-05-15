@@ -74,6 +74,7 @@ export const Ic = ({ n, s=20, c="#fff", style={} }) => {
     dots:        <><circle cx="12" cy="5" r="2" fill={c} stroke="none"/><circle cx="12" cy="12" r="2" fill={c} stroke="none"/><circle cx="12" cy="19" r="2" fill={c} stroke="none"/></>,
     gauge:        <><path d="M5 17a7 7 0 0 1 14 0"{...p}/><line x1="12" y1="17" x2="15.5" y2="11.5"{...p}/><circle cx="12" cy="17" r="1.5" fill="currentColor"{...p}/></>,
     dumbbell:     <><rect x="1.5" y="9.5" width="4" height="5" rx="1.2"{...p}/><rect x="18.5" y="9.5" width="4" height="5" rx="1.2"{...p}/><line x1="5.5" y1="12" x2="18.5" y2="12"{...p}/><line x1="7" y1="10.2" x2="7" y2="13.8" stroke={c} strokeWidth="2.2" strokeLinecap="round"/><line x1="17" y1="10.2" x2="17" y2="13.8" stroke={c} strokeWidth="2.2" strokeLinecap="round"/></>,
+    run:          <><circle cx="15" cy="3.5" r="2" fill="none" {...p}/><path d="M14 5.5L11 12.5"{...p}/><path d="M13 8L7.5 6"{...p}/><path d="M13 8L17 11"{...p}/><path d="M11 12.5L8.5 17.5L5.5 15.5"{...p}/><path d="M11 12.5L14.5 18L18.5 20"{...p}/></>,
     zap:         <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"{...p}/></>
   };
   return <svg viewBox="0 0 24 24" style={{ width:s, height:s, flexShrink:0, ...style }}>{map[n] ?? null}</svg>;
@@ -92,17 +93,26 @@ export const Pill = ({ label, active, color, inactiveColor, onClick }) => (
 );
 
 // ─── StickyHeader ─────────────────────────────────────────────────────────────
-export const StickyHeader = ({ C, icon, title, right }) => (
+export const StickyHeader = ({ C, icon, title, center, right }) => (
   <div className="hdr" style={{
     position:"sticky", top:0, zIndex:50,
     background:C.bg, paddingBottom:10,
     paddingLeft:16, paddingRight:16,
     borderBottom:`1px solid ${C.border}`,
   }}>
-    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-      <h2 style={{ fontSize:18, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.text }}>
+    <div style={{ display:"flex", alignItems:"center", gap:0 }}>
+      <h2 style={{ flex:"0 0 auto", fontSize:18, fontWeight:700, display:"flex", alignItems:"center", gap:8, color:C.text, margin:0 }}>
         <Ic n={icon} s={18} c={C.accent}/>{title}
       </h2>
+      {center ? (
+        <>
+          <div style={{ flex:1 }}/>
+          {center}
+          <div style={{ flex:1 }}/>
+        </>
+      ) : (
+        <div style={{ flex:1 }}/>
+      )}
       {right ?? null}
     </div>
   </div>
