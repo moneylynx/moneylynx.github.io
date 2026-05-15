@@ -73,6 +73,7 @@ export const Ic = ({ n, s=20, c="#fff", style={} }) => {
     camera:      <><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h3l2-3h8l2 3h3a2 2 0 012 2z"{...p}/><circle cx="12" cy="13" r="4"{...p}/></>,
     dots:        <><circle cx="12" cy="5" r="2" fill={c} stroke="none"/><circle cx="12" cy="12" r="2" fill={c} stroke="none"/><circle cx="12" cy="19" r="2" fill={c} stroke="none"/></>,
     gauge:        <><path d="M5 17a7 7 0 0 1 14 0"{...p}/><line x1="12" y1="17" x2="15.5" y2="11.5"{...p}/><circle cx="12" cy="17" r="1.5" fill="currentColor"{...p}/></>,
+    dumbbell:     <><rect x="1.5" y="9.5" width="4" height="5" rx="1.2"{...p}/><rect x="18.5" y="9.5" width="4" height="5" rx="1.2"{...p}/><line x1="5.5" y1="12" x2="18.5" y2="12"{...p}/><line x1="7" y1="10.2" x2="7" y2="13.8" stroke={c} strokeWidth="2.2" strokeLinecap="round"/><line x1="17" y1="10.2" x2="17" y2="13.8" stroke={c} strokeWidth="2.2" strokeLinecap="round"/></>,
     zap:         <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"{...p}/></>
   };
   return <svg viewBox="0 0 24 24" style={{ width:s, height:s, flexShrink:0, ...style }}>{map[n] ?? null}</svg>;
