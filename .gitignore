@@ -26,3 +26,5 @@ dist-ssr
 moja-lova-key.jks 
 .env 
 src/.env 
+"src/*.zip" 
+"android/app/release/baselineProfiles/" 
