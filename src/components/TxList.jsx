@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { fmtEur, fDate } from '../lib/helpers.js';
+import { fmtEur, fDate, translateNote } from '../lib/helpers.js';
 import { categoryIcon } from '../lib/categoryIcons.js';
 import { Ic, Pill, StickyHeader } from './ui.jsx';
 
-function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, onUnpay, onBack, t, fmt: fmtProp }) {
+function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGroup, onPay, onUnpay, onBack, t, lang, fmt: fmtProp }) {
   const fmt = fmtProp || fmtEur;
 
   // ── Search & filter state ──────────────────────────────────────────────────
@@ -435,7 +435,7 @@ function TxList({ C, data, year, filter, setFilter, onEdit, onDelete, onDeleteGr
                     </div>
                   </div>
                 )}
-                {tx.notes && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 7, fontStyle: "italic", borderTop: `1px solid ${C.border}`, paddingTop: 7, textAlign: "left" }}>💬 {tx.notes}</div>}
+                {tx.notes && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 7, fontStyle: "italic", borderTop: `1px solid ${C.border}`, paddingTop: 7, textAlign: "left" }}>💬 {translateNote(tx.notes, lang)}</div>}
               {tx.splits?.length > 0 && (
                 <div style={{ marginTop: 7, paddingTop: 7, borderTop: `1px solid ${C.border}40` }}>
                   {tx.splits.map((sp, si) => (

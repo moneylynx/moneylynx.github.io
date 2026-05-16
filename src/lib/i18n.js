@@ -268,6 +268,7 @@ export const EN_DICT = {
   "filtrirano": "filtered",
   // Dashboard payday (EN-side helpers when category missing)
   "primitka": "next payment",
+  "Backup spremljen u": "Backup saved to",
   // Language toggle: HR shows "Engleski" for EN, EN shows "Croatian" for HR
   // Already defined above: "Hrvatski": "Croatian", "Engleski": "English"
 };

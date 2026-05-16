@@ -125,7 +125,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
                   <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:8 }}>
                     <div>
                       <label style={lbl}>{t("Opis")}</label>
-                      <input type="text" placeholder={t(incomeMode ? "Npr. Uplata plaće" : "Npr. Kredit")} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} style={fld} lang="hr" autoCapitalize="sentences" autoCorrect="off" spellCheck={false}/>
+                      <input type="text" placeholder={t(incomeMode ? "Npr. Uplata plaće" : "Npr. Kredit")} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} style={fld} lang="hr" autoCapitalize="sentences"/>
                     </div>
                     <div>
                       <label style={lbl}>{t("Iznos €")}</label>
@@ -192,7 +192,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
               <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:8 }}>
                 <div>
                   <label style={lbl}>{t("Opis")}</label>
-                  <input type="text" placeholder={t(incomeMode ? "Npr. Uplata plaće" : "Npr. Kredit")} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} style={fld} lang="hr" autoCapitalize="sentences" autoCorrect="off" spellCheck={false}/>
+                  <input type="text" placeholder={t(incomeMode ? "Npr. Uplata plaće" : "Npr. Kredit")} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} style={fld} lang="hr" autoCapitalize="sentences"/>
                 </div>
                 <div>
                   <label style={lbl}>{t("Iznos €")}</label>

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 // V3: FilePicker plugin više se ne koristi — koristimo HTML <input type="file">
 // import { FilePicker } from '@capawesome/capacitor-file-picker';
 import { K, DEF_LISTS, T, MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, MAX_ATT, BACKUP_SNOOZE_MS, CURRENCIES, TIMEZONES } from '../../lib/constants.js';
-import { fmtEur, fDate, load, save, curYear, buildCSV, buildSummary, nativeSaveAndShare, isCapacitor } from '../../lib/helpers.js';
+import { fmtEur, fDate, load, save, curYear, buildCSV, buildSummary, nativeSaveAndShare, nativeSaveToDownloads, isCapacitor } from '../../lib/helpers.js';
 import { hashPinV2, hashPinLegacy } from '../../lib/crypto.js';
 import { rebuildModel } from '../../lib/aiCategorizer.js';
 import { Ic, LynxLogo, LynxLogoWhite, StickyHeader } from '../ui.jsx';
@@ -396,7 +396,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:13, marginBottom:7 }}>
             <p style={{ fontSize:12, color:C.textMuted, marginBottom:10 }}>{t("Jezik aplikacije")}</p>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:7 }}>
-              {[["hr",t("Hrvatski")],["en",t("English")]].map(([id,lb])=>{
+              {[["hr","Hrvatski"],["en","English"]].map(([id,lb])=>{
                 const a = prefs.lang===id;
                 return <button key={id} onClick={()=>updPrefs({lang:id})} style={{ padding:"10px 6px", borderRadius:11, border:`1.5px solid ${a?C.accent:C.border}`, background:a?`${C.accent}15`:"transparent", color:a?C.accent:C.textMuted, fontSize:12, fontWeight:a?700:500, cursor:"pointer" }}>{lb}</button>;
               })}
@@ -748,6 +748,14 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                 <button onClick={async ()=>{
                   const { filename, content } = exportFallback;
                   if (isCapacitor()) {
+                    // Save directly to Downloads (Files app visible)
+                    const r = await nativeSaveToDownloads(filename, content);
+                    if (r.ok) {
+                      updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
+                      alert(`${t("Backup spremljen u")} ${r.location}`);
+                      return;
+                    }
+                    // Fallback to share-sheet (lets user save via Drive / Files)
                     const ok = await nativeSaveAndShare(filename, content);
                     if (ok) {
                       updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });

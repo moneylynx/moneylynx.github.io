@@ -1,4 +1,6 @@
 import { MONTHS, MONTHS_EN, BACKUP_REMIND_AFTER_MS } from './constants.js';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 export const fmtEur = n => {
@@ -73,28 +75,83 @@ export const isCapacitor = () =>
 
 export const nativeSaveAndShare = async (filename, content) => {
   if (!isCapacitor()) return false;
+  // Try writing to Cache first (always writable on Android, no permission needed).
+  // Cache is internal to the app, but Share plugin gives us a content:// URI that
+  // the OS share sheet exposes (Save to Drive, Save to Downloads, send via Mail…).
+  let writeRes = null;
+  let lastError = null;
   try {
-    const [fs, sh] = await Promise.all([
-      import("@capacitor/filesystem").catch(() => null),
-      import("@capacitor/share").catch(() => null),
-    ]);
-    if (!fs || !sh) return false;
-    const { Filesystem, Directory, Encoding } = fs;
-    const { Share } = sh;
-    const writeRes = await Filesystem.writeFile({
-      path: filename, data: content, directory: Directory.Documents,
-      encoding: Encoding.UTF8, recursive: true,
+    writeRes = await Filesystem.writeFile({
+      path: filename,
+      data: content,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8,
+      recursive: true,
     });
+  } catch (e1) {
+    lastError = e1;
+    // Fallback: Documents (app-private but reliable).
     try {
-      await Share.share({
-        title: "Moja Lova — Backup", text: filename,
-        url: writeRes && writeRes.uri, dialogTitle: filename,
+      writeRes = await Filesystem.writeFile({
+        path: filename,
+        data: content,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+        recursive: true,
       });
-    } catch { /* user cancelled share; file is still saved */ }
-    return true;
-  } catch (e) {
-    console.warn("nativeSaveAndShare failed:", e);
+    } catch (e2) {
+      lastError = e2;
+    }
+  }
+  if (!writeRes) {
+    console.warn("nativeSaveAndShare: write failed:", lastError);
     return false;
+  }
+  // Open share sheet so user can save to Downloads / Drive / send via WhatsApp etc.
+  try {
+    await Share.share({
+      title: "Money Lynx — Backup",
+      text: filename,
+      url: writeRes.uri,
+      dialogTitle: filename,
+    });
+  } catch (shareErr) {
+    // User cancelled or share unavailable — file is still saved in Cache.
+    if (shareErr && shareErr.message && !/cancel/i.test(shareErr.message)) {
+      console.warn("Share failed:", shareErr);
+    }
+  }
+  return true;
+};
+
+// Save directly to public Downloads folder on Android (visible in Files app).
+// Falls back to Documents if ExternalStorage write fails (older Android perms).
+export const nativeSaveToDownloads = async (filename, content) => {
+  if (!isCapacitor()) return { ok:false, location:null };
+  try {
+    const res = await Filesystem.writeFile({
+      path: `Download/${filename}`,
+      data: content,
+      directory: Directory.ExternalStorage,
+      encoding: Encoding.UTF8,
+      recursive: true,
+    });
+    return { ok:true, location:`Downloads/${filename}`, uri: res.uri };
+  } catch (e) {
+    console.warn("Save to Downloads failed, falling back to Documents:", e);
+    try {
+      const res = await Filesystem.writeFile({
+        path: filename,
+        data: content,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+        recursive: true,
+      });
+      return { ok:true, location:`Documents/${filename}`, uri: res.uri };
+    } catch (e2) {
+      console.warn("Documents save also failed:", e2);
+      return { ok:false, location:null };
+    }
   }
 };
 
@@ -180,3 +237,43 @@ export function expandSplits(txs) {
   return out;
 }
 
+
+// ── translateNote ──────────────────────────────────────────────────────────
+// Legacy note translator. Transaction notes are persisted in the language the
+// user was using when the transaction was created. When the user switches to
+// another language, those frozen strings would otherwise stay in the original
+// language. This helper recognises the well-known patterns and translates
+// month names + labels at render time without modifying stored data.
+//
+// Patterns supported:
+//   "Ponavljajući trošak"                      → "Recurring expense"
+//   "Redovna obveza · {MonthName} {Year}."     → "Recurring obligation · April 2026."
+//   "Obrok N/M · 389,00 €"                     → "Instalment N/M · 389,00 €"
+//   "Rata N/M · Ukupno: 389,00 €"              → "Instalment N/M · Total: 389,00 €"
+//   "OCR račun:\n..."                          → "OCR receipt:\n..."
+export const translateNote = (note, lang) => {
+  if (!note || lang === "hr") return note;
+  if (lang !== "en") return note;
+  const HR_TO_EN_MONTHS = {
+    "Siječanj": "January", "Veljača": "February", "Ožujak": "March",
+    "Travanj": "April",   "Svibanj": "May",      "Lipanj": "June",
+    "Srpanj":  "July",    "Kolovoz": "August",   "Rujan":  "September",
+    "Listopad":"October", "Studeni": "November", "Prosinac":"December",
+  };
+  let out = note;
+  // Label translations (longest first to avoid partial collisions)
+  const REPL = [
+    [/Ponavljajući trošak/g, "Recurring expense"],
+    [/Redovna obveza/g,      "Recurring obligation"],
+    [/Ukupno:/g,             "Total:"],
+    [/Obrok\s/g,             "Instalment "],
+    [/Rata\s/g,              "Instalment "],
+    [/OCR račun:/g,          "OCR receipt:"],
+  ];
+  for (const [re, en] of REPL) out = out.replace(re, en);
+  // HR month names → EN
+  for (const [hr, en] of Object.entries(HR_TO_EN_MONTHS)) {
+    out = out.replace(new RegExp(`\\b${hr}\\b`, "g"), en);
+  }
+  return out;
+};
