@@ -89,7 +89,7 @@ export const STEPS = [
   },
   {
     id: 6,
-    name: 'Bogatstvo',
+    name: 'Uspjeh',
     nameEN: 'Build wealth',
     desc: '20%+ prihoda u ulaganja, pasivni prihodi',
     descEN: '20%+ of income invested, passive income',
@@ -98,7 +98,7 @@ export const STEPS = [
   },
   {
     id: 7,
-    name: 'Nasljeđe i sloboda',
+    name: 'Mirno more',
     nameEN: 'Legacy & freedom',
     desc: 'Financijska sloboda, planiranje nasljeđa',
     descEN: 'Financial freedom, estate planning',

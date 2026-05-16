@@ -269,6 +269,10 @@ export const EN_DICT = {
   // Dashboard payday (EN-side helpers when category missing)
   "primitka": "next payment",
   "Backup spremljen u": "Backup saved to",
+  "Uspjeh": "Build wealth",
+  "Mirno more": "Legacy & freedom",
+  "Više o ovom koraku": "Learn more about this step",
+  "Zatvori": "Close",
   // Language toggle: HR shows "Engleski" for EN, EN shows "Croatian" for HR
   // Already defined above: "Hrvatski": "Croatian", "Engleski": "English"
 };

@@ -748,18 +748,9 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                 <button onClick={async ()=>{
                   const { filename, content } = exportFallback;
                   if (isCapacitor()) {
-                    // Save directly to Downloads (Files app visible)
-                    const r = await nativeSaveToDownloads(filename, content);
-                    if (r.ok) {
-                      updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
-                      alert(`${t("Backup spremljen u")} ${r.location}`);
-                      return;
-                    }
-                    // Fallback to share-sheet (lets user save via Drive / Files)
                     const ok = await nativeSaveAndShare(filename, content);
                     if (ok) {
                       updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
-                      alert(t("Backup uspješno spremljen."));
                       return;
                     }
                   }

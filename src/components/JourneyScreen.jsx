@@ -59,7 +59,195 @@ function MetricCard({ label, value, sub, color }) {
   );
 }
 
-function StepRow({ step, isCurrent, isDone, progress, t }) {
+// ── Step detail descriptions (bilingual) ─────────────────────────────────────
+const STEP_DETAILS = [
+  {
+    id: 0,
+    hr: `Razumij točno kamo ide tvoj novac. Unesi sve redovne prihode i troškove, pregled obveza i dugova. Ovaj korak ti daje jasnu sliku — bez toga ne možeš planirati sljedeće.
+
+Što napraviti:
+• Unesi sve redovne prihode (plaća, najamnina, freelance)
+• Unesi sve fiksne troškove (stanarina, kredit, pretplate)
+• Dodaj sve dugove — koliko duguješ i po kojoj kamati
+• Koristi kategorije troškova za detaljan pregled`,
+    en: `Understand exactly where your money goes. Enter all recurring income and expenses, obligations and debts. This step gives you a clear picture — without it you can't plan the next steps.
+
+What to do:
+• Enter all recurring income (salary, rent, freelance)
+• Enter all fixed expenses (rent, loan, subscriptions)
+• Add all debts — how much you owe and at what rate
+• Use expense categories for a detailed breakdown`,
+  },
+  {
+    id: 1,
+    hr: `Cilj je imati 2.500 € likvidne štednje dostupne odmah. Ovo je tvoj financijski "air bag" — štiti te od neočekivanih troškova (popravak auta, liječnik, hitni troškovi) bez ulaska u dug.
+
+Što napraviti:
+• Svaki mjesec odvoji minimalno 10% prihoda na štedni račun
+• Ne diraj ovaj novac osim za prave hitne slučajeve
+• Drži na tekućem ili štednom računu — ne na investicijama
+• Jednom kad dostigneš cilj, prelazi na korak 3`,
+    en: `The goal is to have €2,500 in liquid savings available immediately. This is your financial "air bag" — it protects you from unexpected costs (car repair, medical, emergencies) without going into debt.
+
+What to do:
+• Set aside at least 10% of income monthly to a savings account
+• Don't touch this money except for genuine emergencies
+• Keep it in a current or savings account — not investments
+• Once you reach the goal, move to step 3`,
+  },
+  {
+    id: 2,
+    hr: `Otplati sve dugove s kamatom višom od 6% što je brže moguće. Kreditne kartice (15-25% kamata) i potrošački krediti su financijski "crne rupe" koje troše više nego što možeš zaraditi ulaganjem.
+
+Što napraviti:
+• Napravi popis svih dugova s kamatama
+• Koristi "avalanche" metodu — plaćaj minimum na sve, a ostatak na dug s najvišom kamatom
+• Ne uzimaj nove dugove dok ne otplatiš ove
+• Kad otplatiš, taj isti iznos usmjeri na štednju`,
+    en: `Pay off all debts with interest above 6% as fast as possible. Credit cards (15-25% interest) and consumer loans are financial "black holes" that cost more than you can earn from investing.
+
+What to do:
+• List all debts with their interest rates
+• Use the "avalanche" method — pay minimum on all, extra on highest-rate debt
+• Don't take on new debt while paying these off
+• Once paid, redirect that same amount to savings`,
+  },
+  {
+    id: 3,
+    hr: `Proširi sigurnosni jastuk na 6 punih mjeseci troškova. Ako izgubiš posao ili dođe do veće krize, ovo ti daje dovoljno vremena bez finansijskog stresa.
+
+Što napraviti:
+• Izračunaj svoju prosječnu mjesečnu potrošnju
+• Pomnoži s 6 — to je tvoj cilj
+• Odvajaj 15-20% prihoda dok ne dostigneš cilj
+• Drži na odvojenom računu s boljom kamatom (npr. Treasury fond)`,
+    en: `Expand your emergency fund to cover 6 full months of expenses. If you lose your job or face a major crisis, this gives you enough time without financial stress.
+
+What to do:
+• Calculate your average monthly spending
+• Multiply by 6 — that is your target
+• Set aside 15-20% of income until you reach the goal
+• Keep in a separate account with better interest (e.g. money market)`,
+  },
+  {
+    id: 4,
+    hr: `Počni graditi bogatstvo kroz ulaganja. ZPDŠ i ETF fondovi su osnova — daju ti pristup globalnom tržištu uz minimalne naknade i porezne prednosti.
+
+Što napraviti:
+• Otvori ZPDŠ (III. stup mirovinskog) ako nemaš — do 663 € godišnje je porezno odbitno
+• Otvori investicijski račun (npr. IBKR, Trading 212) za ETF
+• Ulaži 10-15% prihoda u S&P 500 ili world ETF (npr. VWCE)
+• Ne pokušavaj "tajmati" tržište — ulaži svaki mjesec bez iznimke`,
+    en: `Start building wealth through investments. Pension funds and ETFs are the foundation — they give you access to global markets with minimal fees and tax advantages.
+
+What to do:
+• Open a supplementary pension (3rd pillar) if you don't have one — up to €663/year is tax-deductible
+• Open a brokerage account (e.g. IBKR, Trading 212) for ETFs
+• Invest 10-15% of income in S&P 500 or world ETF (e.g. VWCE)
+• Don't try to "time" the market — invest every month without exception`,
+  },
+  {
+    id: 5,
+    hr: `Odluči između bržeg otplaćivanja stambenog kredita i pojačavanja ulaganja. Ovo je osobna odluka koja ovisi o kamati kredita i tvojoj toleranciji na rizik.
+
+Što napraviti:
+• Ako je kamata kredita > 4%: razmisli o prijevremenoj otplati
+• Ako je kamata kredita < 3%: ulaganje vjerojatno donosi više
+• Između 3-4%: kombiniraj — pola na kredit, pola na ulaganja
+• Prilagodi strategiju prema trenutnim kamatnim stopama`,
+    en: `Decide between paying off your mortgage faster and ramping up investments. This is a personal decision depending on your loan rate and risk tolerance.
+
+What to do:
+• If loan rate > 4%: consider early repayment
+• If loan rate < 3%: investing likely yields more
+• Between 3-4%: split — half to loan, half to investments
+• Adjust your strategy based on current interest rates`,
+  },
+  {
+    id: 6,
+    hr: `Ulaži 20%+ prihoda i gradi pasivne izvore zarade. Na ovoj razini novac počinje raditi za tebe više nego ti za njega.
+
+Što napraviti:
+• Povećaj udio ulaganja na 20-30% prihoda
+• Razmotr nekretninu za najam kao dodatni prihod
+• Diversificiraj: ETF, obveznice, nekretnine, dividendne dionice
+• Reinvestiraj sve dividende i prihode — složeni rast je ključan`,
+    en: `Invest 20%+ of income and build passive income streams. At this level, money starts working harder for you than you for it.
+
+What to do:
+• Increase investment share to 20-30% of income
+• Consider rental property as additional income
+• Diversify: ETFs, bonds, real estate, dividend stocks
+• Reinvest all dividends and income — compound growth is key`,
+  },
+  {
+    id: 7,
+    hr: `Dostigao si financijsku slobodu — tvoji pasivni prihodi pokrivaju troškove. Sada je fokus na planiranju nasljeđa i ostavljanju traga.
+
+Što napraviti:
+• Napravi oporuku i plan nasljeđivanja
+• Razmisli o darovima i donacijama za života
+• Postavi automatske investicije za djecu/unuke
+• Dokumentiraj sve — računi, ulaganja, upute za obitelj`,
+    en: `You have achieved financial freedom — your passive income covers expenses. The focus now is on legacy planning and leaving a lasting impact.
+
+What to do:
+• Create a will and inheritance plan
+• Consider gifts and donations during your lifetime
+• Set up automatic investments for children/grandchildren
+• Document everything — accounts, investments, family instructions`,
+  },
+];
+
+function StepDetailModal({ step, detail, C, t, lang, onClose }) {
+  if (!step || !detail) return null;
+  const stepNum = step.id + 1;
+  const name = lang === 'en' ? (step.nameEN || step.name) : step.name;
+  const text = lang === 'en' ? detail.en : detail.hr;
+
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:20, width:'100%', maxWidth:440, maxHeight:'80vh', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 8px 40px rgba(0,0,0,.4)' }}>
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 18px 12px', borderBottom:`1px solid ${C.border}`, flexShrink:0, background:C.card }}>
+          <div style={{ width:40, height:40, borderRadius:12, background:`${C.accent}20`, border:`1px solid ${C.accent}30`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
+            {step.icon}
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:11, color:C.textMuted, fontWeight:600, marginBottom:2, letterSpacing:.5, textTransform:'uppercase' }}>{t('Korak')} {stepNum} / 8</div>
+            <div style={{ fontSize:16, fontWeight:700, color:C.text, lineHeight:1.2 }}>{name}</div>
+          </div>
+          <button onClick={onClose} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:10, padding:'7px 11px', cursor:'pointer', fontSize:13, color:C.textMuted, fontWeight:700 }}>
+            ✕
+          </button>
+        </div>
+        {/* Body */}
+        <div style={{ overflowY:'auto', padding:'14px 18px 20px', flex:1, background:C.bg }}>
+          {text.split('\n').map((line, i) => {
+            if (line.startsWith('• ')) {
+              return (
+                <div key={i} style={{ display:'flex', gap:8, marginBottom:7 }}>
+                  <span style={{ color:C.accent, flexShrink:0, marginTop:1, fontWeight:700 }}>•</span>
+                  <span style={{ fontSize:13, color:C.text, lineHeight:1.55 }}>{line.slice(2)}</span>
+                </div>
+              );
+            }
+            if (line === '') return <div key={i} style={{ height:10 }}/>;
+            const isSectionHead = line.endsWith(':');
+            return (
+              <div key={i} style={{ fontSize: isSectionHead ? 11 : 13, fontWeight: isSectionHead ? 700 : 400, color: isSectionHead ? C.textMuted : C.text, lineHeight:1.6, marginBottom: isSectionHead ? 6 : 7, letterSpacing: isSectionHead ? .8 : 0, textTransform: isSectionHead ? 'uppercase' : 'none' }}>
+                {line}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepRow({ step, isCurrent, isDone, progress, t, onSelect }) {
   const statusColor = isDone
     ? 'var(--color-text-success)'
     : isCurrent
@@ -70,14 +258,23 @@ function StepRow({ step, isCurrent, isDone, progress, t }) {
     : isCurrent
     ? 'var(--color-background-info)'
     : 'var(--color-background-secondary)';
+  const stepNum = step.id + 1;
 
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-      <div style={{ width: 32, height: 32, borderRadius: '50%', background: bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0, marginTop: 2 }}>
+      {/* Clickable icon */}
+      <button
+        onClick={() => onSelect(step)}
+        title={t('Više o ovom koraku')}
+        style={{ width: 32, height: 32, borderRadius: '50%', background: bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0, marginTop: 2, border:'none', cursor:'pointer', transition:'transform .15s', padding:0 }}
+        onTouchStart={e => { e.currentTarget.style.transform='scale(0.9)'; }}
+        onTouchEnd={e => { e.currentTarget.style.transform='scale(1)'; }}
+      >
         {isDone ? '✓' : step.icon}
-      </div>
+      </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: statusColor, minWidth: 20 }}>{stepNum}.</span>
           <span style={{ fontSize: 14, fontWeight: 500, color: isDone || isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>
             {t(step.name)}
           </span>
@@ -171,6 +368,7 @@ function QuizModal({ onSave, onDismiss, C, t }) {
 
 // ── Glavni ekran ──────────────────────────────────────────────────────────────
 export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) {
+  const [selectedStep, setSelectedStep] = useState(null);
   const fmt = n => fmtEur(n, prefs?.currency);
   const [showQuiz, setShowQuiz] = useState(false);
   const [expandedSection, setExpandedSection] = useState('steps'); // steps | money | actions | badges
@@ -274,6 +472,7 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
                   isDone={step.id < currentStep}
                   progress={step.id === currentStep ? stepProgress : 0}
                   t={t}
+                  onSelect={setSelectedStep}
                 />
               ))}
             </div>
@@ -382,6 +581,18 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
           t={t}
           onSave={(data) => { saveJourneyData(data); setShowQuiz(false); }}
           onDismiss={() => setShowQuiz(false)}
+        />
+      )}
+
+      {/* ── Step Detail Modal ─────────────────────────────────────────── */}
+      {selectedStep !== null && (
+        <StepDetailModal
+          step={selectedStep}
+          detail={STEP_DETAILS.find(d => d.id === selectedStep.id)}
+          C={C}
+          t={t}
+          lang={lang}
+          onClose={() => setSelectedStep(null)}
         />
       )}
     </div>
