@@ -262,15 +262,34 @@ function StepRow({ step, isCurrent, isDone, progress, t, onSelect }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-      {/* Clickable icon */}
+      {/* Clickable icon — visibly framed to indicate tap action */}
       <button
         onClick={() => onSelect(step)}
         title={t('Više o ovom koraku')}
-        style={{ width: 32, height: 32, borderRadius: '50%', background: bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0, marginTop: 2, border:'none', cursor:'pointer', transition:'transform .15s', padding:0 }}
-        onTouchStart={e => { e.currentTarget.style.transform='scale(0.9)'; }}
+        style={{
+          position: 'relative',
+          width: 38, height: 38, borderRadius: 10,
+          background: bgColor,
+          border: `1.5px solid ${statusColor}`,
+          boxShadow: `0 1px 3px ${statusColor}35, inset 0 0 0 1px var(--color-background-primary)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, flexShrink: 0, marginTop: 2,
+          cursor: 'pointer', transition: 'transform .15s, box-shadow .15s', padding: 0,
+        }}
+        onTouchStart={e => { e.currentTarget.style.transform='scale(0.92)'; }}
         onTouchEnd={e => { e.currentTarget.style.transform='scale(1)'; }}
       >
         {isDone ? '✓' : step.icon}
+        {/* tiny info hint badge in corner so user spots it's tappable */}
+        <span style={{
+          position: 'absolute', top: -4, right: -4,
+          width: 14, height: 14, borderRadius: '50%',
+          background: statusColor, color: '#fff',
+          fontSize: 9, fontWeight: 800,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '1.5px solid var(--color-background-primary)',
+          lineHeight: 1,
+        }}>i</span>
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>

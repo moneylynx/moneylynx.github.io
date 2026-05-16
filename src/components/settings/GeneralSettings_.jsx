@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
-// V3: FilePicker plugin više se ne koristi — koristimo HTML <input type="file">
-// import { FilePicker } from '@capawesome/capacitor-file-picker';
+import { FilePicker } from '@capawesome/capacitor-file-picker';
 import { K, DEF_LISTS, T, MONTHS, MONTHS_EN, MSHORT, MSHORT_EN, MAX_ATT, BACKUP_SNOOZE_MS, CURRENCIES, TIMEZONES } from '../../lib/constants.js';
-import { fmtEur, fDate, load, save, curYear, buildCSV, buildSummary, nativeSaveAndShare, nativeSaveToDownloads, isCapacitor } from '../../lib/helpers.js';
+import { fmtEur, fDate, load, save, curYear, buildCSV, buildSummary, nativeSaveAndShare, isCapacitor } from '../../lib/helpers.js';
 import { hashPinV2, hashPinLegacy } from '../../lib/crypto.js';
 import { rebuildModel } from '../../lib/aiCategorizer.js';
 import { Ic, LynxLogo, LynxLogoWhite, StickyHeader } from '../ui.jsx';
@@ -12,7 +10,7 @@ import { saveToGoogleDrive, loadFromGoogleDrive, isDriveConfigured, revokeGoogle
 import { exportReportPdf, exportReportXlsx, exportReportCsvFallback } from '../../lib/reportExports.js';
 import { ShareModal } from './ShareModal.jsx';
 
-function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, setPage, t, lang }) {
+function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPrefs, user, updUser, sec, updSec, year, setSetupMode, setUnlocked, onBack, onAbout, onChangePinCrypto, onRemovePinCrypto, supaUser, onSignOut, onSyncToCloud, t, lang }) {
   const [pinChg,  setPinChg]  = useState(false);
   const [rmPin,   setRmPin]   = useState(false);
   const [vPin,    setVPin]    = useState("");
@@ -20,15 +18,18 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   const [share,   setShare]   = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [importPending, setImportPending] = useState(null);
-  const importInputRef = useRef(null);
+  const importInputRef = useRef(null); // stable ref for file input
   const [importKey, setImportKey] = useState(0);
-  const [exportFallback, setExportFallback] = useState(null);
-  const [dlMsg, setDlMsg] = useState(null); // { ok: bool, text: string }
-  const [exportYear, setExportYear] = useState("all");
+  // Fallback state: if no download/share path works (some APK wrappers block both),
+  // we show the JSON in a modal with a Copy button so the user can paste into any
+  // note/chat app and save it elsewhere.
+  const [exportFallback, setExportFallback] = useState(null); // { filename, content }
+  const [exportYear, setExportYear]         = useState("all"); // "all" or specific year
 
-  const [driveStatus, setDriveStatus] = useState(null);
-  const [driveMsg, setDriveMsg] = useState("");
-  const [driveLastAt, setDriveLastAt] = useState(() => load(K.prf, {}).driveLastBackup || null);
+  // ── Google Drive backup state ──────────────────────────────────────────────
+  const [driveStatus,  setDriveStatus]  = useState(null); // null | 'saving' | 'saved' | 'error' | 'loading'
+  const [driveMsg,     setDriveMsg]     = useState("");
+  const [driveLastAt,  setDriveLastAt]  = useState(() => load(K.prf, {}).driveLastBackup || null);
 
   const hasProfileData = user.firstName || user.lastName || user.phone || user.email;
   const [isEditingProfile, setIsEditingProfile] = useState(!hasProfileData);
@@ -68,6 +69,9 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     </button>
   );
 
+  // Complete backup — serializes all app data except PIN hash (safety).
+  // Instead of trying to silently pick the "right" save path (which fails
+  // ── Google Drive handlers ──────────────────────────────────────────────────
   const buildBackupPayload = () => {
     const yr = exportYear === "all" ? null : parseInt(exportYear);
     const filtTxs = yr ? txs.filter(x => new Date(x.date).getFullYear() === yr) : txs;
@@ -111,6 +115,9 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     }
   };
 
+  // unpredictably in WebView/APK environments), we ALWAYS show the backup
+  // content in a modal with three clear action buttons: Copy, Share, Download.
+  // Whatever fails, the user always has a working option.
   const fullExport = () => {
     try {
       const yr = exportYear === "all" ? null : parseInt(exportYear);
@@ -157,7 +164,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     }
   };
 
-  // Pomocna funkcija za parsiranje JSON-a (sinkrona, samo parsira, ne postavlja state)
+  // ----- Pomocna funkcija za parsiranje JSON-a (sinkrona, samo parsira, ne postavlja state)
   const parseImportJsonRaw = (jsonText) => {
     let parsed;
     try { parsed = JSON.parse(jsonText); }
@@ -173,80 +180,51 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     return { data, txCount };
   };
 
-  // V3: Univerzalni helper za vizualnu povratnu informaciju (radi i kad alert() ne radi).
-  const showToast = (msg, ms = 4000) => {
+  // ----- Native import za Capacitor (koristi FilePicker)
+  const handleNativeImport = async () => {
     try {
-      const el = document.createElement("div");
-      el.textContent = msg;
-      el.style.cssText = [
-        "position:fixed", "left:50%", "bottom:80px", "transform:translateX(-50%)",
-        "background:#111", "color:#fff", "padding:12px 18px", "border-radius:10px",
-        "font-size:13px", "font-family:system-ui,sans-serif", "z-index:99999",
-        "max-width:90vw", "text-align:center", "box-shadow:0 4px 14px rgba(0,0,0,.4)",
-        "white-space:pre-wrap", "word-break:break-word",
-      ].join(";");
-      document.body.appendChild(el);
-      setTimeout(() => { try { el.remove(); } catch {} }, ms);
-    } catch {}
-  };
-
-  // V3: Native import sad samo programski klikne na hidden HTML input.
-  // Capacitor's WebView ima ugrađeni WebChromeClient.onShowFileChooser koji
-  // lansira system DocumentsUI i vraća File objekt direktno u JS — bez
-  // base64/atob/UTF-8 manipulacije. Pouzdanije od @capawesome plugina.
-  const handleNativeImport = () => {
-    showToast("Otvaram picker…", 1500);
-    // Resetiraj input value da onChange okine i kad se ista datoteka odabere
-    // dvaput zaredom (Chrome/WebView ne okida onChange za isti value).
-    if (importInputRef.current) {
-      importInputRef.current.value = "";
-      importInputRef.current.click();
-    } else {
-      showToast("GREŠKA: importInputRef nije montiran u DOM.", 6000);
+      const result = await FilePicker.pickFiles({
+        types: ["application/json", "text/plain"],
+        readData: true,
+      });
+      if (!result?.files?.length) return;
+      const file = result.files[0];
+      if (!file.data) { alert(t("Greška pri čitanju datoteke.")); return; }
+      const decoded = atob(file.data);
+      const { data, txCount } = parseImportJsonRaw(decoded);
+      // Odgoda 300ms – Capacitor "resume" event se završi, UI se smiri
+      setTimeout(() => {
+        setImportPending({ data, txCount });
+      }, 300);
+    } catch (err) {
+      console.error("FilePicker error:", err);
+      // Fallback na HTML input ako nešto pođe po krivu
+      if (importInputRef.current) importInputRef.current.click();
     }
   };
 
-  // Web fallback (klasični file input)
-  // V3: Web + native import — koristi FileReader koji ispravno dekodira UTF-8 sam.
-  // Dijagnostički toastovi pokazuju gdje pada ako pada.
+  // ----- Web fallback (klasični file input)
   const fullImport = (e) => {
     const file = e.target.files?.[0];
-    if (!file) {
-      showToast("Nije odabrana datoteka.", 2500);
-      return;
-    }
-    showToast(`Datoteka: ${file.name}\n${file.size} B, type: ${file.type || "?"}`, 2500);
+    if (!file) return;
     const reader = new FileReader();
-    reader.onerror = () => {
-      showToast("FileReader greška: " + (reader.error && reader.error.message ? reader.error.message : "?"), 6000);
-    };
+    reader.onerror = () => alert(t("Greška pri čitanju datoteke."));
     reader.onload = (ev) => {
       try {
-        const text = ev.target.result;
-        showToast(`Pročitano ${text.length} znakova.\nPočetak: ${text.slice(0, 40)}`, 2500);
-        const { data, txCount } = parseImportJsonRaw(text);
-        showToast(`OK — ${txCount} transakcija. Otvaram potvrdu…`, 2000);
-        // Mala odgoda da React stigne procesirati prošli render prije nego
-        // mountamo modal portal — pomaže u Capacitor WebView-u nakon resume eventa.
-        setTimeout(() => {
-          try {
-            setImportPending({ data, txCount });
-          } catch (stateErr) {
-            showToast("setState greška: " + (stateErr.message || stateErr), 6000);
-          }
-        }, 100);
+        const { data, txCount } = parseImportJsonRaw(ev.target.result);
+        setImportPending({ data, txCount });
       } catch (err) {
-        showToast("JSON greška: " + (err.message || err), 6000);
+        alert(err.message);
       }
     };
-    // Eksplicitni UTF-8 — default je ionako UTF-8 ali ne škodi biti eksplicitan.
-    reader.readAsText(file, "UTF-8");
+    reader.readAsText(file);
   };
 
   const confirmImport = () => {
     if (!importPending) return;
     const { data } = importPending;
     try {
+      // Write to localStorage
       if (Array.isArray(data.txs))    save(K.db,  data.txs);
       if (Array.isArray(data.drafts)) save(K.drf, data.drafts);
       if (data.lists && typeof data.lists === "object") save(K.lst, { ...DEF_LISTS, ...data.lists });
@@ -255,16 +233,18 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         save(K.prf, { ...load(K.prf,{}), ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
       }
 
+      // Update React state directly — no reload needed, no Capacitor issues
       if (Array.isArray(data.txs))    setTxs(data.txs);
       if (data.lists && typeof data.lists === "object") setLists({ ...DEF_LISTS, ...data.lists });
       if (data.user  && typeof data.user  === "object") updUser(data.user);
       if (data.prefs && typeof data.prefs === "object") updPrefs({ ...data.prefs, onboarded: true, lastBackupAt: Date.now(), backupSnoozedUntil: null });
 
+      // Train AI model on imported transactions
       if (Array.isArray(data.txs)) rebuildModel(data.txs);
 
       setImportPending(null);
-      if (setPage) setPage('dashboard');
-      else if (onBack) onBack();
+      // Close settings and go back to show imported data
+      if (onBack) onBack();
     } catch (err) {
       console.error("Import error:", err);
       setImportPending(null);
@@ -283,6 +263,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
     }
     if (isCorrect) {
       if (onRemovePinCrypto) onRemovePinCrypto();
+      // Also clear biometry.
       updSec({ pinHash:null, pinSalt:null, encSalt:null, pinHashVersion:null,
                bioEnabled:false, bioCredId:null, attempts:0, totalFailed:0, lockedUntil:null });
       setRmPin(false); setVPin(""); setVErr("");
@@ -318,6 +299,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
       };
       const cred = await navigator.credentials.create(createOpt);
       const idBase64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+      // Read current sec directly from localStorage to avoid stale prop.
       const currentSec = JSON.parse(localStorage.getItem("ml_sec") || "{}");
       const newSec = { ...currentSec, bioEnabled: true, bioCredId: idBase64 };
       localStorage.setItem("ml_sec", JSON.stringify(newSec));
@@ -404,6 +386,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </div>
           </div>
 
+          {/* Currency selector */}
           <div style={{ marginBottom:16 }}>
             <p style={{ fontSize:12, color:C.textMuted, marginBottom:8 }}>{t("Valuta")}</p>
             <select value={prefs.currency||"EUR"} onChange={e=>updPrefs({currency:e.target.value})}
@@ -414,6 +397,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </select>
           </div>
 
+          {/* Timezone selector */}
           <div style={{ marginBottom:4 }}>
             <p style={{ fontSize:12, color:C.textMuted, marginBottom:8 }}>{t("Vremenska zona")}</p>
             <select value={prefs.timezone||"Europe/Zagreb"} onChange={e=>updPrefs({timezone:e.target.value})}
@@ -450,6 +434,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         <div style={{ marginTop:14, marginBottom:6 }}>
           <SL text={t("Dijeli i izvezi")} icon="share"/>
           
+          {/* 1) SHARE — send via WhatsApp/Telegram/E-mail/CSV etc. */}
           <button onClick={()=>setShare(true)} style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.accent}20,${C.income}15)`, border:`1px solid ${C.accent}40`, borderRadius:13, marginBottom:7, cursor:"pointer" }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <Ic n="share" s={19} c={C.accent}/>
@@ -461,6 +446,8 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             <Ic n="chevron" s={14} c={C.accent} style={{ transform:"rotate(-90deg)" }}/>
           </button>
 
+          {/* 2) EXPORT (BACKUP) — full JSON backup of all data */}
+          {/* Year filter row */}
           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6, padding:"0 2px" }}>
             <Ic n="cal" s={13} c={C.textMuted}/>
             <span style={{ fontSize:12, color:C.textMuted, flex:1 }}>{t("Izvezi godinu")}:</span>
@@ -505,27 +492,20 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             </div>
           </div>
 
+          {/* 3) IMPORT (RESTORE) — FilePicker native na APK, label fallback na webu */}
           <div style={{ marginBottom:7 }}>
-            {/* V3: Jedinstveni put — i web i Capacitor koriste HTML <input type="file">.
-                Capacitor's WebView ima ugrađeni file chooser koji lansira system DocumentsUI. */}
             {isCapacitor() ? (
-              <>
-                <div onClick={handleNativeImport}
-                  style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13, cursor:"pointer" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <Ic n="ul" s={19} c={C.income}/>
-                    <div style={{ textAlign:"left" }}>
-                      <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("U\u010ditaj (Import / Restore)")}</div>
-                      <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
-                    </div>
+              <div onClick={handleNativeImport}
+                style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 15px", background:`linear-gradient(135deg,${C.income}18,${C.income}08)`, border:`1px solid ${C.income}40`, borderRadius:13, cursor:"pointer" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <Ic n="ul" s={19} c={C.income}/>
+                  <div style={{ textAlign:"left" }}>
+                    <div style={{ fontSize:14, fontWeight:600, color:C.text }}>{t("U\u010ditaj (Import / Restore)")}</div>
+                    <div style={{ fontSize:11, color:C.textMuted }}>{t("Vrati podatke iz prethodne kopije")}</div>
                   </div>
-                  <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
                 </div>
-                {/* V3: hidden input je sad i u Capacitor putu — handleNativeImport ga klikne programski */}
-                <input key={importKey} ref={importInputRef} id="ml-import-file" type="file"
-                  accept="*/*"
-                  onChange={fullImport} style={{ display:"none" }}/>
-              </>
+                <Ic n="chevron" s={14} c={C.income} style={{ transform:"rotate(-90deg)" }}/>
+              </div>
             ) : (
               <>
                 <label htmlFor="ml-import-file" style={{ display:"block", width:"100%", cursor:"pointer" }}>
@@ -547,6 +527,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
             )}
           </div>
 
+        {/* ── Google Drive backup section ──────────────────────────────── */}
         {isDriveConfigured() && (
           <div style={{ marginTop: 14, marginBottom: 6 }}>
             <SL text="Google Drive" icon="repeat"/>
@@ -596,6 +577,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           </div>
         )}
 
+        {/* Account section */}
         {supaUser && (
           <div style={{ marginTop:14, marginBottom:6 }}>
             <SL text={t("Račun")} icon="user"/>
@@ -630,9 +612,9 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
               </div>
           }
 
-          {/* Import confirm overlay rendered via Portal to avoid Capacitor resume event interference */}
-          {importPending && createPortal(
-            <div style={{ position:"fixed", inset:0, zIndex:9999, background:"rgba(0,0,0,.7)", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          {/* ── Import confirm overlay ─────────────────────────────────── */}
+          {importPending && (
+            <div style={{ position:"fixed", inset:0, zIndex:999, background:"rgba(0,0,0,.6)", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
               <div style={{ background:C.card, borderRadius:20, padding:24, maxWidth:340, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,.4)" }}>
                 <div style={{ fontSize:28, textAlign:"center", marginBottom:12 }}>📂</div>
                 <div style={{ fontSize:16, fontWeight:700, color:C.text, textAlign:"center", marginBottom:8 }}>{t("Vrati podatke?")}</div>
@@ -650,15 +632,14 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                   </button>
                 </div>
               </div>
-            </div>,
-            document.body
+            </div>
           )}
         </div>
 
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:15, marginBottom:28, marginTop:24 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, display:"flex", alignItems:"center", justifyContent:"center" }}><LynxLogoWhite s={20}/></div>
-            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja Lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.2</div></div>
+            <div style={{ flex:1 }}><div style={{ fontSize:15, fontWeight:700, color:C.text }}>{t("Moja Lova")}</div><div style={{ fontSize:11, color:C.textMuted }}>{t("Verzija")} 1.1</div></div>
             {onAbout && (
               <button onClick={onAbout}
                 style={{ width:32, height:32, borderRadius:"50%", background:`${C.accent}20`, border:`1.5px solid ${C.accent}50`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
@@ -676,6 +657,10 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
         
         {share && <ShareModal C={C} txs={txs} year={year} user={user} onClose={()=>setShare(false)} t={t} lang={lang} />}
 
+        {/* Export modal — always shown when the user clicks Export (Backup).
+            Provides three reliable save paths so at least one works on any
+            device: Copy (works everywhere), Share (native share sheet),
+            Download (browser download). */}
         {exportFallback && (
           <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }} onClick={e=>{ if(e.target===e.currentTarget) setExportFallback(null); }}>
             <div className="su" style={{ background:C.card, borderRadius:18, width:"100%", maxWidth:420, padding:20, border:`1px solid ${C.border}`, maxHeight:"85vh", display:"flex", flexDirection:"column" }}>
@@ -683,7 +668,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                 <h3 style={{ fontSize:16, fontWeight:700, color:C.text, display:"flex", alignItems:"center", gap:8 }}>
                   <Ic n="dl" s={17} c={C.warning}/>{t("Izvezi (Backup)")}
                 </h3>
-                <button onClick={()=>{ setExportFallback(null); setDlMsg(null); }} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:8, padding:6, cursor:"pointer" }}>
+                <button onClick={()=>setExportFallback(null)} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:8, padding:6, cursor:"pointer" }}>
                   <Ic n="x" s={14} c={C.textMuted}/>
                 </button>
               </div>
@@ -699,19 +684,8 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                 onFocus={e=>e.target.select()}
                 style={{ width:"100%", flex:1, minHeight:140, padding:10, background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:10, color:C.text, fontSize:11, fontFamily:"'JetBrains Mono',monospace", resize:"none", marginBottom:12 }}
               />
-              {dlMsg && (
-                <div style={{ borderRadius:10, marginBottom:8, overflow:"hidden", border:`1px solid ${dlMsg.ok ? C.income : C.expense}50` }}>
-                  {/* Label row */}
-                  <div style={{ padding:"8px 12px", background: dlMsg.ok ? `${C.income}25` : `${C.expense}25`, fontSize:12, fontWeight:700, color: dlMsg.ok ? C.income : C.expense, letterSpacing:.3 }}>
-                    {dlMsg.ok ? (lang === "en" ? "✅ Saved" : "✅ Spremljeno") : (lang === "en" ? "❌ Failed" : "❌ Greška")}
-                  </div>
-                  {/* Path / detail row */}
-                  <div style={{ padding:"8px 12px", background: dlMsg.ok ? `${C.income}10` : `${C.expense}10`, fontSize:11, color:C.text, fontFamily:"'JetBrains Mono',monospace", wordBreak:"break-all", lineHeight:1.5 }}>
-                    {dlMsg.text}
-                  </div>
-                </div>
-              )}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                {/* Copy — works in every environment */}
                 <button onClick={async ()=>{
                   try {
                     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -733,59 +707,63 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                   <Ic n="copy" s={14} c="#000"/>{t("Kopiraj")}
                 </button>
 
+                {/* Share — tries Web Share API (file first, then text) */}
                 <button onClick={async ()=>{
                   const { filename, content } = exportFallback;
-                  if (isCapacitor()) {
-                    // Capacitor: write to Cache → open native Share.share() sheet
-                    // This is the only reliable way to share files in a Capacitor WebView.
-                    const ok = await nativeSaveAndShare(filename, content);
-                    if (ok) { updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null }); return; }
-                  }
-                  // Web fallback
                   try {
-                    if (navigator?.canShare) {
+                    if (typeof File !== "undefined" && typeof navigator !== "undefined" && typeof navigator.canShare === "function") {
                       const file = new File([content], filename, { type: "application/json" });
                       if (navigator.canShare({ files: [file] })) {
-                        await navigator.share({ files: [file], title: "Backup", text: filename });
+                        await navigator.share({ files: [file], title: "Moja Lova — Backup", text: filename });
                         updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
                         return;
                       }
                     }
-                    alert(t("Dijeljenje nije podržano. Koristi Kopiraj ili Preuzmi."));
-                  } catch (e) { if (e?.name !== "AbortError") alert(t("Dijeljenje nije uspjelo.")); }
+                    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+                      await navigator.share({ title: filename, text: content });
+                      updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
+                      return;
+                    }
+                    alert(t("Dijeljenje nije podržano na ovom uređaju. Koristi Kopiraj ili Preuzmi."));
+                  } catch (shareErr) {
+                    if (shareErr && shareErr.name === "AbortError") return;
+                    alert(t("Dijeljenje nije uspjelo. Koristi Kopiraj ili Preuzmi."));
+                  }
                 }} style={{ padding:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, border:"none", borderRadius:12, color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
                   <Ic n="share" s={14} c="#fff"/>{t("Podijeli")}
                 </button>
 
+                {/* Download — prefers native Capacitor save on APK (guaranteed
+                    to write a real file into Documents); falls back to the
+                    classic browser download on web. */}
                 <button onClick={async ()=>{
                   const { filename, content } = exportFallback;
-                  setDlMsg(null);
-                  try {
-                    if (isCapacitor()) {
-                      const r = await nativeSaveToDownloads(filename, content);
-                      if (r.ok) {
-                        updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
-                        const loc = r.location || "app storage";
-                        setDlMsg({ ok: true, text: loc });
-                        return;
-                      }
-                      // Permission denied or write failed
-                      setDlMsg({ ok: false, text: lang === "en"
-                        ? "Save failed. Try Share instead."
-                        : "Spremanje nije uspjelo. Pokušaj Podijeli." });
+                  // 1) Try native (Capacitor Filesystem + Share).
+                  if (isCapacitor()) {
+                    const ok = await nativeSaveAndShare(filename, content);
+                    if (ok) {
+                      updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
+                      alert(t("Backup uspješno spremljen."));
                       return;
                     }
-                    // Web browser fallback
+                    // If native failed (plugins missing or permission denied),
+                    // fall through to web download below.
+                  }
+                  // 2) Web fallback — standard anchor download.
+                  try {
                     const blob = new Blob([content], { type: "application/json" });
                     const url  = URL.createObjectURL(blob);
                     const a    = document.createElement("a");
-                    a.href = url; a.download = filename; a.rel = "noopener";
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    a.href = url;
+                    a.download = filename;
+                    a.rel = "noopener";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                     updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
-                    setDlMsg({ ok: true, text: lang === "en" ? `✅ Downloaded: ${filename}` : `✅ Preuzeto: ${filename}` });
-                  } catch (e) {
-                    setDlMsg({ ok: false, text: `❌ Error: ${e?.message || "unknown"}` });
+                  } catch {
+                    alert(t("Preuzimanje nije uspjelo. Koristi Kopiraj ili Podijeli."));
                   }
                 }} style={{ padding:12, background:`linear-gradient(135deg,${C.income},#059669)`, border:"none", borderRadius:12, color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
                   <Ic n="dl" s={14} c="#fff"/>{t("Preuzmi")}

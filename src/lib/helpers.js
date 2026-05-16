@@ -129,43 +129,21 @@ export const nativeSaveAndShare = async (filename, content) => {
 // Documents path is always writable on any Android version without special permission.
 export const nativeSaveToDownloads = async (filename, content) => {
   if (!isCapacitor()) return { ok:false, location:null };
-
-  // Step 1: Request storage permission — on Android 11+ this triggers
-  // "Allow all files access" settings page for MANAGE_EXTERNAL_STORAGE.
+  // Directory.External = /sdcard/Android/data/com.bojvivoda.mojalova/files/
+  // This requires ZERO permissions on all Android versions and is always writable.
+  // Visible in Files app: Internal Storage → Android → data → com.bojvivoda.mojalova → files
   try {
-    const perm = await Filesystem.requestPermissions();
-    if (perm?.publicStorage === 'granted') {
-      // Permission granted — write to public Downloads folder
-      try {
-        const res = await Filesystem.writeFile({
-          path: `Download/${filename}`,
-          data: content,
-          directory: Directory.ExternalStorage,
-          encoding: Encoding.UTF8,
-          recursive: true,
-        });
-        return { ok:true, location:`Downloads/${filename}`, uri: res.uri };
-      } catch (eWrite) {
-        return { ok:false, location:null, error: `Write failed after permission: ${eWrite?.message}` };
-      }
-    }
-    // Permission denied by user
-    return { ok:false, location:null, error: 'permission_denied' };
-  } catch (ePerm) {
-    // requestPermissions itself failed (e.g. already denied permanently)
-    // Try anyway — permission may have been granted manually in Settings
-    try {
-      const res = await Filesystem.writeFile({
-        path: `Download/${filename}`,
-        data: content,
-        directory: Directory.ExternalStorage,
-        encoding: Encoding.UTF8,
-        recursive: true,
-      });
-      return { ok:true, location:`Downloads/${filename}`, uri: res.uri };
-    } catch (eFallback) {
-      return { ok:false, location:null, error: eFallback?.message || String(eFallback) };
-    }
+    const res = await Filesystem.writeFile({
+      path: filename,
+      data: content,
+      directory: Directory.External,
+      encoding: Encoding.UTF8,
+      recursive: true,
+    });
+    return { ok:true, location:`Android/data/com.bojvivoda.mojalova/files/${filename}`, uri: res.uri };
+  } catch (e) {
+    console.warn("nativeSaveToDownloads failed:", e);
+    return { ok:false, location:null, error: e?.message || String(e) };
   }
 };
 
