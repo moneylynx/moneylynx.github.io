@@ -246,7 +246,7 @@ POBOLJŠANJE UVOZA BACKUPA
     // ── Licences ────────────────────────────────────────────────────────────
     licences: {
       title: t("Licencni uvjeti"),
-      body: `Moja Lova by MoneyLynx v${VER} — Licencni uvjeti / Licence Terms
+      body: `${en ? "Money Lynx by Moneylynx" : "Moja Lova by MoneyLynx"} v${VER} — ${en ? "Licence Terms" : "Licencni uvjeti"}
 
 © 2024–${YEAR} MoneyLynx. Sva prava pridržana.
 All rights reserved.
@@ -296,9 +296,9 @@ https://opensource.org/licenses/MIT`
     // ── Disclaimer ──────────────────────────────────────────────────────────
     disclaimer: {
       title: t("Odricanje odgovornosti"),
-      body: en ? `DISCLAIMER — Moja Lova by MoneyLynx v${VER}
+      body: en ? `DISCLAIMER — Money Lynx by Moneylynx v${VER}
 
-Moja Lova is provided "as is" without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.
+Money Lynx is provided "as is" without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.
 
 FINANCIAL DECISIONS
 This app is a personal budgeting and tracking tool only. It does not provide financial, investment, tax, or legal advice. All financial decisions made based on data entered into this app are the sole responsibility of the user. The Active Advisor feature (forecasts, anomaly alerts, year-on-year comparisons) produces estimates based solely on the data you have entered — these are not professional financial projections.
@@ -357,10 +357,10 @@ VALUTE I IZRAČUNI
     privacy: {
       title: t("Privatnost i kolačići"),
       body: en ? `PRIVACY & COOKIES POLICY
-Moja Lova by MoneyLynx v${VER} · Last updated: May ${YEAR}
+Money Lynx by Moneylynx v${VER} · Last updated: May ${YEAR}
 
 DATA STORAGE
-Moja Lova stores data in two ways:
+Money Lynx stores data in two ways:
 
 1. LOCAL STORAGE (without account)
 All data stored exclusively on your device using browser localStorage. No data sent to any server. Clearing browser data or switching devices will lose data unless you exported a backup.
@@ -485,7 +485,7 @@ Za zahtjeve vezane za privatnost: ${EMAIL}`
     // ── Contact ─────────────────────────────────────────────────────────────
     contact: {
       title: t("Kontaktiraj nas"),
-      body: `Moja Lova by MoneyLynx v${VER}
+      body: `${en ? "Money Lynx by Moneylynx" : "Moja Lova by MoneyLynx"} v${VER}
 
 Web: ${WEB}
 E-mail: ${EMAIL}
@@ -522,7 +522,7 @@ Please describe:
 
 For feature requests, please explain the use case — not just the feature itself.
 
-Thank you for using Moja Lova by MoneyLynx v${VER}!` :
+Thank you for using Money Lynx by Moneylynx v${VER}!` :
 `POŠALJI POVRATNU INFORMACIJU
 
 Hvala na povratnoj informaciji! Pomaže nam poboljšati aplikaciju za sve.
@@ -588,7 +588,7 @@ Hvala što koristiš Moja Lova by MoneyLynx v${VER}!`
                 <LynxLogoWhite s={22}/>
               </div>
               <div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>Moja Lova</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>{en ? "Money Lynx" : "Moja Lova"}</div>
                 <div style={{ fontSize: 12, color: C.textMuted }}>{t("Verzija")} {VER} · © {cy} MoneyLynx</div>
                 <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{WEB}</div>
               </div>

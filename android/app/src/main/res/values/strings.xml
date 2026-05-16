@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Moja Lova</string>
-    <string name="title_activity_main">Moja Lova</string>
+    <string name="app_name">Money Lynx</string>
+    <string name="title_activity_main">Money Lynx</string>
     <string name="package_name">com.bojvivoda.mojalova</string>
     <string name="custom_url_scheme">com.bojvivoda.mojalova</string>
 </resources>

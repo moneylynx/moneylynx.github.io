@@ -1,6 +1,6 @@
 // ─── English Dictionary ───────────────────────────────────────────────────────
 export const EN_DICT = {
-  "Dobrodošao u Moja Lova!": "Welcome to My Money!",
+  "Dobrodošao u Moja Lova!": "Welcome to Money Lynx!",
   "Projekcija na kraju": "Projection at the end of",
   "Skeniraj račun (OCR)": "Scan receipt (OCR)",
   "Čitam račun…": "Reading receipt…",
@@ -12,7 +12,7 @@ export const EN_DICT = {
   "XLSX modul nije dostupan. Izvezen je CSV fallback.": "XLSX module is not available. CSV fallback was exported.",
   "Izvoz izvještaja nije uspio. Provjeri internetsku vezu i pokušaj ponovno.": "Report export failed. Check your internet connection and try again.",
   "Za osobnu upotrebu. · Nije za komercijalnu upotrebu.": "For personal use. · Not for commercial use.",
-  "Moja Lova": "My Money", "Moja Lova by MoneyLynx": "My Money by MoneyLynx", "Osobne financije bez kompliciranja": "Personal finance without the fuss", "Početna": "Home", "Transakcije": "Transactions", "Statistika": "Stats", "Postavke": "Settings",
+  "Moja Lova": "Money Lynx", "Moja Lova by MoneyLynx": "Money Lynx by Moneylynx", "Osobne financije bez kompliciranja": "Personal finance without the fuss", "Početna": "Home", "Transakcije": "Transactions", "Statistika": "Stats", "Postavke": "Settings",
   "Brzi unos": "Quick Add", "Bilanca": "Balance", "primici": "income", "plaćeno": "paid", "čekaju": "pending",
   "Stanje": "Balance", "Stanje na dan": "Balance as of", "Sve obveze podmirene!": "All obligations settled!", "Dodaj više transakcija za projekciju": "Add more transactions for projection", "Nakon 1–2 mjeseca praćenja, aplikacija može projicirati stanje kraju svakog mjeseca.": "After 1–2 months of tracking, the app can project your end-of-month balance.",
   "Dnevni limit potrošnje": "Daily spending limit", "Ušteda/mj.": "Savings/mo.", "Zatvori štednju": "Close savings", "Otvori štednju": "Open savings", "Ušteda/god.": "Savings/yr.", "Ušteđeno": "Saved so far", "planirano": "planned", "Prikaži/sakrij detalje štednje": "Show/hide savings details", "dana do kraja mjeseca": "days left in month", "dana do": "days until", "Danas": "Today", "Štednja": "Savings", "Krizna zona": "Crisis zone", "Kritično": "Critical", "U razvoju": "Developing", "Stabilan": "Stable", "Napredak prema stepenici": "Progress to step", "Moja postignuća": "My achievements", "Sljedeći koraci": "Next steps", "2-min. quiz": "2-min. quiz", "Ažuriraj podatke": "Update data", "Streak": "Streak", "Slobodan novac": "Free cash", "Stopa štednje": "Savings rate", "Starost novca": "Money age", "7 stepenica": "7 steps", "Stepenica": "Step", "Završeno": "Completed", "U tijeku": "In progress", "Financijski put": "Financial journey", "slobodan novac": "free cash", "cilj:": "goal:", "Ovaj mj.": "This mo.", "God.": "Yr.", "Mjes.": "Mo.", "/ dan": "/ day", "Primici": "Income", "Izdaci": "Expenses", "Planirana štednja": "Planned savings", "/mj.": "/mo.", "/god.÷12": "/yr÷12",
@@ -178,7 +178,7 @@ export const EN_DICT = {
   "Dijeljenje nije uspjelo. Koristi Kopiraj ili Preuzmi.": "Sharing failed. Use Copy or Download.",
   "Preuzimanje nije uspjelo. Koristi Kopiraj ili Podijeli.": "Download failed. Use Copy or Share.",
   "Podaci su uspješno vraćeni. Aplikacija će se ponovno učitati.": "Data restored successfully. The app will reload.",
-  "Datoteka nije valjan Moja Lova backup.": "The file is not a valid Moja Lova backup.", "Vrati podatke?": "Restore data?", "Bit će uvezeno": "This will import", "transakcija. Trenutni podaci bit će zamijenjeni.": "transactions. Current data will be replaced.", "Da, vrati": "Yes, restore", "Greška pri vraćanju podataka.": "Error restoring data.",
+  "Datoteka nije valjan Moja Lova backup.": "The file is not a valid Money Lynx backup.", "Vrati podatke?": "Restore data?", "Bit će uvezeno": "This will import", "transakcija. Trenutni podaci bit će zamijenjeni.": "transactions. Current data will be replaced.", "Da, vrati": "Yes, restore", "Greška pri vraćanju podataka.": "Error restoring data.",
   "Greška pri čitanju datoteke.": "Error reading the file.",
   "Vraćanjem podataka trenutni podaci bit će ZAMIJENJENI. Nastaviti?": "Restoring will REPLACE all current data. Continue?",
   "Biometrija otkazana ili neuspješna.": "Biometrics cancelled or failed.",
