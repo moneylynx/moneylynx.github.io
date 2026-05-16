@@ -338,7 +338,7 @@ function TxForm({ C, tx, draft, lists, setLists, txs, onSubmit, onCancel, onGoRe
                   setAutoFilledFields(new Set());
                 }
                 clearErr();
-              }} style={{...fld, borderColor:bd("description")}}/>
+              }} style={{...fld, borderColor:bd("description")}} lang="hr" autoCapitalize="sentences" autoCorrect="off" spellCheck={false}/>
           </div>
 
           <div>

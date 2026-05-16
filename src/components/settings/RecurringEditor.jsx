@@ -43,6 +43,24 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
 
   const cancelForm = () => { setForm(emptyForm); setEditId(null); setAdding(false); };
 
+  // Auto-save any in-progress form when leaving — prevents losing data if user
+  // forgets to click Dodaj/Spremi before "Spremi i vrati se".
+  const flushAndBack = () => {
+    if ((adding || editId) && form.description.trim() && form.amount) {
+      const parsed = { ...form, amount: parseFloat(form.amount)||0, totalPayments: parseInt(form.totalPayments)||0 };
+      let finalArr;
+      if (editId) {
+        finalArr = arr.map(it => it.id === editId ? { ...it, ...parsed } : it);
+      } else {
+        finalArr = [...arr, { ...parsed, id:`r_${Date.now()}` }];
+      }
+      setArr(finalArr);
+      onBack(finalArr);
+    } else {
+      onBack(arr);
+    }
+  };
+
   const move = (i, dir) => {
     if (i+dir < 0 || i+dir >= arr.length) return;
     const nArr = [...arr];
@@ -54,7 +72,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
     <div className="fi" style={{ width:"100%" }}>
       <div className="hdr" style={{ position:"sticky", top:0, zIndex:50, background:C.bg, paddingBottom:10, paddingLeft:16, paddingRight:16, borderBottom:`1px solid ${C.border}` }}>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          <button title={t("Natrag")} onClick={()=>onBack(arr)} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:10, padding:"8px 10px", cursor:"pointer", display:"flex", alignItems:"center" }}><Ic n="arrow_l" s={18} c={C.accent}/></button>
+          <button title={t("Natrag")} onClick={flushAndBack} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:10, padding:"8px 10px", cursor:"pointer", display:"flex", alignItems:"center" }}><Ic n="arrow_l" s={18} c={C.accent}/></button>
           <h2 style={{ fontSize:17, fontWeight:700, color:C.text }}>{t(incomeMode ? "Redovni primici" : "Redovne obveze")}</h2>
         </div>
       </div>
@@ -107,7 +125,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
                   <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:8 }}>
                     <div>
                       <label style={lbl}>{t("Opis")}</label>
-                      <input type="text" placeholder={t("Npr. Kredit")} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} style={fld}/>
+                      <input type="text" placeholder={t(incomeMode ? "Npr. Uplata plaće" : "Npr. Kredit")} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} style={fld} lang="hr" autoCapitalize="sentences" autoCorrect="off" spellCheck={false}/>
                     </div>
                     <div>
                       <label style={lbl}>{t("Iznos €")}</label>
@@ -174,7 +192,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
               <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:8 }}>
                 <div>
                   <label style={lbl}>{t("Opis")}</label>
-                  <input type="text" placeholder={t("Npr. Kredit")} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} style={fld}/>
+                  <input type="text" placeholder={t(incomeMode ? "Npr. Uplata plaće" : "Npr. Kredit")} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} style={fld} lang="hr" autoCapitalize="sentences" autoCorrect="off" spellCheck={false}/>
                 </div>
                 <div>
                   <label style={lbl}>{t("Iznos €")}</label>
@@ -234,7 +252,7 @@ function RecurringEditor({ C, items, lists, onBack, t, incomeMode = false }) {
           </button>
         )}
 
-        <button onClick={()=>onBack(arr)} style={{ width:"100%", padding:13, marginTop:6, background:`linear-gradient(135deg,${C.income},#059669)`, border:"none", borderRadius:13, color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+        <button onClick={flushAndBack} style={{ width:"100%", padding:13, marginTop:6, background:`linear-gradient(135deg,${C.income},#059669)`, border:"none", borderRadius:13, color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
           <Ic n="check" s={16} c="#fff"/>{t("Spremi i vrati se")}
         </button>
       </div>

@@ -44,13 +44,22 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const daysLeft = daysInMonth - today.getDate();
 
-  // Next payday: find largest recurring income, compute days until next dueDay
+  // Next payday: find largest recurring income, compute days until next dueDate.
+  // Use CATEGORY (not description) so EN mode auto-translates ("Plaća" → "Salary").
+  // For HR locative case formatting ("do plaće"), apply runtime case mapping.
+  const HR_LOCATIVE = {
+    "Plaća": "plaće",
+    "Uplata": "uplate",
+    "Ostali primici": "sljedećeg primitka",
+  };
   const nextPayday = (() => {
     const recInc = lists.recurring_income || [];
     if (recInc.length === 0) return null;
     // Find largest by amount
     const biggest = recInc.reduce((best, r) => (parseFloat(r.amount)||0) > (parseFloat(best.amount)||0) ? r : best, recInc[0]);
-    const dDay = Math.max(1, Math.min(28, parseInt(biggest.dueDay)||1));
+    // Field is stored as `dueDate` in RecurringEditor — accept both for backwards compat
+    const dayRaw = biggest.dueDate ?? biggest.dueDay;
+    const dDay = Math.max(1, Math.min(28, parseInt(dayRaw)||1));
     const tDay = today.getDate();
     // Days until next occurrence
     let daysUntil;
@@ -61,7 +70,14 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
       const nextOcc = new Date(today.getFullYear(), today.getMonth()+1, dDay);
       daysUntil = Math.ceil((nextOcc - today) / 86400000);
     }
-    return { name: biggest.description, days: daysUntil, dDay };
+    // Display label:
+    //  - EN: translated category ("Salary", "Deposit") via t()
+    //  - HR: locative form ("plaće", "uplate") for grammatical "do plaće"
+    const cat = biggest.category || "";
+    const label = lang === "en"
+      ? (cat ? t(cat) : t("primitka"))
+      : (HR_LOCATIVE[cat] || cat.toLowerCase() || "sljedećeg primitka");
+    return { name: label, days: daysUntil, dDay };
   })();
 
   const daysLeftYear = (() => { const e=new Date(today.getFullYear(),11,31); return Math.ceil((e-today)/86400000); })();
@@ -124,7 +140,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
     const cy = new Date().getFullYear(), cmi = new Date().getMonth();
     rec.forEach(r => {
       if (recTxsIds.has(r.id)) return;
-      const day = Math.max(1, Math.min(28, parseInt(r.dueDay)||1));
+      const day = Math.max(1, Math.min(28, parseInt(r.dueDate ?? r.dueDay)||1));
       items.push({ kind:"recurring", id:r.id, date:new Date(cy,cmi,day).toISOString().split("T")[0], description:r.description, category:r.category, location:r.location, amount:parseFloat(r.amount)||0, recurring:r });
     });
     // ── Upcoming recurring income ────────────────────────────────────────
@@ -133,7 +149,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
     const todayDate = new Date();
     recInc.forEach(r => {
       if (recIncPaidIds.has(r.id)) return;
-      const day = Math.max(1, Math.min(28, parseInt(r.dueDay)||1));
+      const day = Math.max(1, Math.min(28, parseInt(r.dueDate ?? r.dueDay)||1));
       // If dueDay already passed this month → show next month's occurrence
       let incDate;
       if (day < todayDate.getDate()) {
@@ -173,7 +189,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
   const yy  = now.getFullYear();
   const W   = Math.min(window.innerWidth??480,480)-64;
   const VH  = typeof window !== "undefined" ? Math.min(window.innerHeight || 720, 900) : 720;
-  const todoMaxHeight = Math.max(116, Math.min(238, Math.round(VH * 0.24)));
+  const todoMaxHeight = Math.max(88, Math.min(116, Math.round(VH * 0.13)));
   const dn  = [user.firstName, user.lastName].filter(Boolean).join(" ");
 
   const insightColor = (color) => ({ income:C.income, expense:C.expense, warning:C.warning, accent:C.accent }[color] || C.accent);
@@ -397,7 +413,17 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                       : t("Za platiti")}
                     <span style={{ background:`${C.warning}25`,borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,color:C.warning }}>{todoItems.length}</span>
                   </div>
-                  <div style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.warning }}>{fmt(todoItems.reduce((s,i)=>s+i.amount,0))}</div>
+                  <div style={{ fontSize:12,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",color:C.warning }}>{(() => {
+                    // Sum only items that match the header context:
+                    //  - All items are recurring_income → show income total ("To collect")
+                    //  - Otherwise → show expenses only (recurring_income excluded, since
+                    //    pending income isn't money you owe — it's money you're waiting for).
+                    const allIncome = todoItems.every(i=>i.kind==="recurring_income");
+                    const filtered = allIncome
+                      ? todoItems
+                      : todoItems.filter(i => i.kind !== "recurring_income");
+                    return fmt(filtered.reduce((s,i)=>s+i.amount,0));
+                  })()}</div>
                 </div>
                 {/* Scrollable list — fits ~3.5 items, scrolls if more. Subtle bottom fade hints at more content below. */}
                 <div style={{ position:"relative" }}>
@@ -407,7 +433,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     flexDirection:"column",
                     gap:5,
                     maxHeight: todoMaxHeight,
-                    overflowY: todoItems.length > Math.max(3, Math.floor(todoMaxHeight / 44)) ? "auto" : "visible",
+                    overflowY: todoItems.length > 2 ? "auto" : "visible",
                     overscrollBehavior: "contain",
                     WebkitOverflowScrolling: "touch",
                   }}>
@@ -432,7 +458,7 @@ function Dashboard({ C, data, setTxs, year, user, lists, setPage, setTxFilter, o
                     ))}
                   </div>
                   {/* Bottom fade hint — only when scroll is active */}
-                  {todoItems.length > Math.max(3, Math.floor(todoMaxHeight / 44)) && (
+                  {todoItems.length > 2 && (
                     <div style={{ position:"absolute", left:0, right:0, bottom:0, height:14, pointerEvents:"none", background:`linear-gradient(180deg, transparent 0%, ${C.card} 95%)` }}/>
                   )}
                 </div>

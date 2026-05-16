@@ -396,7 +396,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
           <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:13, padding:13, marginBottom:7 }}>
             <p style={{ fontSize:12, color:C.textMuted, marginBottom:10 }}>{t("Jezik aplikacije")}</p>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:7 }}>
-              {[["hr","Hrvatski"],["en","English"]].map(([id,lb])=>{
+              {[["hr",t("Hrvatski")],["en",t("English")]].map(([id,lb])=>{
                 const a = prefs.lang===id;
                 return <button key={id} onClick={()=>updPrefs({lang:id})} style={{ padding:"10px 6px", borderRadius:11, border:`1.5px solid ${a?C.accent:C.border}`, background:a?`${C.accent}15`:"transparent", color:a?C.accent:C.textMuted, fontSize:12, fontWeight:a?700:500, cursor:"pointer" }}>{lb}</button>;
               })}

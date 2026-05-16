@@ -248,12 +248,36 @@ export const EN_DICT = {
   "Počni pratiti prihode i troškove — to je sve što trebaš na početku.": "Start tracking income and expenses — that is all you need at the beginning.",
   "Postavi cilj štednje": "Set a savings goal",
 
+  // ── v1.3 additions ─────────────────────────────────────────────────────────
+  // RecurringEditor placeholders
+  "Npr. Uplata plaće": "e.g. Salary deposit",
+  "Npr. Kredit": "e.g. Loan",
+  // TxList — missing translations
+  "Filtriraj po iznosu": "Filter by amount",
+  "Filtriraj po kategoriji": "Filter by category",
+  "Od": "From",
+  "Dospjelo": "Overdue",
+  "Savjet: drži duže na ikoni kategorije za vraćanje u Čeka plaćanje": "Tip: long-press the category icon to revert to pending",
+  "odabrano": "selected",
+  "Tap na stavku za odabir": "Tap an item to select",
+  "Jeste li sigurni?": "Are you sure?",
+  "Da!": "Yes!",
+  "Plati sve odabrane?": "Pay all selected?",
+  "Ukloni filtere": "Remove filters",
+  "Duplikat?": "Duplicate?",
+  "filtrirano": "filtered",
+  // Dashboard payday (EN-side helpers when category missing)
+  "primitka": "next payment",
+  // Language toggle: HR shows "Engleski" for EN, EN shows "Croatian" for HR
+  // Already defined above: "Hrvatski": "Croatian", "Engleski": "English"
 };
 
 // ─── HR overrides ─────────────────────────────────────────────────────────────
 // Keys that must stay unchanged in Croatian mode (prevents accidental translation).
 const HR_OVERRIDE = {
   "Primici": "Primici",
+  // Language toggle in HR mode: show "Engleski" (not "English")
+  "English": "Engleski",
 };
 
 // ─── Translation factory ──────────────────────────────────────────────────────
