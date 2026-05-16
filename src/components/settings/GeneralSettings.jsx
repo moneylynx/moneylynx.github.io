@@ -23,6 +23,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
   const importInputRef = useRef(null);
   const [importKey, setImportKey] = useState(0);
   const [exportFallback, setExportFallback] = useState(null);
+  const [dlMsg, setDlMsg] = useState(null); // { ok: bool, text: string }
   const [exportYear, setExportYear] = useState("all");
 
   const [driveStatus, setDriveStatus] = useState(null);
@@ -682,7 +683,7 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                 <h3 style={{ fontSize:16, fontWeight:700, color:C.text, display:"flex", alignItems:"center", gap:8 }}>
                   <Ic n="dl" s={17} c={C.warning}/>{t("Izvezi (Backup)")}
                 </h3>
-                <button onClick={()=>setExportFallback(null)} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:8, padding:6, cursor:"pointer" }}>
+                <button onClick={()=>{ setExportFallback(null); setDlMsg(null); }} style={{ background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:8, padding:6, cursor:"pointer" }}>
                   <Ic n="x" s={14} c={C.textMuted}/>
                 </button>
               </div>
@@ -698,6 +699,11 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
                 onFocus={e=>e.target.select()}
                 style={{ width:"100%", flex:1, minHeight:140, padding:10, background:C.cardAlt, border:`1px solid ${C.border}`, borderRadius:10, color:C.text, fontSize:11, fontFamily:"'JetBrains Mono',monospace", resize:"none", marginBottom:12 }}
               />
+              {dlMsg && (
+                <div style={{ padding:"10px 12px", borderRadius:10, marginBottom:8, background: dlMsg.ok ? `${C.income}15` : `${C.expense}15`, border:`1px solid ${dlMsg.ok ? C.income : C.expense}40`, fontSize:13, fontWeight:600, color: dlMsg.ok ? C.income : C.expense }}>
+                  {dlMsg.text}
+                </div>
+              )}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
                 <button onClick={async ()=>{
                   try {
@@ -722,52 +728,62 @@ function GeneralSettings({ C, txs, setTxs, drafts, lists, setLists, prefs, updPr
 
                 <button onClick={async ()=>{
                   const { filename, content } = exportFallback;
+                  if (isCapacitor()) {
+                    // Capacitor: write to Cache → open native Share.share() sheet
+                    // This is the only reliable way to share files in a Capacitor WebView.
+                    const ok = await nativeSaveAndShare(filename, content);
+                    if (ok) { updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null }); return; }
+                  }
+                  // Web fallback
                   try {
-                    if (typeof File !== "undefined" && typeof navigator !== "undefined" && typeof navigator.canShare === "function") {
+                    if (navigator?.canShare) {
                       const file = new File([content], filename, { type: "application/json" });
                       if (navigator.canShare({ files: [file] })) {
-                        await navigator.share({ files: [file], title: "Moja Lova — Backup", text: filename });
+                        await navigator.share({ files: [file], title: "Backup", text: filename });
                         updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
                         return;
                       }
                     }
-                    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-                      await navigator.share({ title: filename, text: content });
-                      updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
-                      return;
-                    }
-                    alert(t("Dijeljenje nije podržano na ovom uređaju. Koristi Kopiraj ili Preuzmi."));
-                  } catch (shareErr) {
-                    if (shareErr && shareErr.name === "AbortError") return;
-                    alert(t("Dijeljenje nije uspjelo. Koristi Kopiraj ili Preuzmi."));
-                  }
+                    alert(t("Dijeljenje nije podržano. Koristi Kopiraj ili Preuzmi."));
+                  } catch (e) { if (e?.name !== "AbortError") alert(t("Dijeljenje nije uspjelo.")); }
                 }} style={{ padding:12, background:`linear-gradient(135deg,${C.accent},${C.accentDk})`, border:"none", borderRadius:12, color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
                   <Ic n="share" s={14} c="#fff"/>{t("Podijeli")}
                 </button>
 
                 <button onClick={async ()=>{
                   const { filename, content } = exportFallback;
-                  if (isCapacitor()) {
-                    const ok = await nativeSaveAndShare(filename, content);
-                    if (ok) {
-                      updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
+                  setDlMsg(null);
+                  try {
+                    if (isCapacitor()) {
+                      const r = await nativeSaveToDownloads(filename, content);
+                      if (r.ok) {
+                        updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
+                        const loc = r.location || "app storage";
+                        setDlMsg({ ok: true, text: lang === "en"
+                          ? `✅ Saved to ${loc}`
+                          : `✅ Spremljeno u ${loc}` });
+                        return;
+                      }
+                      // Permission denied or write failed
+                      const isPermDenied = r.error === 'permission_denied';
+                      setDlMsg({ ok: false, text: isPermDenied
+                        ? (lang === "en"
+                            ? "❌ Storage permission denied.\n\nTo fix: Settings → Apps → Money Lynx → Permissions → Files → Allow all files access"
+                            : "❌ Dozvola za pohranu odbijena.\n\nIdi u: Postavke → Aplikacije → Moja Lova → Dozvole → Datoteke → Dopusti pristup svim datotekama")
+                        : `❌ ${r.error || "Save failed. Use Copy or Share instead."}` });
                       return;
                     }
-                  }
-                  try {
+                    // Web browser fallback
                     const blob = new Blob([content], { type: "application/json" });
                     const url  = URL.createObjectURL(blob);
                     const a    = document.createElement("a");
-                    a.href = url;
-                    a.download = filename;
-                    a.rel = "noopener";
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
+                    a.href = url; a.download = filename; a.rel = "noopener";
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                     updPrefs({ lastBackupAt: Date.now(), backupSnoozedUntil: null });
-                  } catch {
-                    alert(t("Preuzimanje nije uspjelo. Koristi Kopiraj ili Podijeli."));
+                    setDlMsg({ ok: true, text: lang === "en" ? `✅ Downloaded: ${filename}` : `✅ Preuzeto: ${filename}` });
+                  } catch (e) {
+                    setDlMsg({ ok: false, text: `❌ Error: ${e?.message || "unknown"}` });
                   }
                 }} style={{ padding:12, background:`linear-gradient(135deg,${C.income},#059669)`, border:"none", borderRadius:12, color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
                   <Ic n="dl" s={14} c="#fff"/>{t("Preuzmi")}

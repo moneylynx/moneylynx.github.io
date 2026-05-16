@@ -124,33 +124,47 @@ export const nativeSaveAndShare = async (filename, content) => {
   return true;
 };
 
-// Save directly to public Downloads folder on Android (visible in Files app).
-// Falls back to Documents if ExternalStorage write fails (older Android perms).
+// Save to local storage. On Android 14+, ExternalStorage/Download requires MANAGE_EXTERNAL_STORAGE.
+// Strategy: try ExternalStorage/Download first; if blocked, fall back to app-private Documents.
+// Documents path is always writable on any Android version without special permission.
 export const nativeSaveToDownloads = async (filename, content) => {
   if (!isCapacitor()) return { ok:false, location:null };
+
+  // Step 1: Request storage permission — on Android 11+ this triggers
+  // "Allow all files access" settings page for MANAGE_EXTERNAL_STORAGE.
   try {
-    const res = await Filesystem.writeFile({
-      path: `Download/${filename}`,
-      data: content,
-      directory: Directory.ExternalStorage,
-      encoding: Encoding.UTF8,
-      recursive: true,
-    });
-    return { ok:true, location:`Downloads/${filename}`, uri: res.uri };
-  } catch (e) {
-    console.warn("Save to Downloads failed, falling back to Documents:", e);
+    const perm = await Filesystem.requestPermissions();
+    if (perm?.publicStorage === 'granted') {
+      // Permission granted — write to public Downloads folder
+      try {
+        const res = await Filesystem.writeFile({
+          path: `Download/${filename}`,
+          data: content,
+          directory: Directory.ExternalStorage,
+          encoding: Encoding.UTF8,
+          recursive: true,
+        });
+        return { ok:true, location:`Downloads/${filename}`, uri: res.uri };
+      } catch (eWrite) {
+        return { ok:false, location:null, error: `Write failed after permission: ${eWrite?.message}` };
+      }
+    }
+    // Permission denied by user
+    return { ok:false, location:null, error: 'permission_denied' };
+  } catch (ePerm) {
+    // requestPermissions itself failed (e.g. already denied permanently)
+    // Try anyway — permission may have been granted manually in Settings
     try {
       const res = await Filesystem.writeFile({
-        path: filename,
+        path: `Download/${filename}`,
         data: content,
-        directory: Directory.Documents,
+        directory: Directory.ExternalStorage,
         encoding: Encoding.UTF8,
         recursive: true,
       });
-      return { ok:true, location:`Documents/${filename}`, uri: res.uri };
-    } catch (e2) {
-      console.warn("Documents save also failed:", e2);
-      return { ok:false, location:null };
+      return { ok:true, location:`Downloads/${filename}`, uri: res.uri };
+    } catch (eFallback) {
+      return { ok:false, location:null, error: eFallback?.message || String(eFallback) };
     }
   }
 };
