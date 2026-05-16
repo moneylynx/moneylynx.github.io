@@ -49,16 +49,6 @@ function ProgressBar({ pct, color, height = 6 }) {
   );
 }
 
-function MetricCard({ label, value, sub, color }) {
-  return (
-    <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '10px 12px' }}>
-      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 500, color: color || 'var(--color-text-primary)', fontFamily: "'JetBrains Mono',monospace" }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>{sub}</div>}
-    </div>
-  );
-}
-
 // ── Step detail descriptions (bilingual) ─────────────────────────────────────
 const STEP_DETAILS = [
   {
@@ -199,6 +189,16 @@ What to do:
   },
 ];
 
+function MetricCard({ label, value, sub, color }) {
+  return (
+    <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '10px 12px' }}>
+      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 500, color: color || 'var(--color-text-primary)', fontFamily: "'JetBrains Mono',monospace" }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>{sub}</div>}
+    </div>
+  );
+}
+
 function StepDetailModal({ step, detail, C, t, lang, onClose }) {
   if (!step || !detail) return null;
   const stepNum = step.id + 1;
@@ -247,74 +247,100 @@ function StepDetailModal({ step, detail, C, t, lang, onClose }) {
   );
 }
 
-function StepRow({ step, isCurrent, isDone, progress, t, onSelect }) {
+// ── Redak pojedinog koraka (Cijeli redak je klikabilan gumb, bez "i" kružića) ──
+function StepRow({ step, isCurrent, isDone, progress, t, onSelect, C }) {
+  const [isPressed, setIsPressed] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Boje stanja mapirane iz centralne teme
   const statusColor = isDone
-    ? 'var(--color-text-success)'
+    ? (C.income || 'var(--color-text-success)')
     : isCurrent
-    ? 'var(--color-text-info)'
-    : 'var(--color-text-tertiary)';
-  const bgColor = isDone
-    ? 'var(--color-background-success)'
+    ? (C.accent || 'var(--color-text-info)')
+    : (C.textMuted || 'var(--color-text-tertiary)');
+
+  const statusBg = isDone
+    ? `${C.income}15`
     : isCurrent
-    ? 'var(--color-background-info)'
-    : 'var(--color-background-secondary)';
+    ? `${C.accent}15`
+    : (C.cardAlt || 'var(--color-background-secondary)');
+
   const stepNum = step.id + 1;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-      {/* Clickable icon — visibly framed to indicate tap action */}
-      <button
-        onClick={() => onSelect(step)}
-        title={t('Više o ovom koraku')}
+    <div
+      onClick={() => onSelect(step)}
+      onMouseDown={() => setIsPressed(true)}
+      onMouseUp={() => setIsPressed(false)}
+      onMouseLeave={() => { setIsPressed(false); setIsHovered(false); }}
+      onMouseEnter={() => setIsHovered(true)}
+      onTouchStart={() => setIsPressed(true)}
+      onTouchEnd={() => setIsPressed(false)}
+      title={t('Više o ovom koraku')}
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 14,
+        padding: '12px 10px',
+        borderBottom: `1px solid ${C.border}40`,
+        cursor: 'pointer',
+        borderRadius: 12,
+        backgroundColor: isPressed ? `${C.border}30` : isHovered ? `${C.border}12` : 'transparent',
+        transition: 'background-color 0.2s ease',
+      }}
+    >
+      {/* Vizualni kvadratni Button s 3D efektom sjene (bez "i" kružića) */}
+      <div
         style={{
           position: 'relative',
-          width: 38, height: 38, borderRadius: 10,
-          background: bgColor,
+          width: 38,
+          height: 38,
+          borderRadius: 10,
+          background: statusBg,
           border: `1.5px solid ${statusColor}`,
-          boxShadow: `0 1px 3px ${statusColor}35, inset 0 0 0 1px var(--color-background-primary)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, flexShrink: 0, marginTop: 2,
-          cursor: 'pointer', transition: 'transform .15s, box-shadow .15s', padding: 0,
+          boxShadow: isPressed 
+            ? '0 1px 2px rgba(0,0,0,0.15), inset 0 2px 4px rgba(0,0,0,0.2)' 
+            : '0 3px 6px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 16,
+          flexShrink: 0,
+          marginTop: 2,
+          transition: 'transform .1s cubic-bezier(0.4, 0, 0.2, 1)',
+          transform: isPressed ? 'scale(0.92)' : 'scale(1)',
         }}
-        onTouchStart={e => { e.currentTarget.style.transform='scale(0.92)'; }}
-        onTouchEnd={e => { e.currentTarget.style.transform='scale(1)'; }}
       >
-        {isDone ? '✓' : step.icon}
-        {/* tiny info hint badge in corner so user spots it's tappable */}
-        <span style={{
-          position: 'absolute', top: -4, right: -4,
-          width: 14, height: 14, borderRadius: '50%',
-          background: statusColor, color: '#fff',
-          fontSize: 9, fontWeight: 800,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '1.5px solid var(--color-background-primary)',
-          lineHeight: 1,
-        }}>i</span>
-      </button>
+        <span style={{ color: isDone || isCurrent ? statusColor : C.textMuted, fontWeight: 600 }}>
+          {isDone ? '✓' : step.icon}
+        </span>
+      </div>
+
+      {/* Tekstualni detalji koraka */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: statusColor, minWidth: 20 }}>{stepNum}.</span>
-          <span style={{ fontSize: 14, fontWeight: 500, color: isDone || isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: statusColor, minWidth: 18 }}>{stepNum}.</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: isDone || isCurrent ? C.text : C.textMuted }}>
             {t(step.name)}
           </span>
           {isCurrent && (
-            <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: 'var(--color-background-info)', color: 'var(--color-text-info)' }}>
+            <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: `${C.accent}20`, color: C.accent, fontWeight: 500 }}>
               {t('U tijeku')}
             </span>
           )}
           {isDone && (
-            <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: 'var(--color-background-success)', color: 'var(--color-text-success)' }}>
+            <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: `${C.income}20`, color: C.income, fontWeight: 500 }}>
               {t('Završeno')}
             </span>
           )}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: isCurrent && progress > 0 ? 6 : 0 }}>
+        <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.4, marginBottom: isCurrent && progress > 0 ? 8 : 0 }}>
           {t(step.desc)}
         </div>
         {isCurrent && progress > 0 && (
-          <div>
-            <ProgressBar pct={progress} color="var(--color-border-info)" height={4} />
-            <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 3 }}>{progress}%</div>
+          <div style={{ marginTop: 6 }}>
+            <ProgressBar pct={progress} color={C.accent} height={4} />
+            <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4, fontWeight: 500 }}>{progress}%</div>
           </div>
         )}
       </div>
@@ -482,7 +508,7 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
             <Ic n="chevron-down" s={14} c={C.textMuted} style={{ transform: expandedSection === 'steps' ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}/>
           </button>
           {expandedSection === 'steps' && (
-            <div style={{ padding: '0 16px 12px' }}>
+            <div style={{ padding: '0 10px 12px' }}>
               {STEPS.map(step => (
                 <StepRow
                   key={step.id}
@@ -492,6 +518,7 @@ export function JourneyScreen({ C, txs, lists, prefs, user, setPage, t, lang }) 
                   progress={step.id === currentStep ? stepProgress : 0}
                   t={t}
                   onSelect={setSelectedStep}
+                  C={C}
                 />
               ))}
             </div>
